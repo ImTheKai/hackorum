@@ -1,0 +1,50 @@
+- content_for :title, "IMAP Sync Status"
+
+.container.mt-4
+  .row
+    .col-12
+      .d-flex.justify-content-between.align-items-center.mb-3
+        h1.mb-0 IMAP Sync Status
+        = link_to 'JSON', admin_imap_sync_states_path(format: :json), class: 'btn btn-sm btn-outline-secondary'
+
+      - if @states.empty?
+        .alert.alert-info No IMAP sync state records found.
+      - else
+        .table-responsive
+          table.table.table-striped.table-hover
+            thead.table-dark
+              tr
+                th Label
+                th Last UID
+                th Last Checked
+                th Cycle Started
+                th Cycle ms
+                th Fetched
+                th Ingested
+                th Duplicates
+                th Attachments
+                th Patch Files
+                th Backlog
+                th Err Count
+                th Last Error
+            tbody
+              - @states.each do |s|
+                tr
+                  td= s.mailbox_label
+                  td= s.last_uid
+                  td= s.last_checked_at&.strftime('%Y-%m-%d %H:%M:%S')
+                  td= s.last_cycle_started_at&.strftime('%Y-%m-%d %H:%M:%S')
+                  td= s.last_cycle_duration_ms
+                  td= s.last_fetched_count
+                  td= s.last_ingested_count
+                  td= s.last_duplicate_count
+                  td= s.last_attachment_count
+                  td= s.last_patch_files_count
+                  td= s.last_backlog_count
+                  td= s.consecutive_error_count
+                  td
+                    - if s.last_error.present?
+                      code= s.last_error.truncate(120)
+                    - else
+                      span.text-muted —
+

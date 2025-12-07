@@ -1,0 +1,13 @@
+h1 Set a new password
+
+= form_with url: password_path, method: :patch do
+  = hidden_field_tag :token, @raw
+  .field
+    = label_tag :password
+    = password_field_tag :password
+  .field
+    = label_tag :password_confirmation
+    = password_field_tag :password_confirmation
+  .actions
+    = submit_tag 'Update password'
+

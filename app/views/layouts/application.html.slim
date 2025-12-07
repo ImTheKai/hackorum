@@ -1,0 +1,60 @@
+doctype html
+html
+  head
+    title
+      = content_for(:title) || "Hackorum"
+    meta[name="viewport" content="width=device-width,initial-scale=1"]
+    meta[name="apple-mobile-web-app-capable" content="yes"]
+    meta[name="mobile-web-app-capable" content="yes"]
+    = csrf_meta_tags
+    = csp_meta_tag
+    = yield :head
+    link[rel="icon" href="/icon.png" type="image/png"]
+    link[rel="icon" href="/icon.svg" type="image/svg+xml"]
+    link[rel="apple-touch-icon" href="/icon.png"]
+    = stylesheet_link_tag :app, "data-turbo-track": "reload"
+    = javascript_importmap_tags
+  body
+    - if user_signed_in? && current_user.username.blank?
+      .global-warning
+        span Please set a username in Settings.
+    nav.main-navigation
+      .nav-container
+        .nav-brand
+          = link_to "Hackorum", root_path, class: "brand-link"
+          span.tagline PostgreSQL Hackers Archive
+        .nav-links
+          = link_to "Topics", topics_path, class: "nav-link"
+          = link_to "Search", search_topics_path, class: "nav-link"
+          - if user_signed_in?
+            - unread = activity_unread_count
+            = link_to activities_path, class: "nav-link nav-link-activity" do
+              | Activity
+              - if unread.positive?
+                span.nav-badge = unread
+        .nav-auth
+          - if user_signed_in?
+            - if current_user&.primary_alias
+              span.nav-user = current_user.primary_alias.name
+            = link_to "Settings", settings_path, class: "nav-link"
+            = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }
+          - else
+            = link_to "Sign in", new_session_path, class: "nav-link"
+            = link_to "Register", new_registration_path, class: "nav-link"
+
+    - if content_for?(:sidebar)
+      .page-layout.with-sidebar
+        .layout-sidebar
+          = yield :sidebar
+        main.layout-main
+          - flash.each do |type, message|
+            .flash class=type
+              = message
+          = yield
+    - else
+      main.main-content
+        .container
+          - flash.each do |type, message|
+            .flash class=type
+              = message
+          = yield

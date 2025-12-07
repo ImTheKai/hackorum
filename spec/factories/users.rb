@@ -1,0 +1,6 @@
+FactoryBot.define do
+  factory :user do
+    created_at { 1.month.ago }
+    updated_at { 1.month.ago }
+  end
+end

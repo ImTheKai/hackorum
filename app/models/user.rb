@@ -1,0 +1,43 @@
+class User < ApplicationRecord
+  has_secure_password validations: false
+
+  has_many :aliases
+  has_many :topics, through: :aliases
+  has_many :messages, through: :aliases
+  has_many :identities
+  has_many :team_members
+  has_many :teams, through: :team_members
+  has_many :notes, foreign_key: :author_id
+  has_many :note_edits, foreign_key: :editor_id
+  has_many :activities
+
+  scope :active, -> { where(deleted_at: nil) }
+
+  def primary_alias
+    aliases.find_by(primary_alias: true)
+  end
+
+  validates :username, format: { with: /\A[a-zA-Z0-9_\-\.]+\z/, allow_blank: true }
+  validates :username, presence: true, on: :registration
+
+  before_save :release_old_username_reservation
+  after_commit :reserve_username, on: [:create, :update]
+  after_destroy :release_name_reservation
+
+  private
+
+  def release_old_username_reservation
+    return unless will_save_change_to_username?
+    old_username = username_before_last_save
+    NameReservation.release_for(self) if old_username.present?
+  end
+
+  def reserve_username
+    return if username.blank?
+    NameReservation.reserve!(name: username, owner: self)
+  end
+
+  def release_name_reservation
+    NameReservation.release_for(self)
+  end
+end

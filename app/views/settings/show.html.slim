@@ -1,0 +1,68 @@
+- content_for :title, "Settings"
+
+.settings-page
+  h1 Settings
+
+  .settings-section
+    h2 Username
+    - if current_user.username.blank?
+      .settings-warning You have no username set. Please choose one.
+    = form_with model: current_user, url: username_path, method: :patch, local: true do |f|
+      .form-group
+        = f.label :username
+        = f.text_field :username, placeholder: "your_name", value: current_user.username
+      = f.submit "Save username", class: "button-primary"
+
+  .settings-section
+    h2 Change password
+    = form_with url: update_current_password_path, method: :patch, local: true do
+      - if current_user.password_digest.present?
+        .form-group
+          = label_tag :current_password, "Current password"
+          = password_field_tag :current_password, nil, required: true
+      .form-group
+        = label_tag :password, "New password"
+        = password_field_tag :password, nil, required: true
+      .form-group
+        = label_tag :password_confirmation, "Confirm new password"
+        = password_field_tag :password_confirmation, nil, required: true
+      = submit_tag "Update password", class: "button-primary"
+
+  .settings-section
+    h2 Email addresses
+    = form_with url: emails_path, method: :post, local: true, class: "email-form" do |f|
+      .form-group
+        = f.label :email, "Add email"
+        = f.email_field :email, required: true, placeholder: "user@example.com"
+      = f.submit "Send verification", class: "button-primary"
+
+    - if @aliases.any?
+      table.email-table
+        thead
+          tr
+            th Email
+            th Verified
+            th Primary
+            th Actions
+        tbody
+          - @aliases.each do |al|
+            tr
+              td = al.email
+              td = al.verified_at ? "Yes" : "No"
+              td = al.primary_alias? ? "Yes" : "No"
+              td
+                - unless al.primary_alias?
+                  = button_to "Make primary", primary_email_path(al), method: :post, class: "button-secondary"
+                - unless al.primary_alias?
+                  = button_to "Remove", email_path(al), method: :delete, data: { turbo_confirm: "Remove this email?" }, class: "button-danger"
+    - else
+      p No emails yet.
+
+  .settings-section
+    h2 Danger zone
+    p Deleting your account will remove your data. This cannot be undone.
+    = link_to "Delete account", new_account_deletion_path, class: "button-danger"
+
+  .settings-section
+    h2 Teams
+    = link_to "Manage teams", teams_path, class: "button-secondary"

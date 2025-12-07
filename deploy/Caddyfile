@@ -1,0 +1,10 @@
+{
+  email you@example.com
+}
+
+hackorum.example.com {
+  reverse_proxy web:3000
+  log {
+    output stdout
+  }
+}

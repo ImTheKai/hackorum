@@ -1,0 +1,137 @@
+- content_for :title, @topic.title
+
+- content_for :sidebar do
+  .sidebar
+    .sidebar-section
+      h3.sidebar-heading Participants
+      - if @participants.present?
+        .participants-list
+          - max_participants = 12
+          - @participants.first(max_participants).each do |participant|
+            - alias_record = participant[:alias]
+            - badge_text = alias_record.contributor_badge
+            - avatar_classes = ["participant-avatar"]
+            - avatar_classes << "is-core-team" if alias_record.core_team?
+            - avatar_classes << "is-committer" if !alias_record.core_team? && alias_record.committer?
+            - avatar_classes << "is-major-contributor" if !alias_record.core_team? && !alias_record.committer? && alias_record.major_contributor?
+            - avatar_classes << "is-significant-contributor" if !alias_record.core_team? && !alias_record.committer? && !alias_record.major_contributor? && alias_record.significant_contributor?
+            - avatar_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
+            - row_classes = ["participant-row"]
+            - row_classes << "is-core-team" if alias_record.core_team?
+            - row_classes << "is-committer" if alias_record.committer?
+            - row_classes << "is-major-contributor" if alias_record.major_contributor?
+            - row_classes << "is-significant-contributor" if alias_record.significant_contributor?
+            - row_classes << "is-past-contributor" if alias_record.contributor&.past_contributor?
+            - tooltip = "#{participant[:message_count]} messages, last #{smart_time_display(participant[:last_at])}"
+            .participant-row class=row_classes.join(" ") title=tooltip
+              = image_tag alias_record.gravatar_url(size: 40), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
+              .participant-details
+                .participant-name = alias_record.name
+          - if @participants.size > max_participants
+            .participant-more "+ #{(@participants.size - max_participants)} more"
+      - else
+        p No participants yet
+
+    .sidebar-section
+      h3.sidebar-heading Thread Outline
+      - if @thread_outline.present?
+        .thread-outline
+          - @thread_outline.chunk_while { |a, b| a[:branch_segment_index] == b[:branch_segment_index] }.each do |segment|
+            - first = segment.first
+            - first_msg = first[:message]
+            - segment_size = segment.size
+            - is_reply = first_msg.reply_to_id.present?
+            - branch_class = "branch-#{first[:branch_index]}"
+            - can_toggle = @has_multiple_branches && segment_size > 1
+            - details_classes = ["branch-details", branch_class, ("reply" if is_reply)].compact.join(" ")
+            - details_open = !@has_multiple_branches
+            - indent_px = first[:branch_depth].to_i * 10
+            - first_num = segment.first[:message_number]
+            - last_num = segment.last[:message_number]
+            - number_range = first_num == last_num ? "##{first_num}" : "##{first_num}...##{last_num}"
+            - participants = segment.map { |entry| entry[:message].sender }.uniq(&:id).first(6)
+            - if can_toggle
+              details class=details_classes open=(details_open ? true : nil) style="margin-left: #{indent_px}px"
+                summary class="outline-summary" title="Toggle branch with #{segment_size} messages"
+                  .outline-content
+                    .outline-meta
+                      span.outline-number = number_range
+                      .outline-avatars
+                        - participants.each do |participant|
+                          = image_tag participant.gravatar_url(size: 24), class: "outline-avatar", alt: participant.name, title: participant.name
+                      - if is_reply
+                        span.outline-icon ↳
+                      span.branch-toggle = "▸"
+                      - if is_reply && first_msg.reply_to
+                        - parent_num = @message_numbers[first_msg.reply_to.id]
+                        span.outline-parent = "to #{first_msg.reply_to.sender.name} (##{parent_num})"
+                    .outline-time = smart_time_display(first_msg.created_at)
+                - segment.each do |entry|
+                  - msg = entry[:message]
+                  - is_reply = msg.reply_to_id.present?
+                  - branch_class = "branch-#{entry[:branch_index]}"
+                  - item_indent = entry[:branch_depth].to_i * 10
+                  = link_to "#message-#{msg.id}", class: ["outline-item", ("reply" if is_reply), branch_class, ("branch-start" if entry[:branch_start])].compact.join(" ") do
+                    .outline-content
+                      .outline-meta
+                        span.outline-number = "##{entry[:message_number]}"
+                        = image_tag msg.sender.gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                        - if is_reply
+                          span.outline-icon ↳
+                        span.outline-author = msg.sender.name
+                        - if is_reply && msg.reply_to
+                          - parent_num = @message_numbers[msg.reply_to.id]
+                          span.outline-parent = "to #{msg.reply_to.sender.name} (##{parent_num})"
+                      .outline-time = smart_time_display(msg.created_at)
+            - else
+              - segment.each do |entry|
+                - msg = entry[:message]
+                - is_reply = msg.reply_to_id.present?
+                - branch_class = "branch-#{entry[:branch_index]}"
+                - item_indent = entry[:branch_depth].to_i * 10
+                = link_to "#message-#{msg.id}", class: ["outline-item", ("reply" if is_reply), branch_class, ("branch-start" if entry[:branch_start])].compact.join(" "), style: "margin-left: #{item_indent}px" do
+                  .outline-content
+                    .outline-meta
+                      span.outline-number = "##{entry[:message_number]}"
+                      = image_tag msg.sender.gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                      - if is_reply
+                        span.outline-icon ↳
+                      span.outline-author = msg.sender.name
+                      - if is_reply && msg.reply_to
+                        - parent_num = @message_numbers[msg.reply_to.id]
+                        span.outline-parent = "to #{msg.reply_to.sender.name} (##{parent_num})"
+                    .outline-time = smart_time_display(msg.created_at)
+      - else
+        p No messages yet
+
+.topic-header
+  .topic-title-section
+    h1 = @topic.title
+    .topic-meta
+      span.creator Started by #{@topic.creator.name}
+      span.date #{time_ago_in_words(@topic.created_at)} ago
+      span.message-count #{@messages.size} messages
+
+- if user_signed_in?
+  - thread_notes = @notes_by_message&.[](:thread) || []
+  .thread-notes-container
+    = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes
+
+.view-toggle-bar
+  .view-toggle-group
+    = link_to "Threaded", topic_path(@topic, view: "threaded"), class: ["toggle-btn", ("active" if @view_mode == "threaded")].compact.join(" ")
+    = link_to "Flat", topic_path(@topic, view: "flat"), class: ["toggle-btn", ("active" if @view_mode == "flat")].compact.join(" ")
+  .view-toggle-group
+    = link_to "Oldest First", topic_path(@topic, view: @view_mode, sort: "asc"), class: ["toggle-btn", ("active" if @sort_order == :asc)].compact.join(" ")
+    = link_to "Newest First", topic_path(@topic, view: @view_mode, sort: "desc"), class: ["toggle-btn", ("active" if @sort_order == :desc)].compact.join(" ")
+
+.messages-container class=(["messages-container", @view_mode, (@sort_order == :desc ? "desc" : "asc")].compact.join(" "))
+  - if user_signed_in?
+    .thread-actions data-controller="thread-actions" data-thread-actions-topic-id-value=@topic.id data-thread-actions-read-all-url-value=read_all_topic_path(@topic, format: :json)
+      button.button-secondary data-action="click->thread-actions#markAllRead" Mark all messages read
+
+  - @messages.each do |message|
+    = render 'message', message: message, view_mode: 'flat', number: @message_numbers[message.id]
+
+.topic-navigation
+  = link_to "← Back to Topics", topics_path, class: "back-link"

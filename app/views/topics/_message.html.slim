@@ -1,0 +1,57 @@
+.message-card id=message_dom_id(message) class=("reply-message" if message.reply_to_id)
+  - if (mid_anchor = message_id_anchor(message))
+    a.message-id-anchor id=mid_anchor aria-hidden="true"
+  - display_number = number || (@message_numbers && @message_numbers[message.id])
+  - is_read = defined?(@read_message_ids) && @read_message_ids[message.id]
+  - if user_signed_in?
+    - read_data = { controller: "read-status", "read-status-message-id-value": message.id, "read-status-read-url-value": read_message_path(message, format: :json), "read-status-delay-seconds-value": read_visibility_seconds }
+    - read_classes = ["message-content", ("is-read" if is_read)].compact
+  - else
+    - read_data = {}
+    - read_classes = ["message-content"]
+  .message-header
+    .message-author
+      .author-row
+        span.message-number = "##{display_number}"
+        = image_tag message.sender.gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
+        .author-details
+          .author-name = message.sender.name
+          .author-email = message.sender.email
+    .message-meta
+      .message-date
+        time datetime=message.created_at.iso8601 title=message.created_at.strftime("%B %d, %Y at %I:%M %p")
+          = time_ago_in_words(message.created_at)
+          |  ago
+      - if message.reply_to
+        - parent_number = (@message_numbers && @message_numbers[message.reply_to.id]) || "-"
+        .reply-indicator
+          span.reply-to In reply to: #{message.reply_to.sender.name} (##{parent_number})
+      - if message.attachments.any?
+        .attachment-indicator
+          span.attachment-count #{message.attachments.size} attachment(s)
+
+  .message-content class=read_classes.join(" ") data=read_data
+    - if message.subject != @topic.title && message.subject.present?
+      .message-subject = message.subject
+    
+    .message-body
+      = render_message_body(message.body)
+    
+    - if message.attachments.any?
+      .message-attachments
+        h4 Attachments:
+        - message.attachments.each do |attachment|
+          .attachment
+            .attachment-info
+              span.filename = attachment.file_name
+              span.content-type = attachment.content_type if attachment.content_type
+
+  - if message.import_log.present?
+    .import-metadata
+      details
+        summary Import Notes
+        pre.import-log = message.import_log
+
+  - notes_for_message = @notes_by_message&.[](message.id) || []
+  - if user_signed_in?
+    = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message

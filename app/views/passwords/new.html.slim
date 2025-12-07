@@ -1,0 +1,9 @@
+h1 Reset password
+
+= form_with url: password_path, method: :post do
+  .field
+    = label_tag :email
+    = email_field_tag :email
+  .actions
+    = submit_tag 'Send reset link'
+

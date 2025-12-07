@@ -1,0 +1,54 @@
+- content_for :title, "Search Results"
+
+- content_for :sidebar do
+  .sidebar
+    .sidebar-section
+      h3.sidebar-heading Search
+      .sidebar-search
+        = form_with url: search_topics_path, method: :get, local: true do |f|
+          = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: @query
+          = f.submit "Search", class: "search-button"
+
+    - if @query.present? && @topics.any?
+      .sidebar-section
+        h3.sidebar-heading Results
+        .sidebar-stat
+          span.stat-label Matching Topics
+          span.stat-value = @topics.size
+
+      .sidebar-section
+        h3.sidebar-heading Scroll
+        p Scroll down to load more
+
+#new-topics-banner
+  = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: search_topics_path(q: @query) }
+
+- if @query.present?
+  - if @topics.any?
+    .topics-table
+      table
+        thead
+          tr
+            th Topic
+            th Participants
+            th Replies
+            th Activity
+        tbody#topics
+          = render partial: "topics", locals: { topics: @topics }
+
+      - if @topics.size == 25
+        - last_topic = @topics.last
+        - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"
+        = turbo_frame_tag "pagination", src: search_topics_path(q: @query, cursor: cursor, viewing_since: @viewing_since.iso8601, format: :turbo_stream), loading: :lazy do
+          .loading-indicator Loading more results...
+  - else
+    .no-results
+      h3 No results found
+      p Try different search terms or browse all topics
+      = link_to "Browse All Topics", topics_path, class: "browse-link"
+
+- else
+  .search-help
+    h3 Search the PostgreSQL Hackers Archive
+    p Enter keywords to search through topic titles and message content
+    = link_to "Browse All Topics", topics_path, class: "browse-link"

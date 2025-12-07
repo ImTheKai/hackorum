@@ -1,0 +1,69 @@
+- content_for :title, "PostgreSQL Hackers Archive"
+
+- content_for :sidebar do
+  .sidebar
+    .sidebar-section
+      h3.sidebar-heading Search
+      .sidebar-search
+        = form_with url: search_topics_path, method: :get, local: true do |f|
+          = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: params[:q]
+          = f.submit "Search", class: "search-button"
+
+    .sidebar-section
+      h3.sidebar-heading Scroll
+      p Scroll down to load more
+
+    .sidebar-section
+      h3.sidebar-heading Quick filters
+      ul.quick-filters
+        li = link_to "No contributor/committer replies", topics_path(filter: "no_contrib_replies")
+        li = link_to "Patch, no replies", topics_path(filter: "patch_no_replies")
+        - if user_signed_in?
+          li = link_to "Reading in progress", topics_path(filter: "reading_incomplete")
+          li = link_to "New for me", topics_path(filter: "new_for_me")
+          li = link_to "Started by me", topics_path(filter: "started_by_me")
+          li = link_to "I posted here", topics_path(filter: "messaged_by_me")
+          - current_user.teams.each do |team|
+            li = link_to "#{team.name}: not yet read by team", topics_path(filter: "team_unread", team_id: team.id)
+            li = link_to "#{team.name}: my teammates are reading", topics_path(filter: "team_reading_others", team_id: team.id)
+            li = link_to "#{team.name}: my team is reading", topics_path(filter: "team_reading_any", team_id: team.id)
+            li = link_to "#{team.name}: started by teammate", topics_path(filter: "team_started", team_id: team.id)
+            li = link_to "#{team.name}: messages by teammates", topics_path(filter: "team_messaged", team_id: team.id)
+    - if user_signed_in? && @available_note_tags.present?
+      .sidebar-section
+        h3.sidebar-heading My tags
+        ul.quick-filters
+          - @available_note_tags.each do |tag, count|
+            li = link_to "##{tag} (#{count})", topics_path(note_tag: tag)
+
+
+#new-topics-banner
+  = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since }
+
+- if @active_note_tag.present?
+  .tag-filter-banner
+    span Filtering by ##{@active_note_tag}
+    = link_to "Clear", topics_path, class: "clear-tag-filter"
+
+.topics-table
+  - if user_signed_in?
+    .topics-actions data-controller="topics-aware" data-topics-aware-aware-url-value=aware_bulk_topics_path data-topics-aware-aware-all-url-value=aware_all_topics_path
+      button.mark-aware-button data-action="click->topics-aware#markVisibleAware" Mark displayed threads aware
+      button.mark-aware-button.secondary data-action="click->topics-aware#markAllAware" Mark everything up to now aware
+
+  table
+    thead
+      tr
+        th Topic
+        th Participants
+        th Replies / Activity
+        - if user_signed_in?
+          th Status
+    tbody#topics
+      = render partial: "topics", locals: { topics: @topics }
+
+  - if @topics.size == 25
+    - last_topic = @topics.last
+    - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"
+    = turbo_frame_tag "pagination", src: topics_path(cursor: cursor, viewing_since: @viewing_since.iso8601, format: :turbo_stream), loading: :lazy do
+      .loading-indicator Loading more topics...

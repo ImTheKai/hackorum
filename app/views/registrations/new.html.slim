@@ -1,0 +1,23 @@
+h1 Register
+
+p Enter your email. If it's in the archive, we'll verify and attach it. Otherwise, we'll create a new alias.
+
+= form_with url: registration_path, method: :post do |f|
+  .field
+    = label_tag :email
+    = email_field_tag :email, nil, required: true, placeholder: "you@example.com"
+  .field
+    = label_tag :name, 'Alias name (for new email)'
+    = text_field_tag :name, nil, placeholder: "Your display name"
+  .field
+    = label_tag :username, 'Username'
+    = text_field_tag :username, nil, placeholder: "username", pattern: "[A-Za-z0-9_.-]+", required: true
+    small Allowed: letters, numbers, _, -, .
+  .field
+    = label_tag :password, 'Password'
+    = password_field_tag :password, nil, placeholder: "Password", required: true
+  .field
+    = label_tag :password_confirmation, 'Confirm password'
+    = password_field_tag :password_confirmation, nil, placeholder: "Confirm password", required: true
+  .actions
+    = submit_tag 'Send verification email'

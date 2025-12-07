@@ -1,0 +1,318 @@
+# This file is auto-generated from the current state of the database. Instead
+# of editing this file, please use the migrations feature of Active Record to
+# incrementally modify your database, and then regenerate this schema definition.
+#
+# This file is the source Rails uses to define your schema when running `bin/rails
+# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
+# be faster and is potentially less error prone than running all of your
+# migrations from scratch. Old migrations may fail to apply correctly if those
+# migrations use external dependencies or application code.
+#
+# It's strongly recommended that you check this file into your version control system.
+
+ActiveRecord::Schema[8.0].define(version: 2025_12_07_120000) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
+  # Custom types defined in this database.
+  # Note that some types may not work with other database engines. Be careful if changing database.
+  create_enum "contributor_type", ["core_team", "committer", "major_contributor", "significant_contributor", "past_major_contributor", "past_significant_contributor"]
+  create_enum "team_member_role", ["member", "admin"]
+
+  create_table "activities", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "activity_type", null: false
+    t.string "subject_type", null: false
+    t.bigint "subject_id", null: false
+    t.jsonb "payload"
+    t.datetime "read_at"
+    t.boolean "hidden", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["subject_type", "subject_id"], name: "index_activities_on_subject_type_and_subject_id"
+    t.index ["user_id", "id"], name: "index_activities_on_user_id_and_id"
+    t.index ["user_id", "read_at"], name: "index_activities_on_user_id_and_read_at"
+    t.index ["user_id"], name: "index_activities_on_user_id"
+  end
+
+  create_table "aliases", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "name", null: false
+    t.string "email", null: false
+    t.boolean "primary_alias", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "verified_at"
+    t.index "lower(TRIM(BOTH FROM email))", name: "index_aliases_on_lower_trim_email"
+    t.index ["name", "email"], name: "index_aliases_on_name_and_email", unique: true
+    t.index ["user_id"], name: "index_aliases_on_user_id"
+  end
+
+  create_table "aliases_contributors", force: :cascade do |t|
+    t.bigint "alias_id", null: false
+    t.bigint "contributor_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["alias_id", "contributor_id"], name: "index_alias_contributors_unique", unique: true
+    t.index ["alias_id"], name: "index_aliases_contributors_on_alias_id"
+    t.index ["contributor_id"], name: "index_aliases_contributors_on_contributor_id"
+  end
+
+  create_table "attachments", force: :cascade do |t|
+    t.bigint "message_id", null: false
+    t.string "file_name", null: false
+    t.string "content_type"
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_attachments_on_message_id"
+  end
+
+  create_table "contributors", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "email"
+    t.enum "contributor_type", null: false, enum_type: "contributor_type"
+    t.string "profile_url"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contributor_type"], name: "index_contributors_on_contributor_type"
+    t.index ["email"], name: "index_contributors_on_email"
+  end
+
+  create_table "identities", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "provider", null: false
+    t.string "uid", null: false
+    t.string "email"
+    t.text "raw_info"
+    t.datetime "last_used_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower(TRIM(BOTH FROM email))", name: "index_identities_on_lower_trim_email"
+    t.index ["provider", "uid"], name: "index_identities_on_provider_and_uid", unique: true
+    t.index ["user_id"], name: "index_identities_on_user_id"
+  end
+
+  create_table "imap_sync_states", force: :cascade do |t|
+    t.string "mailbox_label", default: "INBOX", null: false
+    t.bigint "last_uid", default: 0, null: false
+    t.datetime "last_checked_at"
+    t.text "last_error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "last_cycle_started_at"
+    t.integer "last_cycle_duration_ms"
+    t.integer "last_fetched_count"
+    t.integer "last_ingested_count"
+    t.integer "last_duplicate_count"
+    t.integer "last_attachment_count"
+    t.integer "last_patch_files_count"
+    t.integer "last_backlog_count"
+    t.integer "consecutive_error_count", default: 0, null: false
+    t.string "last_error_class"
+    t.integer "backoff_seconds"
+    t.index ["mailbox_label"], name: "index_imap_sync_states_on_mailbox_label", unique: true
+  end
+
+  create_table "mentions", force: :cascade do |t|
+    t.bigint "message_id", null: false
+    t.bigint "alias_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["alias_id"], name: "index_mentions_on_alias_id"
+    t.index ["message_id"], name: "index_mentions_on_message_id"
+  end
+
+  create_table "message_read_ranges", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.bigint "range_start_message_id", null: false
+    t.bigint "range_end_message_id", null: false
+    t.datetime "read_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_message_read_ranges_on_topic_id"
+    t.index ["user_id", "topic_id", "range_start_message_id", "range_end_message_id"], name: "index_message_read_ranges_on_user_topic_range"
+    t.index ["user_id"], name: "index_message_read_ranges_on_user_id"
+  end
+
+  create_table "messages", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "sender_id", null: false
+    t.bigint "reply_to_id"
+    t.string "subject", null: false
+    t.string "message_id"
+    t.text "body", null: false
+    t.text "import_log"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_messages_on_message_id", unique: true
+    t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
+    t.index ["sender_id"], name: "index_messages_on_sender_id"
+    t.index ["topic_id"], name: "index_messages_on_topic_id"
+  end
+
+  create_table "name_reservations", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "owner_type", null: false
+    t.bigint "owner_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_name_reservations_on_name", unique: true
+    t.index ["owner_type", "owner_id"], name: "index_name_reservations_on_owner_type_and_owner_id"
+  end
+
+  create_table "note_edits", force: :cascade do |t|
+    t.bigint "note_id", null: false
+    t.bigint "editor_id", null: false
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["editor_id"], name: "index_note_edits_on_editor_id"
+    t.index ["note_id"], name: "index_note_edits_on_note_id"
+  end
+
+  create_table "note_mentions", force: :cascade do |t|
+    t.bigint "note_id", null: false
+    t.string "mentionable_type", null: false
+    t.bigint "mentionable_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mentionable_type", "mentionable_id"], name: "index_note_mentions_on_mentionable_type_and_mentionable_id"
+    t.index ["note_id", "mentionable_type", "mentionable_id"], name: "index_note_mentions_unique", unique: true
+    t.index ["note_id"], name: "index_note_mentions_on_note_id"
+  end
+
+  create_table "note_tags", force: :cascade do |t|
+    t.bigint "note_id", null: false
+    t.string "tag", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["note_id", "tag"], name: "index_note_tags_on_note_id_and_tag", unique: true
+    t.index ["note_id"], name: "index_note_tags_on_note_id"
+    t.index ["tag"], name: "index_note_tags_on_tag"
+  end
+
+  create_table "notes", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "message_id"
+    t.bigint "author_id", null: false
+    t.bigint "last_editor_id"
+    t.text "body", null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_notes_on_author_id"
+    t.index ["last_editor_id"], name: "index_notes_on_last_editor_id"
+    t.index ["message_id"], name: "index_notes_on_message_id"
+    t.index ["topic_id"], name: "index_notes_on_topic_id"
+  end
+
+  create_table "patch_files", force: :cascade do |t|
+    t.bigint "attachment_id", null: false
+    t.string "filename", null: false
+    t.string "status"
+    t.integer "line_changes"
+    t.string "old_filename"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["attachment_id", "filename"], name: "index_patch_files_on_attachment_id_and_filename", unique: true
+    t.index ["attachment_id"], name: "index_patch_files_on_attachment_id"
+    t.index ["filename"], name: "index_patch_files_on_filename"
+  end
+
+  create_table "team_members", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "user_id", null: false
+    t.enum "role", default: "member", null: false, enum_type: "team_member_role"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id", "user_id"], name: "index_team_members_on_team_id_and_user_id", unique: true
+    t.index ["team_id"], name: "index_team_members_on_team_id"
+    t.index ["user_id"], name: "index_team_members_on_user_id"
+  end
+
+  create_table "teams", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "thread_awarenesses", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.bigint "aware_until_message_id", null: false
+    t.datetime "aware_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_thread_awarenesses_on_topic_id"
+    t.index ["user_id", "topic_id"], name: "index_thread_awarenesses_on_user_id_and_topic_id", unique: true
+    t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
+  end
+
+  create_table "topics", force: :cascade do |t|
+    t.string "title", null: false
+    t.bigint "creator_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["creator_id"], name: "index_topics_on_creator_id"
+  end
+
+  create_table "user_tokens", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "email"
+    t.string "purpose", null: false
+    t.string "token_digest", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "consumed_at"
+    t.text "metadata"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower(TRIM(BOTH FROM email))", name: "index_user_tokens_on_lower_trim_email"
+    t.index ["consumed_at"], name: "index_user_tokens_on_consumed_at"
+    t.index ["purpose"], name: "index_user_tokens_on_purpose"
+    t.index ["token_digest"], name: "index_user_tokens_on_token_digest"
+    t.index ["user_id"], name: "index_user_tokens_on_user_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "aware_before"
+    t.string "username"
+    t.string "password_digest"
+    t.boolean "admin", default: false, null: false
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_users_on_deleted_at"
+    t.index ["username"], name: "index_users_on_username", unique: true
+  end
+
+  add_foreign_key "activities", "users"
+  add_foreign_key "aliases", "users"
+  add_foreign_key "aliases_contributors", "aliases"
+  add_foreign_key "aliases_contributors", "contributors"
+  add_foreign_key "attachments", "messages"
+  add_foreign_key "identities", "users"
+  add_foreign_key "mentions", "aliases"
+  add_foreign_key "mentions", "messages"
+  add_foreign_key "message_read_ranges", "topics"
+  add_foreign_key "message_read_ranges", "users"
+  add_foreign_key "messages", "aliases", column: "sender_id"
+  add_foreign_key "messages", "messages", column: "reply_to_id"
+  add_foreign_key "messages", "topics"
+  add_foreign_key "note_edits", "notes"
+  add_foreign_key "note_edits", "users", column: "editor_id"
+  add_foreign_key "note_mentions", "notes"
+  add_foreign_key "note_tags", "notes"
+  add_foreign_key "notes", "messages"
+  add_foreign_key "notes", "topics"
+  add_foreign_key "notes", "users", column: "author_id"
+  add_foreign_key "notes", "users", column: "last_editor_id"
+  add_foreign_key "patch_files", "attachments"
+  add_foreign_key "team_members", "teams"
+  add_foreign_key "team_members", "users"
+  add_foreign_key "thread_awarenesses", "topics"
+  add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topics", "aliases", column: "creator_id"
+  add_foreign_key "user_tokens", "users"
+end

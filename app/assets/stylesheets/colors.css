@@ -1,0 +1,41 @@
+
+
+:root {
+  /* https://paletton.com/#uid=63S0u0kaVz84jP27qHbeJtFiHpX */
+  --color-primary-1: #C6CBE1;
+  --color-primary-2: #A3ABCD;
+  --color-primary-3: #8089B6;
+  --color-primary-4: #696CA1;
+  --color-primary-5: #45528D;
+
+  --color-secondary1-1: #CFC6E1;
+  --color-secondary1-2: #B0A2CD;
+  --color-secondary1-3: #917EB6;
+  --color-secondary1-4: #755FA2;
+  --color-secondary1-5: #5B438D;
+
+  --color-secondary2-1: #BFD4DB;
+  --color-secondary2-2: #98B9C4;
+  --color-secondary2-3: #719BA9;
+  --color-secondary2-4: #528394;
+  --color-secondary2-5: #396F81;
+
+  /* Color Palette - Grays */
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #374151;
+  --color-gray-800: #1e293b;
+  --color-gray-900: #0f172a;
+
+  --color-bg-page: var(--color-primary-1);
+  --color-bg-container: var(--color-primary-4);
+  --color-bg-nav: var(--color-primary-3);
+  --color-border: var(--color-primary-5);
+  --color-bg-button: var(--color-secondary2-2);
+  --color-bg-button-hover: var(--color-secondary2-1);
+}

@@ -1,0 +1,5 @@
+- if count > 0
+  - refresh_path = local_assigns[:refresh_path] || topics_path
+  .new-topics-banner
+    = link_to refresh_path, class: "new-topics-link" do
+      | ↻ #{count} #{'topic'.pluralize(count)} updated or added - Click to refresh

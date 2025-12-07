@@ -1,0 +1,20 @@
+- submit_label = local_assigns[:submit_text] || (defined?(note) && note&.persisted? ? "Update note" : "Add note")
+- form_note = local_assigns[:note] || Note.new(topic: topic, message: message)
+- note_error = flash[:note_error]&.with_indifferent_access
+
+- prefill_body = form_note.body
+- if note_error
+  - matches_note = note_error[:note_id].present? && form_note.persisted? && form_note.id == note_error[:note_id].to_i
+  - matches_new_note = !form_note.persisted? && note_error[:topic_id].to_i == topic.id && note_error[:message_id].to_s == message&.id.to_s
+  - if matches_note || matches_new_note
+    - prefill_body = note_error[:body]
+
+= form_with model: form_note, url: form_note.persisted? ? note_path(form_note) : notes_path, method: form_note.persisted? ? :patch : :post, data: { turbo: true } do |f|
+  = hidden_field_tag "note[topic_id]", topic.id
+  = hidden_field_tag "note[message_id]", message&.id
+  .note-field
+    = f.text_area :body, rows: 3, placeholder: "Add a note with @mentions and #tags…", required: true, class: "note-textarea", value: prefill_body
+    - if note_error && prefill_body == note_error[:body]
+      .note-error = note_error[:error]
+  .note-actions
+    = f.submit submit_label, class: "button-secondary"

@@ -1,0 +1,88 @@
+/*
+ * Topic Participants Component
+ * Shows avatars of people who participated in a discussion
+ */
+
+.topic-participants {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: nowrap;
+}
+
+.participants-avatars {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.participant-avatar {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-full);
+  border: 2px solid var(--color-bg-card);
+  object-fit: cover;
+  margin-left: -8px;
+  transition: transform var(--transition-fast), z-index 0s;
+  position: relative;
+  flex-shrink: 0;
+  display: block;
+
+  &:hover {
+    transform: translateY(-2px) scale(1.1);
+    z-index: 10;
+    cursor: pointer;
+  }
+
+  &:first-child {
+    margin-left: 0;
+  }
+}
+
+.participant-avatar.is-creator {
+  border-color: var(--color-primary-500);
+}
+
+.participant-avatar.is-last-poster {
+  border-color: var(--color-success);
+}
+
+/* Contributor status borders */
+.participant-avatar.is-core-team {
+  border-color: #ff0080;
+  border-width: 3px;
+  box-shadow: 0 0 0 1px #ff0080;
+}
+
+.participant-avatar.is-committer {
+  border-color: #8b5cf6;
+  border-width: 3px;
+}
+
+.participant-avatar.is-major-contributor {
+  border-color: #f59e0b;
+  border-width: 2px;
+}
+
+.participant-avatar.is-significant-contributor {
+  border-color: #10b981;
+  border-width: 2px;
+}
+
+.participant-avatar.is-past-contributor {
+  border-color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+.participants-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--spacing-1);
+}
+
+/* Tooltip on hover */
+.participant-avatar[title] {
+  cursor: help;
+}

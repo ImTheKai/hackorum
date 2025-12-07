@@ -1,0 +1,41 @@
+/*
+ * Avatar Component
+ */
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.avatar {
+  width: var(--avatar-size-default);
+  height: var(--avatar-size-default);
+  border-radius: var(--border-radius-full);
+  object-fit: cover;
+  border: var(--border-width-thick) solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.avatar-small {
+  width: var(--avatar-size-md);
+  height: var(--avatar-size-md);
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-tight);
+}
+
+.user-time {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+}

@@ -4,7 +4,6 @@
  */
 
 .topic-participants {
-  display: flex;
   align-items: center;
   gap: var(--spacing-2);
   flex-wrap: nowrap;
@@ -40,15 +39,6 @@
   }
 }
 
-.participant-avatar.is-creator {
-  border-color: var(--color-primary-500);
-}
-
-.participant-avatar.is-last-poster {
-  border-color: var(--color-success);
-}
-
-/* Contributor status borders */
 .participant-avatar.is-core-team {
   border-color: #ff0080;
   border-width: 3px;
@@ -76,6 +66,12 @@
 }
 
 .participants-count {
+  border-radius: var(--border-radius-full);
+  background: var(--color-bg-icon);
+  min-width: 32px;
+  height: 32px;
+  text-align: center;
+  line-height: 32px;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   font-weight: var(--font-weight-medium);

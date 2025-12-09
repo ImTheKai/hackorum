@@ -1,9 +1,4 @@
-/*
- * Sidebar Component
- */
-
 .sidebar {
-  padding: var(--spacing-5);
   position: sticky;
   top: calc(var(--nav-height) + var(--spacing-5));
   align-self: start;
@@ -11,10 +6,10 @@
 
 .sidebar-section {
   margin-bottom: var(--spacing-8);
+}
 
-  &:last-child {
-    margin-bottom: 0;
-  }
+.sidebar-content {
+  padding: var(--spacing-3);
 }
 
 .sidebar-heading {
@@ -22,94 +17,23 @@
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   margin-bottom: var(--spacing-4);
-  padding-bottom: var(--spacing-3);
-  border-bottom: var(--border-width-thick) solid var(--color-border);
+  padding: var(--spacing-3);
+  background-color: var(--color-bg-sidebar-header);
+  text-align: right;
 }
 
-.sidebar-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-3) 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-base);
+.sidebar .quick-filters {
+  list-style: square inside;
+  padding-left: 0;
 
-  & .stat-label {
-    font-weight: var(--font-weight-medium);
-  }
-
-  & .stat-value {
-    font-weight: var(--font-weight-bold);
-    color: var(--color-primary-600);
-  }
-}
-
-.sidebar-search {
-  & .search-input {
-    width: 100%;
-    padding: var(--spacing-3) var(--spacing-4);
-    border: var(--border-width) solid var(--color-gray-300);
-    border-radius: var(--border-radius-md);
-    font-size: var(--font-size-base);
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-
-    &:focus {
-      outline: none;
-      border-color: var(--color-border-focus);
-      box-shadow: var(--shadow-focus);
-    }
-  }
-
-  & .search-button {
-    width: 100%;
-    margin-top: var(--spacing-3);
-    padding: var(--spacing-3) var(--spacing-4);
-    background-color: var(--color-primary-500);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius-md);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: background-color var(--transition-fast);
-
-    &:hover {
-      background-color: var(--color-primary-700);
-    }
-  }
-}
-
-.sidebar-pagination {
-  & .pagination {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-2);
-  }
-
-  & .pagination a,
-  & .pagination span {
-    display: block;
-    padding: var(--spacing-2) var(--spacing-3);
-    text-align: center;
-    border-radius: var(--border-radius-sm);
+  & a {
+    color: var(--color-text-link);
     text-decoration: none;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    transition: background-color var(--transition-fast);
+    font-weight: var(--font-weight-medium);
   }
 
-  & .pagination a:hover {
-    background-color: var(--color-bg-hover);
-  }
-
-  & .pagination .current {
-    background-color: var(--color-primary-500);
-    color: white;
-    font-weight: var(--font-weight-semibold);
-  }
-
-  & .pagination .disabled {
-    color: var(--color-text-muted);
-    cursor: not-allowed;
+  & a:hover {
+    text-decoration: underline;
   }
 }
+

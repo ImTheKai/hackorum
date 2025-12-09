@@ -1,0 +1,14 @@
+.participants
+  .participants-avatars
+    - participants.each do |participant|
+      - css_classes = ["participant-avatar"]
+      - css_classes << "is-core-team" if participant.core_team?
+      - css_classes << "is-committer" if !participant.core_team? && participant.committer?
+      - css_classes << "is-major-contributor" if !participant.core_team? && !participant.committer? && participant.major_contributor?
+      - css_classes << "is-significant-contributor" if !participant.core_team? && !participant.committer? && !participant.major_contributor? && participant.significant_contributor?
+      - css_classes << "is-past-contributor" if participant.contributor&.past_contributor?
+      - badge_text = participant.contributor_badge ? "#{participant.name} (#{participant.contributor_badge})" : participant.name
+      = image_tag participant.gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
+    - if total_participants > participants.count
+      span.participants-count +#{total_participants - participants.count}
+

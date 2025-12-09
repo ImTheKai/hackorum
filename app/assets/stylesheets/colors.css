@@ -33,9 +33,20 @@
   --color-gray-900: #0f172a;
 
   --color-bg-page: var(--color-primary-1);
-  --color-bg-container: var(--color-primary-4);
-  --color-bg-nav: var(--color-primary-3);
+  --color-bg-input: var(--color-primary-1);
+  --color-bg-container: var(--color-primary-3);
+  --color-bg-hover: var(--color-primary-4);
+  --color-bg-sidebar: var(--color-primary-3);
+  --color-bg-sidebar-header: var(--color-primary-2);
+  --color-bg-table-header: var(--color-primary-2);
+  --color-bg-nav: var(--color-primary-4);
   --color-border: var(--color-primary-5);
   --color-bg-button: var(--color-secondary2-2);
   --color-bg-button-hover: var(--color-secondary2-1);
+
+  --color-border-contributor: var(--color-secondary2-2);
+
+  --color-bg-icon: var(--color-secondary1-2);
+  --color-bg-contributor: var(--color-secondary1-2);
+  --color-bg-committer: var(--color-secondary1-1);
 }

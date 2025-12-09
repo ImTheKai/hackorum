@@ -255,11 +255,6 @@ class TopicsController < ApplicationController
     last_ids = Message.where(topic_id: topic_ids).group(:topic_id).maximum(:id)
     last_times = Message.where(topic_id: topic_ids).group(:topic_id).maximum(:created_at)
     total_counts = Message.where(topic_id: topic_ids).group(:topic_id).count
-    attachment_topics = Attachment.joins(:message)
-                                  .where(messages: { topic_id: topic_ids })
-                                  .distinct
-                                  .pluck("messages.topic_id")
-                                  .to_set
 
     aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
                                .pluck(:topic_id, :aware_until_message_id)
@@ -286,8 +281,7 @@ class TopicsController < ApplicationController
       end
       status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
       progress = compute_progress(total:, read_count:)
-      has_attachments = attachment_topics.include?(topic.id)
-      @topic_states[topic.id] = { status:, aware_until:, read_count:, last_id:, last_time:, progress:, has_attachments:, team_readers: team_readers[topic.id] || [] }
+      @topic_states[topic.id] = { status:, aware_until:, read_count:, last_id:, last_time:, progress:, team_readers: team_readers[topic.id] || [] }
     end
   end
 

@@ -6,7 +6,24 @@ body {
 
 .container {
   max-width: var(--max-width-container);
+  width: 100%;
   margin: 0 auto;
-  padding: 0 var(--spacing-5);
+  padding: 0;
   background-color: var(--color-bg-container);
+  min-width: 0;
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.page-layout.with-sidebar {
+  display: grid;
+  grid-template-columns: 480px 1fr;
+  gap: 0;
+  align-items: start;
+}
+
+.page-layout.with-sidebar .layout-sidebar {
+  background: var(--color-bg-card);
+  border-right: var(--border-width) solid var(--color-border);
+  min-height: calc(100vh - var(--nav-height));
+  background-color: var(--color-bg-sidebar);
 }

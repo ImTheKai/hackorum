@@ -6,8 +6,8 @@
 
 @import "layouts/header.css";
 @import "layouts/topic-view.css";
-@import "layouts/two-column.css";
 
+@import "components/form.css";
 @import "components/navigation.css";
 @import "components/sidebar.css";
 @import "components/search.css";

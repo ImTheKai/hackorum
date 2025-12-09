@@ -1,24 +1,6 @@
 - content_for :title, "Search Results"
 
-- content_for :sidebar do
-  .sidebar
-    .sidebar-section
-      h3.sidebar-heading Search
-      .sidebar-search
-        = form_with url: search_topics_path, method: :get, local: true do |f|
-          = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: @query
-          = f.submit "Search", class: "search-button"
-
-    - if @query.present? && @topics.any?
-      .sidebar-section
-        h3.sidebar-heading Results
-        .sidebar-stat
-          span.stat-label Matching Topics
-          span.stat-value = @topics.size
-
-      .sidebar-section
-        h3.sidebar-heading Scroll
-        p Scroll down to load more
+= render partial: "sidebar", locals: { available_note_tags: @available_note_tags, search_query: @query }
 
 #new-topics-banner
   = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: search_topics_path(q: @query) }

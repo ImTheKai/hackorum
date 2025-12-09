@@ -1,35 +1,17 @@
 - topics.each do |topic|
-  - row_classes = ["topic-row"]
-  - row_classes << "has-core-team-activity" if topic.has_core_team_activity?
-  - row_classes << "has-committer-activity" if !topic.has_core_team_activity? && topic.has_committer_activity?
-  - row_classes << "has-contributor-activity" if !topic.has_core_team_activity? && !topic.has_committer_activity? && topic.has_contributor_activity?
-  tr class=row_classes.join(" ") data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
+  tr.topic-row data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
     td.topic-title data-label="Topic"
-      - has_attachments = @topic_states&.dig(topic.id, :has_attachments)
-      - if has_attachments
-        span.topic-attachment-icon title="Has attachments" aria-label="Has attachments" 📎
+      - if topic.has_contributor_activity?
+        div class ="topic-icon activity-#{ topic.highest_contributor_activity }"
+          i.fa-solid.fa-users-rays
+      - if topic.attachments.exists?
+        .topic-icon
+          i.fa-solid.fa-paperclip
       = link_to topic.title, topic_path(topic), class: "topic-link"
     td.topic-participants data-label="Participants"
-      .topic-participants
-        .participants-avatars
-          - participants = topic.participant_aliases(limit: 5)
-          - participants.each_with_index do |participant, index|
-            - is_creator = (participant.id == topic.creator.id)
-            - last_message = topic.messages.order(:created_at).last
-            - is_last_poster = (participant.id == last_message&.sender_id)
-            - css_classes = ["participant-avatar"]
-            - css_classes << "is-creator" if is_creator
-            - css_classes << "is-last-poster" if is_last_poster
-            - css_classes << "is-core-team" if participant.core_team?
-            - css_classes << "is-committer" if !participant.core_team? && participant.committer?
-            - css_classes << "is-major-contributor" if !participant.core_team? && !participant.committer? && participant.major_contributor?
-            - css_classes << "is-significant-contributor" if !participant.core_team? && !participant.committer? && !participant.major_contributor? && participant.significant_contributor?
-            - css_classes << "is-past-contributor" if participant.contributor&.past_contributor?
-            - badge_text = participant.contributor_badge ? "#{participant.name} (#{participant.contributor_badge})" : participant.name
-            = image_tag participant.gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
-        - total_participants = topic.messages.select(:sender_id).distinct.count
-        - if total_participants > participants.count
-          span.participants-count +#{total_participants - participants.count}
+      - participants = topic.participant_aliases(limit: 10)
+      - participant_count = topic.participant_count
+      = render partial: "avatar_list", locals: { participants: participants, total_participants: participant_count }
     td.topic-activity data-label="Replies / Activity"
       - last_message = topic.messages.order(:created_at).last
       .activity-info

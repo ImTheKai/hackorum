@@ -14,6 +14,7 @@ html
     link[rel="apple-touch-icon" href="/icon.png"]
     = stylesheet_link_tag :app, "data-turbo-track": "reload"
     = javascript_importmap_tags
+    script[src="https://kit.fontawesome.com/92fb6aa8ba.js"]
   body
     - if user_signed_in? && current_user.username.blank?
       .global-warning
@@ -46,15 +47,14 @@ html
       .page-layout.with-sidebar
         .layout-sidebar
           = yield :sidebar
-        main.layout-main
+        main.container
           - flash.each do |type, message|
             .flash class=type
               = message
           = yield
     - else
-      main.main-content
-        .container
-          - flash.each do |type, message|
-            .flash class=type
-              = message
-          = yield
+      main.container
+        - flash.each do |type, message|
+          .flash class=type
+            = message
+        = yield

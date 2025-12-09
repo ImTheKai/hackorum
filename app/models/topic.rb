@@ -6,47 +6,43 @@ class Topic < ApplicationRecord
   
   validates :title, presence: true
 
-  def participant_aliases(limit: 5)
+  def participant_count
+    messages.select(:sender_id).distinct.count
+  end
+
+  def participant_aliases(limit: 10)
     # Get all unique senders from messages, with their message counts
     sender_counts = messages.group(:sender_id)
                             .select('sender_id, COUNT(*) as message_count')
                             .order('message_count DESC')
-                            .limit(50) # Get top 50 to work with
+                            .limit(50)
                             .index_by(&:sender_id)
 
-    # Get the actual Alias records
     sender_ids = sender_counts.keys
     senders_by_id = Alias.where(id: sender_ids).index_by(&:id)
 
-    # Get first and last message senders
-    first_message = messages.order(:created_at).first
-    last_message = messages.order(:created_at).last
+    first_sender = messages.order(:created_at).first.sender
+    last_sender = messages.order(:created_at).last.sender
 
-    first_sender = first_message&.sender
-    last_sender = last_message&.sender
-
-    # Build the participants list
     participants = []
 
-    # Always start with the creator (first message sender)
     participants << first_sender if first_sender
 
-    # Add other frequent participants (excluding first and last)
-    other_senders = sender_ids - [first_sender&.id, last_sender&.id].compact
+    first_and_last = [first_sender&.id, last_sender&.id].compact.uniq
+    other_senders = sender_ids - first_and_last
     other_participants = other_senders
       .map { |id| senders_by_id[id] }
       .compact
       .sort_by { |s| -sender_counts[s.id].message_count }
-      .take(limit - 2) # Reserve space for first and last
+      .take(limit - first_and_last.length)
 
     participants.concat(other_participants)
 
-    # Always end with last message sender (if different from first)
     if last_sender && last_sender.id != first_sender&.id
       participants << last_sender
     end
 
-    participants.compact.uniq
+    participants
   end
 
   def has_contributor_activity?
@@ -68,5 +64,12 @@ class Topic < ApplicationRecord
       committer_alias_ids = Contributor.committers.joins(:aliases).pluck('aliases.id').uniq
       messages.where(sender_id: committer_alias_ids).exists?
     end
+  end
+
+  def highest_contributor_activity
+    return "core_team" if has_core_team_activity?
+    return "committer" if has_committer_activity?
+    return "contributor" if has_contributor_activity?
+    nil
   end
 end

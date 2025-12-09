@@ -1,0 +1,20 @@
+
+input {
+  background-color: var(--color-bg-input);
+  width: 100%;
+  padding: var(--spacing-4);
+  margin: var(--spacing-4) 0;
+  border: var(--border-width) solid var(--color-gray-300);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-base);
+  display: block;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+  }
+}
+
+input[type=submit], input[type=button] {
+  background-color: var(--color-bg-button);
+}

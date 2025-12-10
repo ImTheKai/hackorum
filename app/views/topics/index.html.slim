@@ -19,11 +19,9 @@
   table
     thead
       tr
-        th Topic
-        th Participants
-        th Activity
-        - if user_signed_in?
-          th Status
+        th.topic-title Topic
+        th.activity-header Activity
+        th.participants-header Participants
     tbody#topics
       = render partial: "topics", locals: { topics: @topics }
 

@@ -12,6 +12,7 @@ class TopicsController < ApplicationController
     preload_topic_states if user_signed_in?
     preload_note_counts if user_signed_in?
     load_visible_tags if user_signed_in?
+    preload_participation_flags if user_signed_in?
 
     respond_to do |format|
       format.html
@@ -97,6 +98,8 @@ class TopicsController < ApplicationController
                  end
 
     apply_cursor_pagination(base_query)
+
+    preload_participation_flags if user_signed_in?
 
     respond_to do |format|
       format.html
@@ -257,22 +260,25 @@ class TopicsController < ApplicationController
     last_times = Message.where(topic_id: topic_ids).group(:topic_id).maximum(:created_at)
     total_counts = Message.where(topic_id: topic_ids).group(:topic_id).count
 
-    aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
-                               .pluck(:topic_id, :aware_until_message_id)
-                               .to_h
-    read_rows = MessageReadRange.where(user: current_user, topic_id: topic_ids)
-                                .pluck(:topic_id, :range_start_message_id, :range_end_message_id)
-    read_ranges = read_rows.each_with_object(Hash.new { |h, k| h[k] = [] }) do |(tid, s, e), acc|
-      acc[tid] << [s, e]
-    end
-    global_aware_before = current_user.aware_before
+    if user_signed_in?
+      aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
+                                 .pluck(:topic_id, :aware_until_message_id)
+                                 .to_h
+      read_rows = MessageReadRange.where(user: current_user, topic_id: topic_ids)
+                                  .pluck(:topic_id, :range_start_message_id, :range_end_message_id)
+      read_ranges = read_rows.each_with_object(Hash.new { |h, k| h[k] = [] }) do |(tid, s, e), acc|
+        acc[tid] << [s, e]
+      end
+      global_aware_before = current_user.aware_before
 
-    team_readers = preload_team_reader_states(topic_ids, last_ids)
+      team_readers = preload_team_reader_states(topic_ids, last_ids)
+    end
 
     @topic_states = {}
     @topics.each do |topic|
       last_id = last_ids[topic.id]
       last_time = last_times[topic.id]
+    if user_signed_in?
       aware_until = aware_map[topic.id]
       total = total_counts[topic.id].to_i
       ranges = read_ranges[topic.id] || []
@@ -282,6 +288,9 @@ class TopicsController < ApplicationController
       end
       status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
       progress = compute_progress(total:, read_count:)
+    else
+      status = :new
+    end
       @topic_states[topic.id] = { status:, aware_until:, read_count:, last_id:, last_time:, progress:, team_readers: team_readers[topic.id] || [] }
     end
   end
@@ -306,7 +315,44 @@ class TopicsController < ApplicationController
                                   .count
   end
 
-  # Legacy helpers for backward compatibility (not used after refactor)
+  def preload_participation_flags
+    topic_ids = @topics.map(&:id)
+    return if topic_ids.empty?
+
+    my_alias_ids = Alias.where(user_id: current_user.id).pluck(:id)
+
+    team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
+    teammate_user_ids = if team_ids.any?
+                          TeamMember.where(team_id: team_ids).pluck(:user_id).uniq
+                        else
+                          [current_user.id]
+                        end
+    teammate_alias_ids = Alias.where(user_id: teammate_user_ids).pluck(:id)
+
+    rows = Message.where(topic_id: topic_ids, sender_id: teammate_alias_ids)
+                  .select(:topic_id, :sender_id)
+                  .distinct
+
+    alias_map = Alias.includes(:contributors).where(id: teammate_alias_ids).index_by(&:id)
+
+    @participation_flags = Hash.new { |h, k| h[k] = { mine: false, team: false, aliases: [] } }
+
+    rows.each do |row|
+      entry = @participation_flags[row.topic_id]
+      alias_record = alias_map[row.sender_id]
+      next unless alias_record
+
+      entry[:aliases] << alias_record
+      entry[:mine] ||= my_alias_ids.include?(row.sender_id)
+      entry[:team] = true
+    end
+
+    @participation_flags.transform_values! do |v|
+      v[:aliases] = v[:aliases].uniq { |a| a.id }
+      v
+    end
+  end
+
   def compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
     return :new unless aware_until || read_count.positive? || global_aware_before
     return :read if total.positive? && read_count >= total

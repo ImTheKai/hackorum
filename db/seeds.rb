@@ -132,6 +132,13 @@ legacy_contributor.aliases << legacy_alias
 example_team = Team.create!(name: "ExampleCompany")
 TeamMember.add_member(team: example_team, user: alice_user, role: :admin)
 TeamMember.add_member(team: example_team, user: bob_user, role: :member)
+  TeamMember.add_member(team: example_team, user: carol_user, role: :member)
+
+# Reserve mention handles for team sharing
+NameReservation.reserve!(name: example_team.name, owner: example_team)
+NameReservation.reserve!(name: alice_user.username, owner: alice_user)
+NameReservation.reserve!(name: bob_user.username, owner: bob_user)
+NameReservation.reserve!(name: carol_user.username, owner: carol_user)
 
 # Topics and messages
 base_time = now - 20.days
@@ -146,6 +153,43 @@ def create_message(topic:, sender:, subject:, body:, created_at:, reply_to: nil,
     message_id: "#{message_id_suffix}@hackorum.dev",
     created_at:,
     updated_at: created_at
+  )
+end
+
+def mark_all_read(user:, topic:, timestamp:)
+  first_id = topic.messages.minimum(:id)
+  last_id = topic.messages.maximum(:id)
+  return unless first_id && last_id
+
+  MessageReadRange.add_range(
+    user:,
+    topic:,
+    start_id: first_id,
+    end_id: last_id,
+    read_at: timestamp
+  )
+end
+
+def mark_read_until(user:, topic:, message:, timestamp:)
+  first_id = topic.messages.minimum(:id)
+  return unless first_id && message
+
+  MessageReadRange.add_range(
+    user:,
+    topic:,
+    start_id: first_id,
+    end_id: message.id,
+    read_at: timestamp
+  )
+end
+
+def mark_aware_until(user:, topic:, message:, timestamp:)
+  return unless message
+  ThreadAwareness.mark_until(
+    user:,
+    topic:,
+    until_message_id: message.id,
+    aware_at: timestamp
   )
 end
 
@@ -242,16 +286,6 @@ msg3 = create_message(
   message_id_suffix: "vacuum-progress-3"
 )
 
-Note.create!(
-  topic: patch_topic,
-  message: msg3,
-  author: alice_user,
-  last_editor: alice_user,
-  body: "- Add WAL position to progress report\n- Split heap vs index counters\n- Autovacuum should emit too",
-  created_at: base_time + 2.days + 1.hour,
-  updated_at: base_time + 2.days + 1.hour
-)
-
 Activity.create!(
   user: bob_user,
   activity_type: "topic_created",
@@ -317,14 +351,6 @@ rfc_msg2 = create_message(
   created_at: base_time + 4.days,
   reply_to: rfc_msg1,
   message_id_suffix: "index-hooks-2"
-)
-
-Note.create!(
-  topic: rfc_topic,
-  author: carol_user,
-  body: "- Add sample AM\n- Document new hooks\n- Draft patch for next CF",
-  created_at: base_time + 4.days + 2.hours,
-  updated_at: base_time + 4.days + 2.hours
 )
 
 Activity.create!(
@@ -712,5 +738,199 @@ moderate_msgs_2 << create_message(
     message_id_suffix: "monitoring-#{i}"
   )
 end
+
+# Threads to exercise participant display (5+)
+five_part_topic = Topic.create!(
+  title: "Five participant sampler",
+  creator: alice_alias,
+  created_at: base_time + 16.days,
+  updated_at: base_time + 16.days
+)
+
+five_participants = [alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias]
+five_msgs = []
+five_msgs << create_message(
+  topic: five_part_topic,
+  sender: five_participants[0],
+  subject: five_part_topic.title,
+  body: "Kickoff for a 5-participant thread.",
+  created_at: base_time + 16.days,
+  message_id_suffix: "five-part-1"
+)
+
+five_participants[1..].each_with_index do |ali, idx|
+  five_msgs << create_message(
+    topic: five_part_topic,
+    sender: ali,
+    subject: "Re: #{five_part_topic.title}",
+    body: "Reply ##{idx + 2} to show distinct participant #{ali.name}.",
+    created_at: base_time + 16.days + (idx + 1).hours,
+    reply_to: five_msgs.last,
+    message_id_suffix: "five-part-#{idx + 2}"
+  )
+end
+
+six_part_topic = Topic.create!(
+  title: "Six participant sampler",
+  creator: bob_alias,
+  created_at: base_time + 17.days,
+  updated_at: base_time + 17.days
+)
+
+six_participants = [alice_alias, bob_alias, carol_alias, dave_alias, legacy_alias, ci_bot_alias]
+six_msgs = []
+six_msgs << create_message(
+  topic: six_part_topic,
+  sender: six_participants[0],
+  subject: six_part_topic.title,
+  body: "Kickoff for a 6-participant thread.",
+  created_at: base_time + 17.days,
+  message_id_suffix: "six-part-1"
+)
+
+six_participants[1..].each_with_index do |ali, idx|
+  six_msgs << create_message(
+    topic: six_part_topic,
+    sender: ali,
+    subject: "Re: #{six_part_topic.title}",
+    body: "Message ##{idx + 2} from #{ali.name} to push participant count over the limit.",
+    created_at: base_time + 17.days + (idx + 1).hours,
+    reply_to: six_msgs.last,
+    message_id_suffix: "six-part-#{idx + 2}"
+  )
+end
+
+# Threads to exercise all smart_time_display branches
+recent_topic = Topic.create!(
+  title: "Recent activity thread",
+  creator: alice_alias,
+  created_at: now - 2.days,
+  updated_at: now - 2.days
+)
+
+recent_msg1 = create_message(
+  topic: recent_topic,
+  sender: alice_alias,
+  subject: recent_topic.title,
+  body: "Thread within 7 days to trigger relative time display.",
+  created_at: now - 2.days,
+  message_id_suffix: "recent-1"
+)
+
+create_message(
+  topic: recent_topic,
+  sender: bob_alias,
+  subject: "Re: #{recent_topic.title}",
+  body: "Reply to keep this within the relative window.",
+  created_at: now - 1.day,
+  reply_to: recent_msg1,
+  message_id_suffix: "recent-2"
+)
+
+old_topic_time = now - 400.days
+old_topic = Topic.create!(
+  title: "Previous year discussion",
+  creator: carol_alias,
+  created_at: old_topic_time,
+  updated_at: old_topic_time
+)
+
+old_msg1 = create_message(
+  topic: old_topic,
+  sender: carol_alias,
+  subject: old_topic.title,
+  body: "Thread from a previous year to trigger absolute year formatting.",
+  created_at: old_topic_time,
+  message_id_suffix: "old-year-1"
+)
+
+create_message(
+  topic: old_topic,
+  sender: legacy_alias,
+  subject: "Re: #{old_topic.title}",
+  body: "Follow-up to keep timestamp anchored in the prior year.",
+  created_at: old_topic_time + 2.days,
+  reply_to: old_msg1,
+  message_id_suffix: "old-year-2"
+)
+
+# Notes and read/awareness states
+alice_notes = NoteBuilder.new(author: alice_user)
+bob_notes   = NoteBuilder.new(author: bob_user)
+carol_notes = NoteBuilder.new(author: carol_user)
+
+# Patch thread notes (two authors)
+alice_notes.create!(
+  topic: patch_topic,
+  message: msg3,
+  body: "- Add WAL position to progress report\n- Split heap vs index counters\n- Autovacuum should emit too\n@ExampleCompany please sync on scope"
+)
+bob_notes.create!(
+  topic: patch_topic,
+  message: msg1,
+  body: "Queued for next CF round; tracking in CF app.\n@ExampleCompany heads-up for review bandwidth"
+)
+
+# RFC thread notes (thread + message, different authors)
+carol_notes.create!(
+  topic: rfc_topic,
+  body: "Thread summary: add index AM hooks, include sample AM + docs.\n@ExampleCompany track follow-ups"
+)
+alice_notes.create!(
+  topic: rfc_topic,
+  message: rfc_msg2,
+  body: "Docs + sample AM needed before commit. Add SGML + README.\n@ExampleCompany can we help draft?"
+)
+
+# Discussion thread: mix of thread/message notes from different people
+carol_notes.create!(
+  topic: discussion_topic,
+  body: "Thread note: align logical slots with failover, add standby-safe flag.\n@ExampleCompany capture design risks"
+)
+alice_notes.create!(
+  topic: discussion_topic,
+  message: disc_msg4,
+  body: "Message note: prototype slot fencing, watch cascading setups; prefer heartbeat piggyback.\n@ExampleCompany please review"
+)
+
+# Committer topic: partially read with a note
+bob_notes.create!(
+  topic: committer_topic,
+  message: committer_messages[3],
+  body: "Action: test lower freeze_age under heavy autovacuum.\n@ExampleCompany check lab capacity"
+)
+
+# Moderate topic note for visibility
+carol_notes.create!(
+  topic: moderate_topic_1,
+  message: moderate_msgs_1[5],
+  body: "Pooling experiments look good; consider adaptive target.\n@ExampleCompany let's benchmark with PG16"
+)
+
+timestamp_now = Time.current
+
+# Fully read threads
+mark_all_read(user: alice_user, topic: patch_topic, timestamp: timestamp_now)
+mark_all_read(user: bob_user, topic: patch_topic, timestamp: timestamp_now)
+mark_all_read(user: carol_user, topic: rfc_topic, timestamp: timestamp_now)
+mark_all_read(user: alice_user, topic: resolved_topic, timestamp: timestamp_now)
+mark_all_read(user: bob_user, topic: committer_topic, timestamp: timestamp_now)
+
+# Partially read threads
+mark_read_until(user: carol_user, topic: patch_topic, message: msg2, timestamp: timestamp_now)
+mark_read_until(user: bob_user, topic: discussion_topic, message: disc_msg2, timestamp: timestamp_now)
+mark_read_until(user: carol_user, topic: discussion_topic, message: disc_msg3, timestamp: timestamp_now)
+mark_read_until(user: alice_user, topic: committer_topic, message: committer_messages[5], timestamp: timestamp_now)
+mark_read_until(user: carol_user, topic: moderate_topic_1, message: moderate_msgs_1[-4], timestamp: timestamp_now)
+
+# Awareness-only threads
+mark_aware_until(user: bob_user, topic: bot_topic, message: bot_topic.messages.last, timestamp: timestamp_now)
+mark_aware_until(user: carol_user, topic: bot_topic, message: bot_topic.messages.last, timestamp: timestamp_now)
+mark_aware_until(user: alice_user, topic: discussion_topic, message: disc_msg4, timestamp: timestamp_now)
+mark_aware_until(user: bob_user, topic: rfc_topic, message: rfc_msg2, timestamp: timestamp_now)
+mark_aware_until(user: carol_user, topic: committer_topic, message: committer_messages.last, timestamp: timestamp_now)
+mark_aware_until(user: alice_user, topic: long_topic, message: long_messages[20], timestamp: timestamp_now)
+
+# Leave some threads entirely new/unaware (e.g., past_topic, moderate_topic_2, contrib_topic)
 
 puts "Development seed data loaded."

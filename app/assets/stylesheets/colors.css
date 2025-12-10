@@ -45,9 +45,16 @@
   --color-bg-button-hover: var(--color-secondary2-1);
 
   --color-border-contributor: var(--color-secondary2-2);
+  --color-border-new: var(--color-secondary1-1);
+  --color-border-aware: var(--color-secondary1-2);
+  --color-border-reading: var(--color-secondary1-3);
+  --color-border-read: var(--color-secondary1-4);
 
   --color-bg-icon: var(--color-secondary1-2);
+  --color-bg-icon-status: var(--color-secondary2-2);
   --color-bg-hoverbox: var(--color-secondary2-1);
   --color-bg-contributor: var(--color-secondary1-2);
   --color-bg-committer: var(--color-secondary1-1);
+  --color-bg-activity-team: var(--color-secondary2-2);
+  --color-bg-activity-user: var(--color-secondary2-1);
 }

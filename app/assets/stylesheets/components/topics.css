@@ -55,14 +55,42 @@
     color: var(--color-text-secondary);
   }
 
+  & th.activity-header {
+    text-align: center;
+  }
+
+  & th.participants-header {
+    text-align: right;
+  }
+
+  & th.topic-title {
+    border-left: var(--color-bg-table-header) 8px solid;
+  }
+
   & td {
-    padding: var(--spacing-4);
+    padding: var(--spacing-2);
     border-bottom: 1px #000 solid;
     vertical-align: top;
   }
 
+  & .topic-replies {
+    width: 100px;
+  }
+  & .topic-activity {
+    width: 140px;
+  }
   & .topic-participants {
-    width: 340px;
+    width: 250px;
+    text-align: right;
+
+    .topic-icon {
+      margin: 0 4px;
+      vertical-align: top;
+    }
+
+    .participants {
+      display: inline-block;
+    }
   }
 }
 
@@ -71,7 +99,7 @@
   background: var(--color-bg-icon);
   border-radius: var(--border-radius-sm);
   padding: 3px;
-  margin: 5px 0px;
+  margin: 0px;
   margin-right: 10px;
   position: relative;
 }
@@ -95,6 +123,26 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+.status-border {
+  border-left: 8px solid transparent;
+}
+
+.status-border.status-new {
+  border-left-color: var(--color-border-new);
+}
+
+.status-border.status-aware {
+  border-left-color: var(--color-border-aware);
+}
+
+.status-border.status-reading {
+  border-left-color: var(--color-border-reading);
+}
+
+.status-border.status-read {
+  border-left-color: var(--color-border-read);
+}
+
 .activity-core_team {
   background-color: var(--color-bg-committer);
 }
@@ -103,10 +151,40 @@
   background-color: var(--color-bg-committer);
 }
 
+.activity-note {
+  background-color: var(--color-bg-activity-team);
+  .topic-icon-badge {
+    background-color: var(--color-bg-activity-team);
+  }
+}
+
+.activity-team {
+  background-color: var(--color-bg-activity-team);
+  
+  .topic-icon-badge {
+    background-color: var(--color-bg-activity-team);
+  }
+}
+
+.activity-team.is-mine {
+  background-color: var(--color-bg-activity-user);
+}
+
+.activity-team-read {
+  background-color: var(--color-bg-activity-team);
+  .topic-icon-badge {
+    background-color: var(--color-bg-activity-team);
+  }
+}
+
 .topic-row {
   &:hover {
     background: var(--color-bg-hover);
   }
+}
+
+.topic-row.topic-read {
+	color: #444;
 }
 
 .topic-icon-hover {
@@ -120,6 +198,11 @@
   padding: var(--spacing-3);
   box-shadow: var(--shadow-lg);
   min-width: 260px;
+}
+
+.topic-participants .topic-icon-hover {
+  left: auto;
+  right: 0;
 }
 
 .topic-icon.is-open .topic-icon-hover {
@@ -156,17 +239,21 @@
 .activity-info {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
+  gap: 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
 }
 
 .activity-replies {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .activity-time {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .activity-author {

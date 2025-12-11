@@ -6,6 +6,9 @@ if [ -z "${LD_PRELOAD+x}" ]; then
     export LD_PRELOAD
 fi
 
+# Ensure gems are installed when using a persistent bundle volume.
+bundle check || bundle install
+
 # If running the rails server (directly or via bin/dev), create or migrate the database
 if { [ "$1" = "./bin/rails" ] && [ "$2" = "server" ]; } || [ "$1" = "./bin/dev" ]; then
   ./bin/rails db:prepare

@@ -44,6 +44,10 @@ This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzne
 5) Verify:
    - Browse to your domain; or `curl -f http://localhost:3000/up` from the host (`docker compose exec web ...` inside the network).
 
+## Observability
+- Query stats: pg_stat_statements is preloaded via the Postgres config and created on first init via `/docker-entrypoint-initdb.d/01_pg_stat_statements.sql`. For existing databases, run `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;` once. PgHero is available at `/pghero` for signed-in admin users.
+- Request-level profiling: rack-mini-profiler is available; in production it renders only for signed-in admin users.
+
 ## Environment variables (deploy/.env)
 - `SECRET_KEY_BASE` (required)
 - `DATABASE_URL` (defaults to local Postgres via env interpolation)

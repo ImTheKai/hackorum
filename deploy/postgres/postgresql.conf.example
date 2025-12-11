@@ -6,6 +6,11 @@ effective_cache_size = 12GB
 work_mem = 32MB
 maintenance_work_mem = 1GB
 
+# Extensions / instrumentation
+shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.max = 10000
+pg_stat_statements.track = all
+
 # WAL and archiving
 wal_level = replica
 wal_compression = on

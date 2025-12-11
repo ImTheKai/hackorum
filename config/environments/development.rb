@@ -49,6 +49,22 @@ Rails.application.configure do
   # Append comments with runtime information tags to SQL queries in logs.
   config.active_record.query_log_tags_enabled = true
 
+  # Bullet: detect N+1 and eager loading issues.
+  config.after_initialize do
+    if defined?(Bullet)
+      Bullet.enable = true
+      Bullet.alert = false
+      Bullet.bullet_logger = true
+      Bullet.rails_logger = true
+      Bullet.add_footer = false
+    end
+  end
+
+  # rack-mini-profiler in development.
+  if defined?(Rack::MiniProfiler)
+    Rack::MiniProfiler.config.position = :right
+  end
+
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
 

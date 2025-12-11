@@ -74,4 +74,13 @@ group :development do
   # Capture emails in-browser during development
   gem "letter_opener"
   gem "letter_opener_web"
+
+  # Detect N+1 queries and unused eager loads
+  gem "bullet"
 end
+
+# Per-request SQL timings and flamegraphs (enabled for dev + admin users in prod)
+gem "rack-mini-profiler"
+
+# Mountable Postgres insights (uses pg_stat_statements)
+gem "pghero"

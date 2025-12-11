@@ -53,6 +53,12 @@ Rails.application.routes.draw do
 
   post "messages/:id/read", to: "messages#read", as: :read_message
 
+  if defined?(PgHero)
+    constraints AdminConstraint.new do
+      mount PgHero::Engine, at: "/pghero"
+    end
+  end
+
   if Rails.env.development?
     mount LetterOpenerWeb::Engine, at: "/letter_opener"
   end

@@ -2,8 +2,9 @@ class ApplicationController < ActionController::Base
   allow_browser versions: :modern
   
   rescue_from ActiveRecord::RecordNotFound, with: :render_404
-  helper_method :current_user, :user_signed_in?
+  helper_method :current_user, :user_signed_in?, :current_admin?
   helper_method :activity_unread_count
+  before_action :authorize_mini_profiler
   
   private
   
@@ -21,8 +22,21 @@ class ApplicationController < ActionController::Base
     current_user.present?
   end
 
+  def current_admin?
+    current_user&.admin?
+  end
+
   def require_authentication
     redirect_to new_session_path, alert: 'Please sign in' unless user_signed_in?
+  end
+
+  def authorize_mini_profiler
+    return unless defined?(Rack::MiniProfiler)
+    if Rails.env.development?
+      Rack::MiniProfiler.authorize_request
+    elsif Rails.env.production? && current_admin?
+      Rack::MiniProfiler.authorize_request
+    end
   end
 
   def activity_unread_count

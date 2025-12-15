@@ -4,10 +4,10 @@ class TopicsController < ApplicationController
 
   def index
     @search_query = nil
-    base_query = Topic.includes(:creator)
-    base_query = apply_filters(base_query)
+    base_query = apply_filters(Topic.includes(:creator))
 
     apply_cursor_pagination(base_query)
+    @new_topics_count = 0
 
     preload_topic_states if user_signed_in?
     preload_note_counts if user_signed_in?
@@ -18,6 +18,15 @@ class TopicsController < ApplicationController
       format.html
       format.turbo_stream
     end
+  end
+
+  def new_topics_count
+    @viewing_since = viewing_since_param
+    base_query = topics_base_query(search_query: params[:q])
+    @new_topics_count = count_new_topics(base_query, @viewing_since)
+    refresh_path = params[:q].present? ? search_topics_path(q: params[:q]) : topics_path
+
+    render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: refresh_path }
   end
 
   def show
@@ -81,20 +90,10 @@ class TopicsController < ApplicationController
   def search
     @search_query = params[:q].to_s.strip
 
-    base_query = if @search_query.present?
-                   search_pattern = "%#{ActiveRecord::Base.sanitize_sql_like(@search_query)}%"
-
-                   title_sql = Topic.select(:id).where("title ILIKE ?", search_pattern).to_sql
-                   message_sql = Message.select(:topic_id).where("body ILIKE ?", search_pattern).to_sql
-                   union_sql = "(#{title_sql}) UNION (#{message_sql})"
-
-                   Topic.where("topics.id IN (#{union_sql})")
-                        .includes(:creator)
-                 else
-                   Topic.none
-                 end
+    base_query = topics_base_query(search_query: @search_query)
 
     apply_cursor_pagination(base_query)
+    @new_topics_count = 0
 
     preload_participation_flags if user_signed_in?
 
@@ -220,11 +219,7 @@ class TopicsController < ApplicationController
   end
 
   def apply_cursor_pagination(base_query)
-    @viewing_since = if params[:viewing_since].present?
-                       Time.zone.parse(params[:viewing_since])
-                     else
-                       Time.current
-                     end
+    @viewing_since = viewing_since_param
 
     query_with_window = base_query.joins(:messages)
                                    .group('topics.id')
@@ -242,12 +237,6 @@ class TopicsController < ApplicationController
     @topics = @topics.order('MAX(messages.created_at) DESC, topics.id DESC')
                      .limit(25)
                      .load
-
-    @new_topics_count = base_query.joins(:messages)
-                                   .group('topics.id')
-                                   .having('MAX(messages.created_at) > ?', @viewing_since)
-                                   .count
-                                   .size
   end
 
   def preload_topic_states
@@ -549,6 +538,45 @@ class TopicsController < ApplicationController
     readers = @topic_states.dig(topic.id, :team_readers) || []
     return readers unless team_id
     readers.select { |r| r[:team_id] == team_id }
+  end
+
+  def topics_base_query(search_query: nil)
+    return apply_filters(Topic.includes(:creator)) if search_query.nil?
+
+    cleaned_query = search_query.to_s.strip
+    return Topic.none if cleaned_query.blank?
+
+    build_search_query(cleaned_query)
+  end
+
+  def build_search_query(query)
+    cleaned_query = query.to_s.strip
+    return Topic.none if cleaned_query.blank?
+
+    search_pattern = "%#{ActiveRecord::Base.sanitize_sql_like(cleaned_query)}%"
+
+    title_sql = Topic.select(:id).where("title ILIKE ?", search_pattern).to_sql
+    message_sql = Message.select(:topic_id).where("body ILIKE ?", search_pattern).to_sql
+    union_sql = "(#{title_sql}) UNION (#{message_sql})"
+
+    Topic.where("topics.id IN (#{union_sql})")
+         .includes(:creator)
+  end
+
+  def viewing_since_param
+    if params[:viewing_since].present?
+      Time.zone.parse(params[:viewing_since])
+    else
+      Time.current
+    end
+  end
+
+  def count_new_topics(base_query, viewing_since)
+    base_query.joins(:messages)
+              .group('topics.id')
+              .having('MAX(messages.created_at) > ?', viewing_since)
+              .count
+              .size
   end
 
   def load_notes

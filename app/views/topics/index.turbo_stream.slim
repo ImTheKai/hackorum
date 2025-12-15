@@ -1,10 +1,6 @@
 = turbo_stream.append "topics" do
   = render partial: "topics", locals: { topics: @topics }
 
-= turbo_stream.replace "new-topics-banner" do
-  - refresh_path = params[:q].present? ? search_topics_path(q: params[:q]) : topics_path
-  = render partial: "new_topics_banner", locals: { count: @new_topics_count, viewing_since: @viewing_since, refresh_path: refresh_path }
-
 - if @topics.size == 25
   - last_topic = @topics.last
   - cursor = "#{last_topic.last_activity.iso8601}_#{last_topic.id}"

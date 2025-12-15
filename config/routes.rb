@@ -24,6 +24,7 @@ Rails.application.routes.draw do
   resources :topics, only: [:index, :show] do
     collection do
       get :search
+      get :new_topics_count
       post :aware_bulk
       post :aware_all
     end

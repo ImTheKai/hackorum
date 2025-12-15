@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_15_150057) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_15_151100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -134,6 +134,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_15_150057) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["topic_id"], name: "index_message_read_ranges_on_topic_id"
+    t.index ["user_id", "topic_id", "range_end_message_id"], name: "index_message_read_ranges_on_user_topic_range_end_desc", order: { range_end_message_id: :desc }
     t.index ["user_id", "topic_id", "range_start_message_id", "range_end_message_id"], name: "index_message_read_ranges_on_user_topic_range"
     t.index ["user_id"], name: "index_message_read_ranges_on_user_id"
   end
@@ -152,6 +153,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_15_150057) do
     t.index ["message_id"], name: "index_messages_on_message_id", unique: true
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["sender_id"], name: "index_messages_on_sender_id"
+    t.index ["topic_id", "created_at", "id"], name: "index_messages_on_topic_id_and_created_at_desc_id_desc", order: { created_at: :desc, id: :desc }
     t.index ["topic_id"], name: "index_messages_on_topic_id"
   end
 

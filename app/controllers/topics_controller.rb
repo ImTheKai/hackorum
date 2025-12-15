@@ -221,17 +221,18 @@ class TopicsController < ApplicationController
   def apply_cursor_pagination(base_query)
     @viewing_since = viewing_since_param
 
-    query_with_window = base_query.joins(:messages)
-                                   .group('topics.id')
-                                   .having('MAX(messages.created_at) <= ?', @viewing_since)
-                                   .select('topics.*, MAX(messages.created_at) as last_activity')
+    windowed_query = base_query.joins(:messages)
+                               .where(messages: { created_at: ..@viewing_since })
+                               .group('topics.id')
+                               .having('MAX(messages.created_at) <= ?', @viewing_since)
+                               .select('topics.*, MAX(messages.created_at) as last_activity')
 
     if params[:cursor].present?
       cursor_time, cursor_id = params[:cursor].split('_')
-      @topics = query_with_window.having('(MAX(messages.created_at), topics.id) < (?, ?)',
+      @topics = windowed_query.having('(MAX(messages.created_at), topics.id) < (?, ?)',
                                           Time.zone.parse(cursor_time), cursor_id.to_i)
     else
-      @topics = query_with_window
+      @topics = windowed_query
     end
 
     @topics = @topics.order('MAX(messages.created_at) DESC, topics.id DESC')
@@ -573,6 +574,7 @@ class TopicsController < ApplicationController
 
   def count_new_topics(base_query, viewing_since)
     base_query.joins(:messages)
+              .where(messages: { created_at: viewing_since.. })
               .group('topics.id')
               .having('MAX(messages.created_at) > ?', viewing_since)
               .count

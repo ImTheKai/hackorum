@@ -99,13 +99,13 @@
   .thread-notes-container
     = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes
 
-.messages-container class=(["messages-container", @view_mode, (@sort_order == :desc ? "desc" : "asc")].compact.join(" "))
+.messages-container.flat.asc
   - if user_signed_in?
     .thread-actions data-controller="thread-actions" data-thread-actions-topic-id-value=@topic.id data-thread-actions-read-all-url-value=read_all_topic_path(@topic, format: :json)
       button.button-secondary data-action="click->thread-actions#markAllRead" Mark all messages read
 
   - @messages.each do |message|
-    = render 'message', message: message, view_mode: 'flat', number: @message_numbers[message.id]
+    = render 'message', message: message, number: @message_numbers[message.id]
 
 .topic-navigation
   = link_to "← Back to Topics", topics_path, class: "back-link"

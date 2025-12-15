@@ -14,9 +14,11 @@ class RegistrationsController < ApplicationController
       return redirect_to registration_path, alert: "Username and password are required."
     end
 
-    if User.exists?(username: username)
-      return redirect_to registration_path, alert: "Username is already taken."
+    if password != password_confirmation
+      return redirect_to registration_path, alert: "Password confirmation does not match."
     end
+
+    password_digest = BCrypt::Password.create(password)
 
     purpose = 'register'
     ttl = 1.hour
@@ -27,10 +29,16 @@ class RegistrationsController < ApplicationController
       metadata: {
         name: name,
         username: username,
-        password: password,
-        password_confirmation: password_confirmation
+        password_digest: password_digest
       }.to_json
     )
+
+    begin
+      NameReservation.reserve!(name: username, owner: token)
+    rescue ActiveRecord::RecordInvalid
+      token.destroy
+      return redirect_to registration_path, alert: "Username is already taken."
+    end
 
     UserMailer.verification_email(token, raw).deliver_later
     redirect_to root_path, notice: 'Verification email sent. Please check your inbox.'

@@ -102,6 +102,54 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
+  mail:
+    image: boky/postfix:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    environment:
+      # Domain from which emails will be sent
+      ALLOWED_SENDER_DOMAINS: ${MAIL_DOMAIN:-example.com}
+
+      # Relay host (leave empty for direct sending, or use a relay like SendGrid/Mailgun)
+      # RELAYHOST: ${MAIL_RELAYHOST:-}
+      # RELAYHOST_USERNAME: ${MAIL_RELAYHOST_USERNAME:-}
+      # RELAYHOST_PASSWORD: ${MAIL_RELAYHOST_PASSWORD:-}
+
+      # DKIM signing
+      DKIM_SELECTOR: ${DKIM_SELECTOR:-mail}
+      DKIM_AUTOGENERATE: "true"
+
+      # Logging
+      LOG_LEVEL: ${MAIL_LOG_LEVEL:-info}
+
+      # Override from address (optional, for testing)
+      # OVERWRITE_FROM: ${MAIL_OVERWRITE_FROM:-}
+
+      # TLS configuration
+      TLS: "true"
+
+      # Allow localhost relay (for the web container)
+      ALLOW_EMPTY_SENDER_DOMAINS: "false"
+
+      # Message size limit (default 10MB)
+      MESSAGE_SIZE_LIMIT: ${MAIL_MESSAGE_SIZE_LIMIT:-10240000}
+    volumes:
+      # Persist DKIM keys
+      - mail_dkim:/etc/opendkim/keys
+      # Persist mail queue
+      - mail_spool:/var/spool/postfix
+    expose:
+      - "587"  # Submission port (for authenticated clients)
+    ports:
+      - "25:25"   # SMTP port (for receiving mail)
+    healthcheck:
+      test: ["CMD-SHELL", "postfix status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+
   psql:
     image: postgres:18
     entrypoint: ["psql", "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackorum}"]
@@ -117,3 +165,5 @@ volumes:
   pgbackups:
   caddy_data:
   caddy_config:
+  mail_dkim:
+  mail_spool:

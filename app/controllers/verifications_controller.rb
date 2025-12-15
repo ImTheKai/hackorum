@@ -21,7 +21,6 @@ class VerificationsController < ApplicationController
 
   def handle_register(token)
     existing_aliases = Alias.by_email(token.email)
-    # If email already linked to another user, block registration
     if existing_aliases.where.not(user_id: nil).exists?
       return redirect_to new_session_path, alert: 'This email is already claimed. Please sign in.'
     end
@@ -30,27 +29,34 @@ class VerificationsController < ApplicationController
     metadata = JSON.parse(token.metadata || '{}') rescue {}
     desired_username = metadata['username']
     user.username = desired_username
-    if metadata['password'].present?
-      user.password = metadata['password']
-      user.password_confirmation = metadata['password_confirmation']
+    if metadata['password_digest'].present?
+      user.password_digest = metadata['password_digest']
     end
-    begin
+
+    ActiveRecord::Base.transaction do
       user.save!(context: :registration)
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
-      if e.message =~ /username/i
-        return redirect_to new_registration_path, alert: "Username is already taken."
+
+      reservation = NameReservation.find_by(
+        owner_type: 'UserToken',
+        owner_id: token.id,
+        name: NameReservation.normalize(desired_username)
+      )
+      if reservation
+        reservation.update!(owner_type: 'User', owner_id: user.id)
       else
-        raise
+        begin
+          NameReservation.reserve!(name: desired_username, owner: user)
+        rescue ActiveRecord::RecordInvalid
+          raise ActiveRecord::RecordInvalid.new(user), "Username is already taken."
+        end
       end
     end
 
     if existing_aliases.exists?
       existing_aliases.update_all(user_id: user.id, verified_at: Time.current)
-      # Ensure one primary alias
       primary = existing_aliases.find_by(primary_alias: true) || existing_aliases.first
       primary.update!(primary_alias: true)
     else
-      # Use provided name if any
       name = metadata['name'] || token.email
       Alias.create!(user: user, name: name, email: token.email, primary_alias: true, verified_at: Time.current)
     end
@@ -63,7 +69,6 @@ class VerificationsController < ApplicationController
   def handle_add_alias(token)
     require_authentication
     email = token.email
-    # Block if email belongs to another active user
     if Alias.by_email(email).where.not(user_id: [nil, current_user.id]).exists?
       return redirect_to settings_path, alert: 'Email is linked to another account. Delete that account first to release it.'
     end

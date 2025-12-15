@@ -42,6 +42,64 @@ RSpec.describe 'Registration and Login', type: :request do
       expect(al.primary_alias).to be(true)
       expect(al.verified_at).to be_present
     end
+
+    it 'reserves username during registration request' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'reserved', password: 'secret', password_confirmation: 'secret' }
+        expect(response).to redirect_to(root_path)
+      end
+
+      # Username should be reserved for the token
+      token = UserToken.order(:created_at).last
+      reservation = NameReservation.find_by(name: 'reserved')
+      expect(reservation).to be_present
+      expect(reservation.owner_type).to eq('UserToken')
+      expect(reservation.owner_id).to eq(token.id)
+    end
+
+    it 'transfers username reservation to user on verification' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'new@example.com', name: 'New Person', username: 'transfer', password: 'secret', password_confirmation: 'secret' }
+        expect(response).to redirect_to(root_path)
+      end
+
+      raw = extract_raw_token_from_mailer
+      get verification_path(token: raw)
+      expect(response).to redirect_to(root_path)
+
+      user = User.order(:created_at).last
+      reservation = NameReservation.find_by(name: 'transfer')
+      expect(reservation).to be_present
+      expect(reservation.owner_type).to eq('User')
+      expect(reservation.owner_id).to eq(user.id)
+    end
+
+    it 'prevents race condition where username is taken during verification' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'first@example.com', username: 'racetest', password: 'secret', password_confirmation: 'secret' }
+        expect(response).to redirect_to(root_path)
+      end
+
+      # Try to register with same username from different email - should fail
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'second@example.com', username: 'racetest', password: 'secret', password_confirmation: 'secret' }
+        expect(response).to redirect_to(registration_path)
+        expect(flash[:alert]).to match(/already taken/i)
+      end
+    end
+
+    it 'releases username reservation when token is destroyed' do
+      perform_enqueued_jobs do
+        post registration_path, params: { email: 'cleanup@example.com', username: 'cleanup', password: 'secret', password_confirmation: 'secret' }
+        expect(response).to redirect_to(root_path)
+      end
+
+      token = UserToken.order(:created_at).last
+      expect(NameReservation.find_by(name: 'cleanup')).to be_present
+
+      token.destroy
+      expect(NameReservation.find_by(name: 'cleanup')).to be_nil
+    end
   end
 
   describe 'password login' do

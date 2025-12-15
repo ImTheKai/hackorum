@@ -9,6 +9,8 @@ class UserToken < ApplicationRecord
 
   scope :unconsumed, -> { where(consumed_at: nil) }
 
+  after_destroy :release_name_reservation
+
   def consumed?
     consumed_at.present?
   end
@@ -46,5 +48,15 @@ class UserToken < ApplicationRecord
 
   def self.digest(raw)
     OpenSSL::Digest::SHA256.hexdigest(raw)
+  end
+
+  def self.cleanup_expired!(older_than: 1.day)
+    where('expires_at < ? OR consumed_at < ?', older_than.ago, older_than.ago).destroy_all
+  end
+
+  private
+
+  def release_name_reservation
+    NameReservation.release_for(self)
   end
 end

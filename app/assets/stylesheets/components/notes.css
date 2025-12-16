@@ -121,6 +121,28 @@
   justify-content: flex-end;
 }
 
+.note-actions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-2);
+}
+
+.note-delete-button {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-link);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .notes-inline-add {
   margin: var(--spacing-3) 0;
 }

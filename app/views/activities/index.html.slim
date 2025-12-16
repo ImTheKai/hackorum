@@ -29,6 +29,9 @@
               .activity-tags
                 - note.note_tags.each do |tag|
                   span.note-tag ##{tag.tag}
+            - if current_user.id == note.author_id
+              .activity-actions
+                = button_to "Delete note", note_path(note), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }
         - else
           .activity-body
             span.activity-missing Content not available anymore.

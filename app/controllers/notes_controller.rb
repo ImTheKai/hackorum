@@ -61,7 +61,7 @@ class NotesController < ApplicationController
       return
     end
     unless @note.author_id == current_user.id
-      redirect_back fallback_location: topic_path(@note.topic), alert: "You can only edit your own notes"
+      redirect_back fallback_location: topic_path(@note.topic), alert: "You can edit or delete your own notes"
       return
     end
   end

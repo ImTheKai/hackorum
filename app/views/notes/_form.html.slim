@@ -3,18 +3,33 @@
 - note_error = flash[:note_error]&.with_indifferent_access
 
 - prefill_body = form_note.body
+- prefill_tags = form_note.note_tags.map(&:tag).join(", ")
+- prefill_mentions = form_note.note_mentions.includes(:mentionable).map { |mention| note_mention_label(mention) }.join(", ")
 - if note_error
   - matches_note = note_error[:note_id].present? && form_note.persisted? && form_note.id == note_error[:note_id].to_i
   - matches_new_note = !form_note.persisted? && note_error[:topic_id].to_i == topic.id && note_error[:message_id].to_s == message&.id.to_s
   - if matches_note || matches_new_note
     - prefill_body = note_error[:body]
+    - prefill_tags = note_error[:tags_input].to_s
+    - prefill_mentions = note_error[:mentions_input].to_s
 
 = form_with model: form_note, url: form_note.persisted? ? note_path(form_note) : notes_path, method: form_note.persisted? ? :patch : :post, data: { turbo: true } do |f|
   = hidden_field_tag "note[topic_id]", topic.id
   = hidden_field_tag "note[message_id]", message&.id
-  .note-field
-    = f.text_area :body, rows: 3, placeholder: "Add a note with @mentions and #tags…", required: true, class: "note-textarea", value: prefill_body
-    - if note_error && prefill_body == note_error[:body]
-      .note-error = note_error[:error]
+  .note-form-fields
+    .note-field
+      = f.label :body, "Note"
+      = f.text_area :body, rows: 4, placeholder: "Write your note", required: true, class: "note-textarea", value: prefill_body
+      - if note_error && prefill_body == note_error[:body]
+        .note-error = note_error[:error]
+    .note-meta-fields
+      .note-field
+        = label_tag :note_mentions_input, "Mentions"
+        = text_field_tag "note[mentions_input]", prefill_mentions, placeholder: "@alice, @team", class: "note-text-field"
+        .note-hint "Notify people or teams. Separate with commas or spaces."
+      .note-field
+        = label_tag :note_tags_input, "Tags"
+        = text_field_tag "note[tags_input]", prefill_tags, placeholder: "release, docs, follow-up", class: "note-text-field"
+        .note-hint "Optional tags for filtering. Lowercase letters, numbers, dash, underscore, or dot."
   .note-actions
     = f.submit submit_label, class: "button-secondary"

@@ -7,7 +7,13 @@ class NotesController < ApplicationController
   def create
     topic = Topic.find(note_params[:topic_id])
     message = resolve_message(topic)
-    note = NoteBuilder.new(author: current_user).create!(topic:, message:, body: note_params[:body])
+    note = NoteBuilder.new(author: current_user).create!(
+      topic:,
+      message:,
+      body: note_params[:body],
+      tags: parsed_tags,
+      mention_names: parsed_mentions
+    )
 
     redirect_to topic_path(topic, anchor: note_anchor(note)), notice: "Note added"
   rescue NoteBuilder::Error, ActiveRecord::RecordInvalid => e
@@ -16,6 +22,8 @@ class NotesController < ApplicationController
       body: note_params[:body],
       message_id: note_params[:message_id].presence,
       topic_id: note_params[:topic_id],
+      tags_input: note_params[:tags_input],
+      mentions_input: note_params[:mentions_input],
       error: e.message
     }
     redirect_back fallback_location: topic_path(topic)
@@ -24,7 +32,12 @@ class NotesController < ApplicationController
   def update
     return if performed?
 
-    NoteBuilder.new(author: current_user).update!(note: @note, body: note_params[:body])
+    NoteBuilder.new(author: current_user).update!(
+      note: @note,
+      body: note_params[:body],
+      tags: parsed_tags,
+      mention_names: parsed_mentions
+    )
 
     redirect_to topic_path(@note.topic, anchor: note_anchor(@note)), notice: "Note updated"
   rescue NoteBuilder::Error, ActiveRecord::RecordInvalid => e
@@ -34,6 +47,8 @@ class NotesController < ApplicationController
       message_id: note_params[:message_id].presence,
       topic_id: note_params[:topic_id],
       note_id: @note.id,
+      tags_input: note_params[:tags_input],
+      mentions_input: note_params[:mentions_input],
       error: e.message
     }
     redirect_back fallback_location: topic_path(@note.topic)
@@ -67,7 +82,7 @@ class NotesController < ApplicationController
   end
 
   def note_params
-    params.require(:note).permit(:body, :topic_id, :message_id)
+    params.require(:note).permit(:body, :topic_id, :message_id, :tags_input, :mentions_input)
   end
 
   def resolve_message(topic)
@@ -81,5 +96,21 @@ class NotesController < ApplicationController
     else
       "thread-notes"
     end
+  end
+
+  def parsed_tags
+    split_tokens(note_params[:tags_input]) { |token| token.delete_prefix("#") }
+  end
+
+  def parsed_mentions
+    split_tokens(note_params[:mentions_input]) { |token| token.delete_prefix("@") }
+  end
+
+  def split_tokens(raw, &block)
+    Array(raw.to_s.split(/[,\s]+/))
+      .map { |token| token.strip }
+      .reject(&:blank?)
+      .map(&block)
+      .reject(&:blank?)
   end
 end

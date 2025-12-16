@@ -107,6 +107,25 @@
   margin-bottom: var(--spacing-2);
 }
 
+.note-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.note-meta-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.note-field label {
+  display: block;
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--spacing-1);
+  color: var(--color-text-primary);
+}
+
 .note-textarea {
   width: 100%;
   border-radius: var(--border-radius-sm);
@@ -114,6 +133,21 @@
   padding: var(--spacing-2);
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);
+}
+
+.note-text-field {
+  width: 100%;
+  border-radius: var(--border-radius-sm);
+  border: var(--border-width) solid var(--color-border);
+  padding: var(--spacing-2);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+}
+
+.note-hint {
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .note-actions {

@@ -913,48 +913,56 @@ carol_notes = NoteBuilder.new(author: carol_user)
 alice_notes.create!(
   topic: patch_topic,
   message: msg3,
-  body: "- Add WAL position to progress report\n- Split heap vs index counters\n- Autovacuum should emit too\n@ExampleCompany please sync on scope"
+  body: "- Add WAL position to progress report\n- Split heap vs index counters\n- Autovacuum should emit too\nExampleCompany please sync on scope",
+  mention_names: [example_team.name]
 )
 bob_notes.create!(
   topic: patch_topic,
   message: msg1,
-  body: "Queued for next CF round; tracking in CF app.\n@ExampleCompany heads-up for review bandwidth"
+  body: "Queued for next CF round; tracking in CF app.\nExampleCompany heads-up for review bandwidth",
+  mention_names: [example_team.name]
 )
 
 # RFC thread notes (thread + message, different authors)
 carol_notes.create!(
   topic: rfc_topic,
-  body: "Thread summary: add index AM hooks, include sample AM + docs.\n@ExampleCompany track follow-ups"
+  body: "Thread summary: add index AM hooks, include sample AM + docs.\nExampleCompany track follow-ups",
+  mention_names: [example_team.name]
 )
 alice_notes.create!(
   topic: rfc_topic,
   message: rfc_msg2,
-  body: "Docs + sample AM needed before commit. Add SGML + README.\n@ExampleCompany can we help draft?"
+  body: "Docs + sample AM needed before commit. Add SGML + README.\nExampleCompany can we help draft?",
+  mention_names: [example_team.name]
 )
 
 # Discussion thread: mix of thread/message notes from different people
 carol_notes.create!(
   topic: discussion_topic,
-  body: "Thread note: align logical slots with failover, add standby-safe flag.\n@ExampleCompany capture design risks"
+  body: "Thread note: align logical slots with failover, add standby-safe flag.\nExampleCompany capture design risks",
+  mention_names: [example_team.name]
 )
 alice_notes.create!(
   topic: discussion_topic,
   message: disc_msg4,
-  body: "Message note: prototype slot fencing, watch cascading setups; prefer heartbeat piggyback.\n@ExampleCompany please review"
+  body: "Message note: prototype slot fencing, watch cascading setups; prefer heartbeat piggyback.\nExampleCompany please review",
+  mention_names: [example_team.name]
 )
 
 # Committer topic: partially read with a note
 bob_notes.create!(
   topic: committer_topic,
   message: committer_messages[3],
-  body: "Action: test lower freeze_age under heavy autovacuum.\n@ExampleCompany check lab capacity"
+  body: "Action: test lower freeze_age under heavy autovacuum.\nExampleCompany check lab capacity",
+  mention_names: [example_team.name]
 )
 
 # Moderate topic note for visibility
 carol_notes.create!(
   topic: moderate_topic_1,
   message: moderate_msgs_1[5],
-  body: "Pooling experiments look good; consider adaptive target.\n@ExampleCompany let's benchmark with PG16"
+  body: "Pooling experiments look good; consider adaptive target.\nExampleCompany let's benchmark with PG16",
+  mention_names: [example_team.name]
 )
 
 # Notes on extra sampler topics for visibility across pages

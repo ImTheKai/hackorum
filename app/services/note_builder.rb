@@ -7,7 +7,7 @@ class NoteBuilder
     @author = author
   end
 
-  def create!(topic:, message: nil, body:)
+  def create!(topic:, message: nil, body:, tags: [], mention_names: [])
     raise Error, "You must be signed in to add a note" unless author
     body_text = body.to_s.strip
     raise Error, "Note cannot be blank" if body_text.blank?
@@ -15,13 +15,13 @@ class NoteBuilder
     ActiveRecord::Base.transaction do
       note = Note.new(topic:, message:, author:, last_editor: author, body: body_text)
       note.save!
-      mentionables, tags = rebuild_mentions_and_tags!(note, body_text)
+      mentionables, tags = rebuild_mentions_and_tags!(note, tags:, mention_names:)
       fan_out!(note:, mentionables:, mark_author_read: true)
       note
     end
   end
 
-  def update!(note:, body:)
+  def update!(note:, body:, tags: [], mention_names: [])
     raise Error, "You do not have permission to edit this note" unless note.author_id == author.id
     body_text = body.to_s.strip
     raise Error, "Note cannot be blank" if body_text.blank?
@@ -30,7 +30,7 @@ class NoteBuilder
       note.note_edits.create!(editor: author, body: note.body) if note.body != body_text
       note.update!(body: body_text, last_editor: author)
 
-      mentionables, _tags = rebuild_mentions_and_tags!(note, body_text)
+      mentionables, _tags = rebuild_mentions_and_tags!(note, tags:, mention_names:)
       fan_out!(note:, mentionables:, mark_author_read: false)
       note
     end
@@ -40,10 +40,10 @@ class NoteBuilder
 
   attr_reader :author
 
-  def rebuild_mentions_and_tags!(note, body_text)
-    mention_names = extract_mentions(body_text)
-    mentionables = resolve_mentions(mention_names)
-    tags = extract_tags(body_text)
+  def rebuild_mentions_and_tags!(note, tags:, mention_names:)
+    normalized_mentions = normalize_mentions(mention_names)
+    mentionables = resolve_mentions(normalized_mentions)
+    normalized_tags = normalize_tags(tags)
 
     note.note_mentions.delete_all
     mentionables.each do |mentionable|
@@ -51,27 +51,26 @@ class NoteBuilder
     end
 
     note.note_tags.delete_all
-    tags.each do |tag|
+    normalized_tags.each do |tag|
       note.note_tags.create!(tag:)
     end
 
-    [mentionables, tags]
+    [mentionables, normalized_tags]
   end
 
-  def extract_mentions(text)
-    text.to_s.scan(/(?:^|[^@\w])@([A-Za-z0-9_.-]+)/)
-        .flatten
-        .map { |m| NameReservation.normalize(m) }
-        .reject(&:blank?)
-        .uniq
+  def normalize_mentions(mention_names)
+    Array(mention_names)
+      .map { |m| m.to_s.delete_prefix("@") }
+      .map { |m| NameReservation.normalize(m) }
+      .reject(&:blank?)
+      .uniq
   end
 
-  def extract_tags(text)
-    text.to_s.scan(/(?:^|[^#\w])#([A-Za-z0-9_.-]+)/)
-        .flatten
-        .map { |t| t.to_s.strip.downcase }
-        .select { |tag| tag.match?(NoteTag::TAG_FORMAT) }
-        .uniq
+  def normalize_tags(tags)
+    Array(tags)
+      .map { |t| t.to_s.delete_prefix("#").strip.downcase }
+      .select { |tag| tag.match?(NoteTag::TAG_FORMAT) }
+      .uniq
   end
 
   def resolve_mentions(names)

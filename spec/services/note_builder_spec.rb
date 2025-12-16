@@ -11,7 +11,13 @@ RSpec.describe NoteBuilder do
     team_member = create(:user, username: "carl")
     create(:team_member, team:, user: team_member)
 
-    note = described_class.new(author: author).create!(topic:, message:, body: "Ping @bob and @team-two #Foo #bar")
+    note = described_class.new(author: author).create!(
+      topic:,
+      message:,
+      body: "Ping for review",
+      tags: %w[foo bar],
+      mention_names: %w[bob team-two]
+    )
 
     expect(note.note_tags.pluck(:tag)).to match_array(%w[foo bar])
     expect(note.note_mentions.map(&:mentionable)).to match_array([mentioned_user, team])
@@ -30,8 +36,8 @@ RSpec.describe NoteBuilder do
     carol = create(:user, username: "carol")
 
     builder = described_class.new(author: author)
-    note = builder.create!(topic:, message:, body: "Hi @bob and @devs")
-    builder.update!(note:, body: "Hi @bob and @carol")
+    note = builder.create!(topic:, message:, body: "Hi team", mention_names: %w[bob devs])
+    builder.update!(note:, body: "Hi friends", mention_names: %w[bob carol])
 
     old_activity = Activity.find_by(user: dev_member, subject: note)
     new_activity = Activity.find_by(user: carol, subject: note)

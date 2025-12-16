@@ -8,10 +8,11 @@
   tr class="topic-row topic-#{state[:status]}" data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
     td class="topic-title status-border status-#{state[:status] || 'new'}" data-label="Topic"
       - if state[:status] == :reading
+        - unread_count = [topic.messages.count - state[:read_count], 0].max
         .topic-icon.topic-icon-reading
-          i.fa-solid.fa-message
-            - unread_count = topic.messages.count - state[:read_count]
-            span.topic-icon-badge = unread_count < 10 ? unread_count : "9+"
+          i.fa-solid.fa-envelope
+          - if unread_count.positive?
+            span.topic-icon-badge.topic-icon-badge-sup = unread_count
       - if user_signed_in? && other_team_readers.any?
         - reader_count = other_team_readers.size
         div class="topic-icon activity-team-read" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"

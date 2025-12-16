@@ -123,6 +123,14 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+.topic-icon-badge-sup {
+  bottom: -6px;
+  right: -6px;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 .status-border {
   border-left: 8px solid transparent;
 }

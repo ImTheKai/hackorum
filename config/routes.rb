@@ -36,7 +36,7 @@ Rails.application.routes.draw do
   resources :activities, only: [:index] do
     post :mark_all_read, on: :collection
   end
-  resources :notes, only: [:create, :update]
+  resources :notes, only: [:create, :update, :destroy]
 
   # Authentication
   resource :session, only: [:new, :create, :destroy]

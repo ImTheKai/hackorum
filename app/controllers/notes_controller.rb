@@ -2,7 +2,7 @@
 
 class NotesController < ApplicationController
   before_action :require_authentication
-  before_action :set_note, only: [:update]
+  before_action :set_note, only: [:update, :destroy]
 
   def create
     topic = Topic.find(note_params[:topic_id])
@@ -39,12 +39,29 @@ class NotesController < ApplicationController
     redirect_back fallback_location: topic_path(@note.topic)
   end
 
+  def destroy
+    return if performed?
+
+    @note.transaction do
+      @note.update!(deleted_at: Time.current)
+      @note.note_mentions.delete_all
+      @note.note_tags.delete_all
+      @note.activities.update_all(hidden: true)
+    end
+
+    redirect_back fallback_location: topic_path(@note.topic), notice: "Note deleted"
+  end
+
   private
 
   def set_note
     @note = Note.find(params[:id])
+    if @note.deleted_at?
+      redirect_back fallback_location: topic_path(@note.topic), alert: "Note has been deleted"
+      return
+    end
     unless @note.author_id == current_user.id
-      redirect_back fallback_location: topic_path(@note.topic), alert: "You can only edit your own notes"
+      redirect_back fallback_location: topic_path(@note.topic), alert: "You can edit or delete your own notes"
       return
     end
   end

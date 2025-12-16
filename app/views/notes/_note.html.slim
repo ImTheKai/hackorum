@@ -19,6 +19,8 @@
         span.note-mention = note_mention_label(mention)
 
   - if current_user&.id == note.author_id
-    details.note-edit-toggle
-      summary Edit
-      = render "notes/form", note: note, topic: note.topic, message: note.message, submit_text: "Update note"
+    .note-actions-row
+      details.note-edit-toggle
+        summary Edit
+        = render "notes/form", note: note, topic: note.topic, message: note.message, submit_text: "Update note"
+      = button_to "Delete", note_path(note), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }

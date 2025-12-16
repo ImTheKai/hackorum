@@ -56,6 +56,10 @@
   color: var(--color-text-secondary);
 }
 
+.activity-actions {
+  margin-top: var(--spacing-2);
+}
+
 .activity-tags {
   display: flex;
   flex-wrap: wrap;

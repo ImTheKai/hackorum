@@ -313,11 +313,9 @@ class TopicsController < ApplicationController
       aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
                                  .pluck(:topic_id, :aware_until_message_id)
                                  .to_h
-      read_rows = MessageReadRange.where(user: current_user, topic_id: topic_ids)
-                                  .pluck(:topic_id, :range_start_message_id, :range_end_message_id)
-      read_ranges = read_rows.each_with_object(Hash.new { |h, k| h[k] = [] }) do |(tid, s, e), acc|
-        acc[tid] << [s, e]
-      end
+      read_counts = MessageReadRange.where(user: current_user, topic_id: topic_ids)
+                                    .group(:topic_id)
+                                    .sum(:message_count)
       global_aware_before = current_user.aware_before
 
       team_readers = preload_team_reader_states(topic_ids, last_ids)
@@ -327,19 +325,19 @@ class TopicsController < ApplicationController
     @topics.each do |topic|
       last_id = last_ids[topic.id]
       last_time = last_times[topic.id]
-    if user_signed_in?
-      aware_until = aware_map[topic.id]
-      total = total_counts[topic.id].to_i
-      ranges = read_ranges[topic.id] || []
-      read_count = ranges.sum do |(s, e)|
-        next 0 unless s && e
-        (e - s + 1)
+      if user_signed_in?
+        aware_until = aware_map[topic.id]
+        total = total_counts[topic.id].to_i
+        read_count = read_counts[topic.id].to_i
+        status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
+        progress = compute_progress(total:, read_count:)
+      else
+        status = :new
+        aware_until = nil
+        read_count = 0
+        progress = 0
       end
-      status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
-      progress = compute_progress(total:, read_count:)
-    else
-      status = :new
-    end
+
       @topic_states[topic.id] = { status:, aware_until:, read_count:, last_id:, last_time:, progress:, team_readers: team_readers[topic.id] || [] }
     end
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_15_151100) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_17_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -133,6 +133,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_15_151100) do
     t.datetime "read_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "message_count", default: 0, null: false
     t.index ["topic_id"], name: "index_message_read_ranges_on_topic_id"
     t.index ["user_id", "topic_id", "range_end_message_id"], name: "index_message_read_ranges_on_user_topic_range_end_desc", order: { range_end_message_id: :desc }
     t.index ["user_id", "topic_id", "range_start_message_id", "range_end_message_id"], name: "index_message_read_ranges_on_user_topic_range"

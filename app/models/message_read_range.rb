@@ -24,7 +24,16 @@ class MessageReadRange < ApplicationRecord
         overlapping.delete_all
       end
 
-      create!(user:, topic:, range_start_message_id: s, range_end_message_id: e, read_at:)
+      count = Message.where(topic_id: topic.id, id: s..e).count
+
+      create!(
+        user: user,
+        topic: topic,
+        range_start_message_id: s,
+        range_end_message_id: e,
+        message_count: count,
+        read_at: read_at
+      )
     end
   end
 

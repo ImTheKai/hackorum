@@ -28,7 +28,6 @@ RSpec.describe "Topics", type: :request do
 
       it "shows topics with most recent activity first" do
         get topics_path
-        # topic2 has more recent message, should appear first
         topic1_position = response.body.index(topic1.title)
         topic2_position = response.body.index(topic2.title)
         expect(topic2_position).to be < topic1_position
@@ -76,7 +75,6 @@ RSpec.describe "Topics", type: :request do
       it "shows flat view (oldest first)" do
         get topic_path(topic)
         expect(response.body).to include('messages-container flat')
-        # root should appear before reply
         root_position = response.body.index(root_message.body)
         reply_position = response.body.index(reply_message.body)
         expect(root_position).to be < reply_position

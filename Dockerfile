@@ -5,10 +5,11 @@ FROM ruby:${RUBY_VERSION} AS base
 
 ENV BUNDLE_WITHOUT="development:test" \
     RAILS_ENV=production \
-    NODE_ENV=production
+    NODE_ENV=production \
+    NPM_CONFIG_PRODUCTION=false
 
 RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends build-essential libpq-dev git curl && \
+    apt-get install -y --no-install-recommends build-essential libpq-dev git curl nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,6 +19,9 @@ RUN bundle install --jobs=4 --retry=3
 
 COPY . .
 
+# Install JS deps including devDependencies for the PostCSS build, then build CSS.
+RUN npm ci --production=false && \
+    npm run build:css
 RUN SECRET_KEY_BASE=dummy bundle exec rails assets:precompile
 
 FROM ruby:${RUBY_VERSION}-slim AS final

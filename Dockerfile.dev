@@ -6,7 +6,7 @@ ENV RAILS_ENV=development \
     BUNDLE_WITHOUT=""
 
 RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends build-essential libpq-dev git curl && \
+    apt-get install -y --no-install-recommends build-essential libpq-dev git curl nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -15,6 +15,9 @@ COPY Gemfile Gemfile.lock ./
 RUN bundle install --jobs=4 --retry=3
 
 COPY . .
+
+# Install JS dependencies so dev server can run the CSS watcher; actual CSS is rebuilt by bin/dev/foreman.
+RUN npm install
 
 EXPOSE 3000
 

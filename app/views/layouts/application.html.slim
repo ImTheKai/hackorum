@@ -21,7 +21,7 @@ html data-theme="light"
           var theme = stored || (prefersDark ? 'dark' : 'light');
           document.documentElement.dataset.theme = theme;
         })();
-    = stylesheet_link_tag :app, "data-turbo-track": "reload"
+    = stylesheet_link_tag "application", "data-turbo-track": "reload"
     = javascript_importmap_tags
     script[src="https://kit.fontawesome.com/92fb6aa8ba.js"]
   body

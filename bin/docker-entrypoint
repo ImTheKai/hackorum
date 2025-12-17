@@ -9,6 +9,11 @@ fi
 # Ensure gems are installed when using a persistent bundle volume.
 bundle check || bundle install
 
+# Ensure JS dependencies are present when using a node_modules volume.
+if [ -f package.json ] && [ ! -d node_modules ]; then
+  npm install --no-progress
+fi
+
 # If running the rails server (directly or via bin/dev), create or migrate the database
 if { [ "$1" = "./bin/rails" ] && [ "$2" = "server" ]; } || [ "$1" = "./bin/dev" ]; then
   ./bin/rails db:prepare

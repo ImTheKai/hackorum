@@ -1,0 +1,2 @@
+web: env RUBY_DEBUG_OPEN=true bin/rails server -b ${HOST:-127.0.0.1} -p ${PORT:-3000}
+css: yarn build:css --watch

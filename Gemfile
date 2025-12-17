@@ -4,6 +4,7 @@ source "https://rubygems.org"
 gem "rails", "~> 8.0.2"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
+gem "cssbundling-rails"
 # Use postgresql as the database for Active Record
 gem "pg", "~> 1.1"
 # PostgreSQL-specific ActiveRecord extensions (UNION, CTE, etc.)

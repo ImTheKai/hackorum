@@ -36,6 +36,7 @@ services:
       PGUSER: ${POSTGRES_USER:-hackorum}
       PGPASSWORD: ${POSTGRES_PASSWORD:-hackorum}
       PGDATABASE: ${POSTGRES_DB:-hackorum_development}
+      SOLID_QUEUE_IN_PUMA: "1"
       FORCE_SSL: ${FORCE_SSL:-false}
     volumes:
       - .:/app

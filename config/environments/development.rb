@@ -32,10 +32,13 @@ Rails.application.configure do
   config.active_storage.service = :local
 
   # Mailer setup for development
-  config.action_mailer.raise_delivery_errors = false
+  # Surface mail delivery errors locally so broken configuration (e.g., missing From) is obvious.
+  config.action_mailer.raise_delivery_errors = true
   config.action_mailer.perform_caching = false
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
-  config.action_mailer.delivery_method = :letter_opener
+  config.action_mailer.default_options = { from: ENV.fetch("MAIL_FROM", "noreply@hackorum.dev") }
+  # Use the web UI for viewing emails to avoid Launchy/browser dependencies inside containers.
+  config.action_mailer.delivery_method = :letter_opener_web
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log

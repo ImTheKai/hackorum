@@ -731,11 +731,11 @@ class TopicsController < ApplicationController
   end
 
   def topics_page_cache_key
-    return nil unless @topics&.last
+    return nil unless @topics&.first
     return nil if params[:filter].present? || params[:team_id].present?
 
-    last_topic = @topics.last
-    watermark = "#{last_topic.last_activity.to_i}_#{last_topic.id}"
+    latest_topic = @topics.first
+    watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
     ["topics-index", watermark]
   end
 

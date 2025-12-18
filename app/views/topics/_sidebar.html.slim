@@ -22,8 +22,8 @@
               li = link_to "#{team.name}: not yet read by team", topics_path(filter: "team_unread", team_id: team.id)
               li = link_to "#{team.name}: my teammates are reading", topics_path(filter: "team_reading_others", team_id: team.id)
               li = link_to "#{team.name}: my team is reading", topics_path(filter: "team_reading_any", team_id: team.id)
-              li = link_to "#{team.name}: started by teammate", topics_path(filter: "team_started", team_id: team.id)
-              li = link_to "#{team.name}: messages by teammates", topics_path(filter: "team_messaged", team_id: team.id)
+              li = link_to "#{team.name}: started by team", topics_path(filter: "team_started", team_id: team.id)
+              li = link_to "#{team.name}: messages by team", topics_path(filter: "team_messaged", team_id: team.id)
       - if user_signed_in? && @available_note_tags.present?
         .sidebar-section
           h3.sidebar-heading My tags

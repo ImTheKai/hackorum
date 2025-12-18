@@ -541,7 +541,7 @@ class TopicsController < ApplicationController
     when "team_messaged"
       if team_id
         member_alias_ids = Alias.joins(user: :team_members).where(team_members: { team_id: team_id }).select(:id)
-        base_query = base_query.joins(:messages).where(messages: { sender_id: member_alias_ids }).distinct
+        base_query = base_query.where(id: Message.where(sender_id: member_alias_ids).select(:topic_id))
       end
     end
     base_query

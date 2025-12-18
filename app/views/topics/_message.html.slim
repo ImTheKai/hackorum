@@ -12,7 +12,13 @@
   .message-header
     .message-author
       .author-row
-        span.message-number = "##{display_number}"
+        = link_to "##{display_number}", "#message-#{message.id}", class: "message-number"
+        = button_tag type: "button",
+                     class: "message-copy",
+                     data: { controller: "clipboard", action: "click->clipboard#copy", "clipboard-url-value": topic_url(@topic, anchor: "message-#{message.id}") },
+                     title: "Copy message link",
+                     "aria-label": "Copy message link" do
+          i.fa-regular.fa-copy
         = image_tag message.sender.gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
         .author-details
           .author-name = message.sender.name

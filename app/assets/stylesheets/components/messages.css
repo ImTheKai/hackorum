@@ -79,6 +79,35 @@
   color: var(--color-text-muted);
 }
 
+.message-number {
+  color: var(--color-text-link);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+  margin-right: var(--spacing-2);
+}
+
+.message-number:hover {
+  text-decoration: underline;
+}
+
+.message-copy {
+  border: none;
+  background: none;
+  color: var(--color-text-link);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.message-copy:hover {
+  text-decoration: underline;
+}
+
+.message-copy.copied {
+  color: var(--color-success);
+}
+
 .reply-indicator {
   color: var(--color-purple);
   font-style: italic;

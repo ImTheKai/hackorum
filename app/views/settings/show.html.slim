@@ -15,7 +15,7 @@
 
   .settings-section
     h2 Change password
-    = form_with url: update_current_password_path, method: :patch, local: true do
+    = form_with url: update_current_password_path, method: :patch, local: true, data: { turbo: false } do
       - if current_user.password_digest.present?
         .form-group
           = label_tag :current_password, "Current password"
@@ -50,7 +50,7 @@
 
   .settings-section
     h2 Email addresses
-    = form_with url: emails_path, method: :post, local: true, class: "email-form" do |f|
+    = form_with url: emails_path, method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
       .form-group
         = f.label :email, "Add email"
         = f.email_field :email, required: true, placeholder: "user@example.com"

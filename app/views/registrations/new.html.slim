@@ -2,7 +2,7 @@ h1 Register
 
 p Enter your email. If it's in the archive, we'll verify and attach it. Otherwise, we'll create a new alias.
 
-= form_with url: registration_path, method: :post do |f|
+= form_with url: registration_path, method: :post, data: { turbo: false } do |f|
   .field
     = label_tag :email
     = email_field_tag :email, nil, required: true, placeholder: "you@example.com"

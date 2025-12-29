@@ -1,6 +1,6 @@
 h1 Set a new password
 
-= form_with url: password_path, method: :patch do
+= form_with url: password_path, method: :patch, data: { turbo: false } do
   = hidden_field_tag :token, @raw
   .field
     = label_tag :password
@@ -10,4 +10,3 @@ h1 Set a new password
     = password_field_tag :password_confirmation
   .actions
     = submit_tag 'Update password'
-

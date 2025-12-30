@@ -19,7 +19,7 @@ class Topic < ApplicationRecord
                             .index_by(&:sender_id)
 
     sender_ids = sender_counts.keys
-    senders_by_id = Alias.where(id: sender_ids).index_by(&:id)
+    senders_by_id = Alias.includes(person: :contributor_memberships).where(id: sender_ids).index_by(&:id)
 
     first_sender = messages.order(:created_at).first.sender
     last_sender = messages.order(:created_at).last.sender
@@ -76,10 +76,10 @@ class Topic < ApplicationRecord
                       .group(:sender_id)
                       .select('sender_id, COUNT(*) AS message_count, MAX(messages.created_at) AS last_at')
 
-      alias_map = Alias.includes(:person).where(id: stats.map(&:sender_id)).index_by(&:id)
+      alias_map = Alias.includes(person: :contributor_memberships).where(id: stats.map(&:sender_id)).index_by(&:id)
 
       stats.map do |row|
-        alias_record = alias_map[row.sender_id]
+      alias_record = alias_map[row.sender_id]
         next unless alias_record
 
         {

@@ -38,25 +38,27 @@ class Alias < ApplicationRecord
   }.freeze
 
   def contributor?
-    person&.contributor_memberships&.exists?
+    contributor_membership_types.any?
   end
 
   def contributor_type
-    return nil unless person
-    types = person.contributor_memberships.pluck(:contributor_type)
+    types = contributor_membership_types
+    return nil if types.empty?
+
     types.min_by { |t| CONTRIBUTOR_RANK[t] || 99 }
   end
 
   def core_team?
-    person&.contributor_memberships&.core_team&.exists?
+    contributor_membership_types.include?('core_team')
   end
 
   def committer?
-    person&.contributor_memberships&.committer&.exists?
+    contributor_membership_types.include?('committer')
   end
 
   def past_contributor?
-    person&.contributor_memberships&.where(contributor_type: %w[past_major_contributor past_significant_contributor])&.exists?
+    types = contributor_membership_types
+    types.include?('past_major_contributor') || types.include?('past_significant_contributor')
   end
 
   def current_contributor?
@@ -64,11 +66,17 @@ class Alias < ApplicationRecord
   end
 
   def major_contributor?
-    person&.contributor_memberships&.major_contributor&.exists?
+    contributor_membership_types.include?('major_contributor')
   end
 
   def significant_contributor?
-    person&.contributor_memberships&.significant_contributor&.exists?
+    contributor_membership_types.include?('significant_contributor')
+  end
+
+  def contributor_membership_types
+    return [] unless person
+
+    @contributor_membership_types ||= person.contributor_memberships.load.map(&:contributor_type)
   end
 
   def contributor_badge

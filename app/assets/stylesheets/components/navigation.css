@@ -90,6 +90,10 @@
   gap: 6px;
 }
 
+.nav-link-activity i {
+  font-size: 1.05em;
+}
+
 .nav-badge {
   display: inline-flex;
   align-items: center;

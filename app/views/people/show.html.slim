@@ -9,7 +9,7 @@
         .alias-list
           - additional_aliases.each do |al|
             .alias-row
-              = image_tag al.gravatar_url(size: 32), class: "alias-row-avatar", alt: al.name
+              = image_tag al.display_gravatar_url(size: 32), class: "alias-row-avatar", alt: al.name
               .alias-row-details
                 span.alias-row-name = al.name
                 span.alias-row-email = al.email

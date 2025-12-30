@@ -22,9 +22,9 @@
         - profile_path = message.sender.person ? person_path(message.sender.email) : nil
         - if profile_path
           = link_to profile_path, class: "author-avatar-link" do
-            = image_tag message.sender.gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
+            = image_tag message.sender.display_gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
         - else
-          = image_tag message.sender.gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
+          = image_tag message.sender.display_gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
         .author-details
           - if profile_path
             .author-name = link_to message.sender.name, profile_path, class: "author-name-link"

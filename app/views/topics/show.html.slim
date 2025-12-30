@@ -63,7 +63,7 @@
                       .outline-avatars
                         - participants.each do |participant|
                           = link_to person_path(participant.email), class: "outline-avatar-link" do
-                            = image_tag participant.gravatar_url(size: 24), class: "outline-avatar", alt: participant.name, title: participant.name
+                            = image_tag participant.display_gravatar_url(size: 24), class: "outline-avatar", alt: participant.name, title: participant.name
                       - if is_reply
                         span.outline-icon ↳
                       span.branch-toggle = "▸"
@@ -80,7 +80,7 @@
                     .outline-content
                       .outline-meta
                         span.outline-number = "##{entry[:message_number]}"
-                        = image_tag msg.sender.gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                        = image_tag msg.sender.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
                         - if is_reply
                           span.outline-icon ↳
                         span.outline-author = msg.sender.name
@@ -98,7 +98,7 @@
                   .outline-content
                     .outline-meta
                       span.outline-number = "##{entry[:message_number]}"
-                      = image_tag msg.sender.gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                      = image_tag msg.sender.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
                       - if is_reply
                         span.outline-icon ↳
                       span.outline-author = msg.sender.name

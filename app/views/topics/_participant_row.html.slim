@@ -21,6 +21,6 @@
 - row_classes << "is-past-contributor" if alias_record.past_contributor?
 .participant-row class=row_classes.join(" ") title=tooltip
   = link_to person_path(alias_record.email), class: "participant-avatar-link" do
-    = image_tag alias_record.gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
+    = image_tag alias_record.display_gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
   .participant-details
     .participant-name = link_to alias_record.name, person_path(alias_record.email), class: "participant-name-link"

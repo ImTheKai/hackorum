@@ -20,6 +20,10 @@ class Alias < ApplicationRecord
     "https://www.gravatar.com/avatar/#{hash}?s=#{size}&d=identicon"
   end
 
+  def display_gravatar_url(size: 80)
+    (person&.default_alias || self).gravatar_url(size: size)
+  end
+
   def contributor
     person
   end

@@ -8,6 +8,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-hackorum}
+      UMAMI_DB: ${UMAMI_DB:-umami}
+      UMAMI_DB_USER: ${UMAMI_DB_USER:-umami}
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
     volumes:
       # Postgres 18+ stores data under /var/lib/postgresql/<major>/main
       - pgdata:/var/lib/postgresql
@@ -62,6 +65,22 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+
+  umami:
+    image: umami/umami:postgresql-latest
+    env_file: .env
+    environment:
+      DATABASE_URL: ${UMAMI_DATABASE_URL:-postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASSWORD:-umami}@db:5432/${UMAMI_DB:-umami}}
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      HASH_SALT: ${UMAMI_HASH_SALT}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "3000"
     restart: unless-stopped
     labels:
       autoheal: "true"

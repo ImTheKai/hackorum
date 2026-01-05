@@ -11,11 +11,8 @@ shared_preload_libraries = 'pg_stat_statements'
 pg_stat_statements.max = 10000
 pg_stat_statements.track = all
 
-# WAL and archiving
+# WAL
 wal_level = replica
 wal_compression = on
-archive_mode = on
-archive_timeout = 60s
-archive_command = 'test ! -f /var/lib/postgresql/wal-archive/%f && cp %p /var/lib/postgresql/wal-archive/%f'
 max_wal_size = 8GB
 min_wal_size = 2GB

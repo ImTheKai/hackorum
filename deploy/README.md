@@ -3,16 +3,16 @@
 This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzner) with Docker Compose. It includes:
 - Web app (Rails / Puma)
 - IMAP runner (continuous)
-- Postgres with WAL archiving to a local volume
+- Postgres
 - Caddy for TLS / reverse proxy
 - Umami analytics (self-hosted)
 - Autoheal watchdog to restart unhealthy containers
-- Local base backups + WAL retention scripts (no external storage)
+- Monthly SQL dumps (public + private split)
 
 ## Prerequisites
 - Docker + Docker Compose v2 on the VPS
 - A domain pointing to the VPS (for Caddy/HTTPS)
-- Enough disk for Postgres data + backups (base backups + WAL archives)
+- Enough disk for Postgres data + monthly dumps
 
 ## Setup steps
 1) Copy env template and fill in secrets:
@@ -30,6 +30,7 @@ This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzne
 3) Update Caddyfile domain:
    - Edit `deploy/Caddyfile` and replace `hackorum.example.com` and contact email.
    - Ensure the Umami host is set to `umami.hackorum.dev` (see `deploy/Caddyfile.example`).
+   - Optional: add `dumps.hackorum.dev` to serve public dumps (see `deploy/Caddyfile.example`).
 
 4) Configure Umami analytics:
    - Set `UMAMI_APP_SECRET` and `UMAMI_HASH_SALT` in `deploy/.env`.
@@ -44,7 +45,7 @@ This is a minimal, single-host setup for running Hackorum on a VPS (e.g., Hetzne
    Services:
    - `web`: Rails/Puma on port 3000 (internal)
    - `imap_worker`: continuous IMAP ingest
-   - `db`: Postgres 18 with WAL archiving to `/var/lib/postgresql/wal-archive`
+  - `db`: Postgres 18
    - `caddy`: TLS + reverse proxy on :80/:443
    - `umami`: self-hosted analytics UI/API on port 3000 (internal)
    - `autoheal`: restarts containers whose healthchecks fail
@@ -94,18 +95,25 @@ Access:
   - `GOOGLE_REDIRECT_URI` (e.g., https://your-domain/auth/google_oauth2/callback)
 - Rails runtime: `RAILS_ENV=production`, `RAILS_LOG_TO_STDOUT=1`, `RAILS_SERVE_STATIC_FILES=1`
 
-## Backups (local, WAL + base backups)
-Postgres is configured with `archive_mode=on` and copies WAL files into a dedicated volume (`pgwal`). Use the provided scripts to create compressed base backups and prune old WAL/base backups.
+## Backups (monthly SQL dumps)
+The database dumps are split into public and private data, written to a Docker volume mounted at `/dumps` inside the Postgres container. Each month overwrites the same two files:
+- `public/public-YYYY-MM.sql.gz` (full schema + data, excluding private tables)
+- `private/private-YYYY-MM.sql.gz` (data-only for private tables)
+
+The table list lives in `deploy/backup/private_tables.txt` and is used for both dumps.
+If you enable the `dumps.hackorum.dev` site in Caddy, only `/dumps/public` is mounted read-only in the Caddy container, so private dumps remain inaccessible.
 
 Run (from `deploy/`):
 ```bash
-./backup/run_base_backup.sh   # creates tarred base backup under /backups
-RETAIN=3 ./backup/prune_backups.sh  # keep 3 most recent base backups, prune old WAL (>14 days)
+./backup/run_monthly_dumps.sh
 ```
 Recommended cadence:
-- Base backup weekly (or more often if you prefer).
-- Prune after each base backup.
-- Monitor disk usage; adjust retention or add external storage later if needed.
+- Run monthly (or more often if you want fresher dev data).
+
+Example crontab (runs at 02:15 on the 1st of each month):
+```bash
+15 2 1 * * cd /path/to/hackorum/deploy && ./backup/run_monthly_dumps.sh >> /var/log/hackorum-dumps.log 2>&1
+```
 
 ## Initial archive import (mbox)
 If you need to import the historical mailing list archive before running the app:
@@ -147,5 +155,5 @@ docker compose up -d --build
 ```
 
 ## Notes / future improvements
-- Swap local backups for remote object storage later by replacing the backup scripts with wal-g or pgbackrest.
+- Swap local dumps for remote object storage later if needed.
 - Add log shipping/metrics if needed; for now Docker logs go to the host.

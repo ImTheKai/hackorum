@@ -15,3 +15,11 @@ umami.hackorum.dev {
     output stdout
   }
 }
+
+dumps.hackorum.dev {
+  root * /dumps/public
+  file_server browse
+  log {
+    output stdout
+  }
+}

@@ -67,7 +67,7 @@ services:
       autoheal: "true"
 
   umami:
-    image: umami/umami:postgresql-latest
+    image: ghcr.io/umami-software/umami:latest
     env_file: .env
     environment:
       DATABASE_URL: ${UMAMI_DATABASE_URL:-postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASSWORD:-umami}@db:5432/${UMAMI_DB:-umami}}

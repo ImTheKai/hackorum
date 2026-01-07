@@ -1,0 +1,47 @@
+- content_for :title, "Import read status"
+
+.settings-page
+  h1 Import existing read status
+
+  .settings-section
+    ul
+      li
+        p Upload a CSV file with rows like: 
+        pre message_id,notemode,note
+      li All mentioned message_ids that are present in hackorum will be marked as read.
+      li If a proper note is present for the message_id, it will be also created or updated
+      li This is mainly intended for importing existing mailbox folders/tags
+      li The header row is optional. If present, use message_id, notemode, note as column names.
+      li message_id is required and should be the email Message-ID value without the &lt; and &gt; characters (same as the postgresql.org archive message ID)
+      li notemode is optional and can be none, message, or topic (case-insensitive).
+      li note is optional. If note is empty or missing, no note is imported even when notemode is set.
+      li For notemode=message, notes attach to that message. For notemode=topic, notes attach to the topic (thread).
+      li Notes are stored as "!autoimport &lt;your note&gt;" so you can include @mentions and #tags.
+      li Each message/topic can only have one autoimport message - if there's already one, the upload will overwrite the existing note.
+
+    = form_with url: read_status_imports_path, method: :post, local: true, multipart: true, data: { turbo: false } do
+      .form-group
+        = label_tag :import_file, "CSV file"
+        = file_field_tag :import_file, accept: ".csv,text/csv", required: true
+      = submit_tag "Import", class: "button-primary"
+
+  - if @summary
+    .settings-section
+      h2 Import results
+      ul
+        li New notes: #{@summary[:new_notes]}
+        li Replaced notes: #{@summary[:replaced_notes]}
+        li Message IDs marked as read: #{@summary[:marked_read]}
+        li Skipped message IDs: #{@summary[:skipped_message_ids].size}
+
+      - if @summary[:warnings].any?
+        h3 Warnings
+        ul
+          - @summary[:warnings].each do |warning|
+            li = warning
+
+      - if @summary[:skipped_message_ids].any?
+        h3 Skipped message IDs
+        ul
+          - @summary[:skipped_message_ids].each do |mid|
+            li = mid

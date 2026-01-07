@@ -39,6 +39,7 @@ Rails.application.routes.draw do
     post :mark_all_read, on: :collection
   end
   resources :notes, only: [:create, :update, :destroy]
+  resources :read_status_imports, only: [:new, :create]
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
   get "person/*email/contributions/:year", to: "people#contributions", as: :person_contributions, format: false

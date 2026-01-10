@@ -51,6 +51,8 @@ class EmailIngestor
 
     handle_attachments(m, msg)
 
+    MessageActivityBuilder.new(msg).process!
+
     msg
   end
 

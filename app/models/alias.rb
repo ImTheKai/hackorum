@@ -9,6 +9,8 @@ class Alias < ApplicationRecord
   validates :email, presence: true
   validates :name, uniqueness: { scope: :email }
 
+  after_commit :auto_star_recent_topics, if: :saved_change_to_user_id?
+
 
   scope :by_email, ->(email) {
     where("lower(trim(email)) = lower(trim(?))", email)
@@ -92,4 +94,22 @@ class Alias < ApplicationRecord
     end
   end
 
+  private
+
+  def auto_star_recent_topics
+    return unless user_id.present?
+
+    one_year_ago = 1.year.ago
+
+    topic_ids = Message.joins("INNER JOIN topics ON topics.id = messages.topic_id")
+                       .where(messages: { sender_id: id })
+                       .where("topics.updated_at >= ?", one_year_ago)
+                       .distinct
+                       .pluck(:topic_id)
+
+    topic_ids.each do |topic_id|
+      TopicStar.find_or_create_by(user_id: user_id, topic_id: topic_id)
+    rescue ActiveRecord::RecordNotUnique
+    end
+  end
 end

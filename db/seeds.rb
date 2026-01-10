@@ -971,4 +971,131 @@ mark_aware_until(user: alice_user, topic: long_topic, message: long_messages[20]
 
 # Leave some threads entirely new/unaware (e.g., past_topic, moderate_topic_2, contrib_topic)
 
+# Topic stars and message notifications
+puts "Creating topic stars and message notification activities..."
+
+TopicStar.create!(user: alice_user, topic: patch_topic)
+TopicStar.create!(user: bob_user, topic: patch_topic)
+TopicStar.create!(user: carol_user, topic: patch_topic)
+
+TopicStar.create!(user: alice_user, topic: rfc_topic)
+TopicStar.create!(user: carol_user, topic: rfc_topic)
+
+TopicStar.create!(user: bob_user, topic: discussion_topic)
+TopicStar.create!(user: carol_user, topic: discussion_topic)
+TopicStar.create!(user: dave_user, topic: discussion_topic)
+
+TopicStar.create!(user: alice_user, topic: recent_topic)
+TopicStar.create!(user: dave_user, topic: recent_topic)
+
+Activity.create!(
+  user: alice_user,
+  activity_type: "topic_message_received",
+  subject: msg2,
+  payload: { topic_id: patch_topic.id, message_id: msg2.id },
+  read_at: nil,
+  created_at: msg2.created_at,
+  updated_at: msg2.created_at
+)
+
+Activity.create!(
+  user: bob_user,
+  activity_type: "topic_message_received",
+  subject: msg3,
+  payload: { topic_id: patch_topic.id, message_id: msg3.id },
+  read_at: timestamp_now,
+  created_at: msg3.created_at,
+  updated_at: msg3.created_at
+)
+
+Activity.create!(
+  user: carol_user,
+  activity_type: "topic_message_received",
+  subject: msg3,
+  payload: { topic_id: patch_topic.id, message_id: msg3.id },
+  read_at: nil,
+  created_at: msg3.created_at,
+  updated_at: msg3.created_at
+)
+
+Activity.create!(
+  user: alice_user,
+  activity_type: "topic_message_received",
+  subject: rfc_msg2,
+  payload: { topic_id: rfc_topic.id, message_id: rfc_msg2.id },
+  read_at: timestamp_now,
+  created_at: rfc_msg2.created_at,
+  updated_at: rfc_msg2.created_at
+)
+
+Activity.create!(
+  user: carol_user,
+  activity_type: "topic_message_received",
+  subject: rfc_msg2,
+  payload: { topic_id: rfc_topic.id, message_id: rfc_msg2.id },
+  read_at: nil,
+  created_at: rfc_msg2.created_at,
+  updated_at: rfc_msg2.created_at
+)
+
+Activity.create!(
+  user: bob_user,
+  activity_type: "topic_message_received",
+  subject: disc_msg3,
+  payload: { topic_id: discussion_topic.id, message_id: disc_msg3.id },
+  read_at: nil,
+  created_at: disc_msg3.created_at,
+  updated_at: disc_msg3.created_at
+)
+
+Activity.create!(
+  user: carol_user,
+  activity_type: "topic_message_received",
+  subject: disc_msg4,
+  payload: { topic_id: discussion_topic.id, message_id: disc_msg4.id },
+  read_at: timestamp_now,
+  created_at: disc_msg4.created_at,
+  updated_at: disc_msg4.created_at
+)
+
+Activity.create!(
+  user: dave_user,
+  activity_type: "topic_message_received",
+  subject: disc_msg4,
+  payload: { topic_id: discussion_topic.id, message_id: disc_msg4.id },
+  read_at: nil,
+  created_at: disc_msg4.created_at,
+  updated_at: disc_msg4.created_at
+)
+
+recent_reply = create_message(
+  topic: recent_topic,
+  sender: carol_alias,
+  subject: "Re: #{recent_topic.title}",
+  body: "Fresh reply to demonstrate starred topic notifications.",
+  created_at: now - 2.hours,
+  reply_to: recent_msg1,
+  message_id_suffix: "recent-3"
+)
+
+Activity.create!(
+  user: alice_user,
+  activity_type: "topic_message_received",
+  subject: recent_reply,
+  payload: { topic_id: recent_topic.id, message_id: recent_reply.id },
+  read_at: nil,
+  created_at: recent_reply.created_at,
+  updated_at: recent_reply.created_at
+)
+
+Activity.create!(
+  user: dave_user,
+  activity_type: "topic_message_received",
+  subject: recent_reply,
+  payload: { topic_id: recent_topic.id, message_id: recent_reply.id },
+  read_at: nil,
+  created_at: recent_reply.created_at,
+  updated_at: recent_reply.created_at
+)
+
 puts "Development seed data loaded."

@@ -12,26 +12,33 @@
 - if @activities.any?
   .activities-list
     - @activities.each do |activity|
-      - note = activity.subject if activity.subject_type == "Note"
+      - subject = activity.subject
       .activity-card class=("is-unread" if activity.read_at.nil?)
         .activity-meta
-          span.activity-type = activity.activity_type.humanize
+          span.activity-type = activity_type_label(activity)
           span.activity-time title=absolute_time_display(activity.created_at) = smart_time_display(activity.created_at)
           - if activity.read_at.nil?
             span.activity-unread-badge Unread
 
-        - if note
+        - if subject.is_a?(Note)
           .activity-body
             .activity-title
-              = link_to(note.topic.title, topic_path(note.topic, anchor: note.message_id ? message_dom_id(note.message) : "thread-notes"))
-            .activity-snippet = truncate(note.body, length: 160)
-            - if note.note_tags.any?
+              = link_to(subject.topic.title, topic_path(subject.topic, anchor: subject.message_id ? message_dom_id(subject.message) : "thread-notes"))
+            .activity-snippet = truncate(subject.body, length: 160)
+            - if subject.note_tags.any?
               .activity-tags
-                - note.note_tags.each do |tag|
+                - subject.note_tags.each do |tag|
                   span.note-tag ##{tag.tag}
-            - if current_user.id == note.author_id
+            - if current_user.id == subject.author_id
               .activity-actions
-                = button_to "Delete note", note_path(note), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }
+                = button_to "Delete note", note_path(subject), method: :delete, class: "note-delete-button", form: { data: { turbo_confirm: "Delete this note?" } }
+        - elsif subject.is_a?(Message)
+          .activity-body
+            .activity-title
+              = link_to(subject.topic.title, topic_path(subject.topic, anchor: message_dom_id(subject)))
+            .activity-snippet
+              strong> = subject.subject
+              = truncate(subject.body, length: 140)
         - else
           .activity-body
             span.activity-missing Content not available anymore.

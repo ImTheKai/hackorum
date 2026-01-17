@@ -7,13 +7,13 @@ class PendingMigrationCatcher
 
   def call(env)
     @app.call(env)
-  rescue ActiveRecord::PendingMigrationError, ActiveRecord::NoDatabaseError => e
-    render_maintenance_page(e)
+  rescue ActiveRecord::PendingMigrationError, ActiveRecord::NoDatabaseError
+    render_maintenance_page
   end
 
   private
 
-  def render_maintenance_page(_error)
+  def render_maintenance_page
     html = <<~HTML
       <!DOCTYPE html>
       <html>

@@ -8,7 +8,7 @@ Rails.application.routes.draw do
 
   if Rails.env.development?
     get "preview/maintenance" => ->(env) {
-      PendingMigrationCatcher.new(nil).send(:render_maintenance_page, nil)
+      PendingMigrationCatcher.new(nil).send(:render_maintenance_page)
     }
   end
   get "messages/by-id/*message_id", to: "messages#by_message_id", as: :message_by_id, format: false

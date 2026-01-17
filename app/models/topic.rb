@@ -1,6 +1,16 @@
 class Topic < ApplicationRecord
+  CONTRIBUTOR_TYPE_RANK = {
+    'core_team' => 1,
+    'committer' => 2,
+    'major_contributor' => 3,
+    'significant_contributor' => 4,
+    'past_major_contributor' => 5,
+    'past_significant_contributor' => 6
+  }.freeze
+
   belongs_to :creator, class_name: 'Alias', inverse_of: :topics
   belongs_to :creator_person, class_name: 'Person'
+  belongs_to :last_sender_person, class_name: 'Person', optional: true
   has_many :messages
   has_many :attachments, through: :messages
   has_many :notes, dependent: :destroy
@@ -8,15 +18,18 @@ class Topic < ApplicationRecord
   has_many :commitfest_patches, through: :commitfest_patch_topics
   has_many :topic_stars, dependent: :destroy
   has_many :starring_users, through: :topic_stars, source: :user
+  has_many :topic_participants, dependent: :delete_all
+  has_many :top_topic_participants,
+           -> { order(message_count: :desc).limit(5) },
+           class_name: 'TopicParticipant'
+  has_many :contributor_topic_participants,
+           -> { where(is_contributor: true).order(message_count: :desc) },
+           class_name: 'TopicParticipant'
 
   validates :title, presence: true
 
   def creator_display_alias
     creator_person&.default_alias || creator
-  end
-
-  def participant_count
-    messages.select(:sender_id).distinct.count
   end
 
   def participant_aliases(limit: 10)
@@ -161,6 +174,63 @@ class Topic < ApplicationRecord
     return "committer" if has_committer_activity?
     return "contributor" if has_contributor_activity?
     nil
+  end
+
+  # Rebuild topic_participants from messages and update denormalized counts
+  def recalculate_participants!
+    contributor_person_ids = ContributorMembership.distinct.pluck(:person_id).to_set
+
+    # Aggregate message stats per person
+    stats = messages.group(:sender_person_id)
+                    .select(
+                      'sender_person_id',
+                      'COUNT(*) AS msg_count',
+                      'MIN(messages.created_at) AS first_at',
+                      'MAX(messages.created_at) AS last_at'
+                    )
+
+    # Clear existing participants and rebuild
+    topic_participants.delete_all
+
+    stats.each do |row|
+      person_id = row.sender_person_id
+      TopicParticipant.create!(
+        topic_id: id,
+        person_id: person_id,
+        message_count: row.msg_count,
+        first_message_at: row.first_at,
+        last_message_at: row.last_at,
+        is_contributor: contributor_person_ids.include?(person_id)
+      )
+    end
+
+    update_denormalized_counts!
+  end
+
+  # Update denormalized counts on the topic from topic_participants
+  def update_denormalized_counts!
+    last_msg = messages.order(created_at: :desc, id: :desc).first
+
+    participants = topic_participants.reload
+    contributor_participants_rel = participants.where(is_contributor: true)
+
+    # Calculate highest contributor type from actual contributor memberships
+    highest_type = nil
+    if contributor_participants_rel.exists?
+      contributor_person_ids = contributor_participants_rel.pluck(:person_id)
+      types = ContributorMembership.where(person_id: contributor_person_ids).pluck(:contributor_type)
+      highest_type = types.min_by { |t| CONTRIBUTOR_TYPE_RANK[t] || 99 }
+    end
+
+    update_columns(
+      participant_count: participants.count,
+      contributor_participant_count: contributor_participants_rel.count,
+      highest_contributor_type: highest_type,
+      message_count: messages.count,
+      last_message_at: last_msg&.created_at,
+      last_message_id: last_msg&.id,
+      last_sender_person_id: last_msg&.sender_person_id
+    )
   end
 
   def self.commitfest_summaries(topic_ids)

@@ -1,25 +1,27 @@
+- topic_participants_map ||= @topic_participants_map || {}
+
 - topics.each do |topic|
-  tr id=dom_id(topic) class="topic-row" data-topic-id=topic.id data-last-message-id=topic.messages.maximum(:id)
+  - tp_data = topic_participants_map[topic.id] || {}
+  - top_participants = tp_data[:top] || []
+  - contributor_participants = tp_data[:contributors] || []
+
+  tr id=dom_id(topic) class="topic-row" data-topic-id=topic.id data-last-message-id=topic.last_message_id
     = render partial: "topics/status_cell", locals: { topic: topic, state: {}, note_count: 0, team_readers: [], star_data: {} }
     td.topic-activity data-label="Activity"
-      - last_message = topic.messages.order(:created_at).last
-      - replies_count = [topic.messages.count - 1, 0].max
+      - replies_count = [topic.message_count - 1, 0].max
       .activity-info.compact
         .activity-replies = pluralize(replies_count, "reply")
-        .activity-time title=absolute_time_display(last_message.created_at) = smart_time_display(last_message.created_at)
+        .activity-time title=absolute_time_display(topic.last_message_at) = smart_time_display(topic.last_message_at)
     td.topic-participants data-label="Participants"
-      - participants = topic.participant_alias_stats(limit: 5)
-      - participant_count = topic.participant_count
-      = render partial: "avatar_list", locals: { participants: participants, total_participants: participant_count }
-      - if topic.has_contributor_activity?
-        - contributor_participants = topic.contributor_participants
-        - contributor_count = contributor_participants.size
-        div class ="topic-icon activity-#{ topic.highest_contributor_activity }" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+      - participants = top_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
+      = render partial: "avatar_list", locals: { participants: participants, total_participants: topic.participant_count }
+      - if topic.contributor_participant_count.positive?
+        - contributor_data = contributor_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
+        div class="topic-icon activity-#{topic.highest_contributor_type || 'contributor'}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
           i.fa-solid.fa-users-rays
-          - if contributor_count.positive?
-            span.topic-icon-badge = contributor_count
-          - if contributor_participants.any?
+          span.topic-icon-badge = topic.contributor_participant_count
+          - if contributor_data.any?
             .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
-              - contributor_participants.each do |participant|
+              - contributor_data.each do |participant|
                 = render partial: "participant_row", locals: { participant: participant, avatar_size: 32 }
       = render partial: "topics/participation_icon", locals: { topic: topic, participation: {} }

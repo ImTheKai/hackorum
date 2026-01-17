@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_17_172025) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_17_183400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -543,6 +543,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_17_172025) do
     t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
   end
 
+  create_table "topic_participants", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "person_id", null: false
+    t.integer "message_count", default: 0, null: false
+    t.datetime "first_message_at", null: false
+    t.datetime "last_message_at", null: false
+    t.boolean "is_contributor", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["person_id", "last_message_at"], name: "index_topic_participants_on_person_id_and_last_message_at", order: { last_message_at: :desc }
+    t.index ["person_id"], name: "index_topic_participants_on_person_id"
+    t.index ["topic_id", "message_count"], name: "index_topic_participants_on_topic_id_and_message_count", order: { message_count: :desc }
+    t.index ["topic_id", "person_id"], name: "index_topic_participants_on_topic_id_and_person_id", unique: true
+    t.index ["topic_id"], name: "idx_topic_participants_contributors", where: "(is_contributor = true)"
+  end
+
   create_table "topic_stars", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "topic_id", null: false
@@ -559,9 +575,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_17_172025) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "creator_person_id", null: false
+    t.integer "participant_count", default: 0, null: false
+    t.integer "contributor_participant_count", default: 0, null: false
+    t.enum "highest_contributor_type", enum_type: "contributor_type"
+    t.datetime "last_message_at"
+    t.bigint "last_sender_person_id"
+    t.integer "message_count", default: 0, null: false
+    t.boolean "has_attachments", default: false, null: false
+    t.bigint "last_message_id"
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
+    t.index ["last_message_at"], name: "index_topics_on_last_message_at"
     t.index ["title"], name: "index_topics_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
   end
 
@@ -633,10 +658,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_17_172025) do
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
   add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topic_participants", "people"
+  add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
   add_foreign_key "topic_stars", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
+  add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"
+  add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

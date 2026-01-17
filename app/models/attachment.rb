@@ -1,7 +1,10 @@
 class Attachment < ApplicationRecord
   belongs_to :message
   has_many :patch_files, dependent: :destroy
-  
+
+  after_create :mark_topic_has_attachments
+  after_destroy :update_topic_has_attachments
+
   def patch?
     file_name&.ends_with?('.patch') || file_name&.ends_with?('.diff') || patch_content?
   end
@@ -22,13 +25,28 @@ class Attachment < ApplicationRecord
   end
   
   private
-  
+
   def patch_content?
-    decoded_body&.starts_with?('diff ') || 
+    decoded_body&.starts_with?('diff ') ||
     decoded_body&.starts_with?('--- ') ||
     decoded_body&.starts_with?('*** ') ||
     decoded_body&.starts_with?('Index:') ||
     decoded_body&.include?('@@') ||
     decoded_body&.include?('***************')
+  end
+
+  def mark_topic_has_attachments
+    topic = message&.topic
+    return unless topic
+
+    topic.update_column(:has_attachments, true) unless topic.has_attachments?
+  end
+
+  def update_topic_has_attachments
+    topic = message&.topic
+    return unless topic
+
+    has_any = topic.attachments.exists?
+    topic.update_column(:has_attachments, has_any) if topic.has_attachments? != has_any
   end
 end

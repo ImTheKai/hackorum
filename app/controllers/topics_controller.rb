@@ -8,6 +8,7 @@ class TopicsController < ApplicationController
     base_query = apply_filters(Topic.includes(:creator))
 
     apply_cursor_pagination(base_query)
+    preload_topic_participants
     preload_commitfest_summaries
     @new_topics_count = 0
     @page_cache_key = topics_page_cache_key
@@ -170,6 +171,7 @@ class TopicsController < ApplicationController
 
     load_cached_search_results
 
+    preload_topic_participants
     preload_commitfest_summaries
     preload_participation_flags if user_signed_in?
 
@@ -245,24 +247,22 @@ class TopicsController < ApplicationController
     @topic = Topic.find(params[:id])
   end
 
-  def build_participants_sidebar_data(messages_scope)
-    participant_map = {}
+  def build_participants_sidebar_data(_messages_scope)
+    participants = @topic.topic_participants
+                         .includes(person: [:default_alias, :contributor_memberships])
+                         .order(message_count: :desc, first_message_at: :asc)
 
-    messages_scope.order(:created_at).each do |message|
-      sender_id = message.sender_id
-      entry = (participant_map[sender_id] ||= {
-        alias: message.sender,
-        message_count: 0,
-        first_at: message.created_at,
-        last_at: message.created_at
-      })
-      entry[:message_count] += 1
-      entry[:first_at] = [entry[:first_at], message.created_at].min
-      entry[:last_at] = [entry[:last_at], message.created_at].max
-    end
+    @participants = participants.map do |tp|
+      alias_record = tp.person&.default_alias
+      next unless alias_record
 
-    @participants = participant_map.values
-                                   .sort_by { |entry| [-entry[:message_count], entry[:first_at]] }
+      {
+        alias: alias_record,
+        message_count: tp.message_count,
+        first_at: tp.first_message_at,
+        last_at: tp.last_message_at
+      }
+    end.compact
   end
 
   def build_thread_outline(messages_scope)
@@ -475,6 +475,26 @@ class TopicsController < ApplicationController
                                   .count
   end
 
+  def preload_topic_participants
+    topic_ids = @topics.map(&:id)
+    return if topic_ids.empty?
+
+    # Load top 5 participants per topic, plus contributor participants
+    all_participants = TopicParticipant
+      .where(topic_id: topic_ids)
+      .includes(person: [:default_alias, :contributor_memberships])
+
+    @topic_participants_map = Hash.new { |h, k| h[k] = { top: [], contributors: [] } }
+
+    # Group by topic and separate into top participants and contributors
+    all_participants.group_by(&:topic_id).each do |topic_id, participants|
+      sorted = participants.sort_by { |p| [-p.message_count, p.first_message_at] }
+      @topic_participants_map[topic_id][:top] = sorted.first(5)
+      @topic_participants_map[topic_id][:contributors] = sorted.select(&:is_contributor)
+      @topic_participants_map[topic_id][:all] = sorted
+    end
+  end
+
   def preload_participation_flags
     topic_ids = @topics.map(&:id)
     return if topic_ids.empty?
@@ -489,9 +509,9 @@ class TopicsController < ApplicationController
                         end
     teammate_person_ids = User.where(id: teammate_user_ids).pluck(:person_id)
 
-    rows = Message.where(topic_id: topic_ids, sender_person_id: teammate_person_ids)
-                  .select(:topic_id, :sender_person_id)
-                  .distinct
+    # Use topic_participants instead of messages for efficiency
+    rows = TopicParticipant.where(topic_id: topic_ids, person_id: teammate_person_ids)
+                           .select(:topic_id, :person_id)
 
     person_map = Person.includes(:default_alias).where(id: teammate_person_ids).index_by(&:id)
 
@@ -499,14 +519,14 @@ class TopicsController < ApplicationController
 
     rows.each do |row|
       entry = @participation_flags[row.topic_id]
-      person = person_map[row.sender_person_id]
+      person = person_map[row.person_id]
       next unless person
 
       alias_record = person.default_alias
       next unless alias_record
 
       entry[:aliases] << alias_record
-      entry[:mine] ||= row.sender_person_id == my_person_id
+      entry[:mine] ||= row.person_id == my_person_id
       entry[:team] = true
     end
 

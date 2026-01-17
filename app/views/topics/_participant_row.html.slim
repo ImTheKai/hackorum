@@ -1,17 +1,18 @@
 - alias_record = participant[:alias]
 - return unless alias_record
+- person = participant[:person] || alias_record.person
 - avatar_size = local_assigns[:avatar_size] || 40
 - message_count = participant[:message_count]
 - last_at = participant[:last_at]
 - tooltip_parts = []
-- tooltip_parts << "#{message_count} messages" if message_count
+- tooltip_parts << pluralize(message_count, "message") if message_count
 - tooltip_parts << "last #{smart_time_display(last_at)}" if last_at
-- role_label = alias_record.contributor_badge || "User"
-- tooltip_parts << role_label
-- tooltip = local_assigns[:tooltip] || (tooltip_parts.any? ? tooltip_parts.join(", ") : "#{alias_record.name} (#{role_label})")
+- role_label = person&.contributor_badge
+- tooltip_parts << role_label if role_label
+- tooltip = local_assigns[:tooltip] || (tooltip_parts.any? ? tooltip_parts.join(", ") : alias_record.name)
 - avatar_classes = ["participant-avatar"]
 - membership_icons = []
-- membership_types = alias_record.contributor_membership_types
+- membership_types = person&.contributor_membership_types || []
 - if membership_types.include?("core_team")
   - membership_icons << { icon: "fa-solid fa-people-group", label: "Core Team" }
 - if membership_types.include?("committer")
@@ -25,7 +26,7 @@
 .participant-row title=tooltip
   .participant-left
     = link_to person_path(alias_record.email), class: "participant-avatar-link" do
-      = image_tag alias_record.display_gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
+      = image_tag alias_record.gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
     .participant-details
       - name_classes = ["participant-name-link"]
       - name_classes << "is-committer" if membership_types.include?("committer")

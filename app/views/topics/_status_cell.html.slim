@@ -16,7 +16,7 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   - commitfest_summary = @commitfest_summaries&.dig(topic.id)
   - if commitfest_summary
     = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
-  - elsif topic.attachments.exists?
+  - elsif topic.has_attachments?
     .topic-icon title="Attachments"
       i.fa-solid.fa-paperclip
   = link_to topic.title, topic_path(topic), class: "topic-link"

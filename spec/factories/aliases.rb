@@ -9,6 +9,12 @@ FactoryBot.define do
     created_at { 1.month.ago }
     updated_at { 1.month.ago }
 
+    after(:create) do |alias_record|
+      if alias_record.person && alias_record.person.default_alias_id.nil?
+        alias_record.person.update!(default_alias_id: alias_record.id)
+      end
+    end
+
     trait :with_user do
       user
     end

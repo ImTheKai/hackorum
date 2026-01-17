@@ -5,6 +5,7 @@ class Person < ApplicationRecord
   has_many :created_topics, class_name: 'Topic', foreign_key: 'creator_person_id'
   has_many :sent_messages, class_name: 'Message', foreign_key: 'sender_person_id'
   has_many :mentions
+  has_many :topic_participants
 
   belongs_to :default_alias, class_name: 'Alias', optional: true
 
@@ -12,10 +13,27 @@ class Person < ApplicationRecord
     default_alias&.name || aliases.order(:created_at).first&.name || "Unknown"
   end
 
+  CONTRIBUTOR_RANK = {
+    'core_team' => 1,
+    'committer' => 2,
+    'major_contributor' => 3,
+    'significant_contributor' => 4,
+    'past_major_contributor' => 5,
+    'past_significant_contributor' => 6
+  }.freeze
+
+  def contributor_membership_types
+    @contributor_membership_types ||= contributor_memberships.load.map(&:contributor_type)
+  end
+
+  def contributor?
+    contributor_membership_types.any?
+  end
+
   def contributor_type
-    return nil unless contributor_memberships.exists?
-    types = contributor_memberships.pluck(:contributor_type)
-    types.min_by { |t| Alias::CONTRIBUTOR_RANK[t] || 99 }
+    types = contributor_membership_types
+    return nil if types.empty?
+    types.min_by { |t| CONTRIBUTOR_RANK[t] || 99 }
   end
 
   def contributor_badge
@@ -27,6 +45,27 @@ class Person < ApplicationRecord
     when 'past_major_contributor' then 'Past Contributor'
     when 'past_significant_contributor' then 'Past Contributor'
     end
+  end
+
+  def core_team?
+    contributor_membership_types.include?('core_team')
+  end
+
+  def committer?
+    contributor_membership_types.include?('committer')
+  end
+
+  def major_contributor?
+    contributor_membership_types.include?('major_contributor')
+  end
+
+  def significant_contributor?
+    contributor_membership_types.include?('significant_contributor')
+  end
+
+  def past_contributor?
+    types = contributor_membership_types
+    types.include?('past_major_contributor') || types.include?('past_significant_contributor')
   end
 
   def display_name

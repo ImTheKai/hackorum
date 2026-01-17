@@ -1,12 +1,12 @@
 FactoryBot.define do
   factory :topic do
     transient do
-      creator_alias { association(:alias, strategy: :create) }
+      creator_alias { nil }
     end
 
     sequence(:title) { |n| "PostgreSQL Feature Discussion #{n}" }
-    creator { creator_alias }
-    creator_person_id { creator_alias.person_id }
+    creator { creator_alias || association(:alias, strategy: :create) }
+    creator_person_id { creator.person_id }
     created_at { 1.week.ago }
     updated_at { 1.week.ago }
 

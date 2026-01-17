@@ -234,6 +234,7 @@ class TopicsController < ApplicationController
     preload_participation_flags
     preload_commitfest_summaries
     preload_star_counts
+    preload_topic_participants
 
     respond_to do |format|
       format.turbo_stream
@@ -380,9 +381,7 @@ class TopicsController < ApplicationController
     topic_ids = @topics.map(&:id)
     return if topic_ids.empty?
 
-    last_ids = Message.where(topic_id: topic_ids).group(:topic_id).maximum(:id)
-    last_times = Message.where(topic_id: topic_ids).group(:topic_id).maximum(:created_at)
-    total_counts = Message.where(topic_id: topic_ids).group(:topic_id).count
+    last_ids = @topics.index_by(&:id).transform_values(&:last_message_id)
 
     if user_signed_in?
       aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
@@ -398,11 +397,11 @@ class TopicsController < ApplicationController
 
     @topic_states = {}
     @topics.each do |topic|
-      last_id = last_ids[topic.id]
-      last_time = last_times[topic.id]
+      last_id = topic.last_message_id
+      last_time = topic.last_message_at
       if user_signed_in?
         aware_until = aware_map[topic.id]
-        total = total_counts[topic.id].to_i
+        total = topic.message_count
         read_count = read_counts[topic.id].to_i
         status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
         progress = compute_progress(total:, read_count:)
@@ -501,13 +500,16 @@ class TopicsController < ApplicationController
 
     my_person_id = current_user.person_id
 
-    team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
-    teammate_user_ids = if team_ids.any?
-                          TeamMember.where(team_id: team_ids).pluck(:user_id).uniq
-                        else
-                          [current_user.id]
-                        end
-    teammate_person_ids = User.where(id: teammate_user_ids).pluck(:person_id)
+    my_team_ids = TeamMember.where(user_id: current_user.id).select(:team_id)
+    teammate_user_ids = TeamMember.where(team_id: my_team_ids).pluck(:user_id).uniq
+
+    if teammate_user_ids.empty?
+      teammate_user_ids = [current_user.id]
+    end
+
+    other_user_ids = teammate_user_ids - [current_user.id]
+    teammate_person_ids = [my_person_id]
+    teammate_person_ids += User.where(id: other_user_ids).pluck(:person_id) if other_user_ids.any?
 
     # Use topic_participants instead of messages for efficiency
     rows = TopicParticipant.where(topic_id: topic_ids, person_id: teammate_person_ids)
@@ -560,13 +562,14 @@ class TopicsController < ApplicationController
   def preload_team_reader_states(topic_ids, last_ids)
     return {} unless user_signed_in?
 
-    team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
-    return {} if team_ids.empty?
-
-    memberships = TeamMember.where(team_id: team_ids).pluck(:user_id, :team_id)
+    my_team_ids = TeamMember.where(user_id: current_user.id).select(:team_id)
+    memberships = TeamMember.where(team_id: my_team_ids).pluck(:user_id, :team_id)
     return {} if memberships.empty?
 
-    team_users = User.includes(:aliases).where(id: memberships.map(&:first)).index_by(&:id)
+    member_user_ids = memberships.map(&:first).uniq
+    team_users = User.includes(:aliases, person: [:default_alias, :contributor_memberships])
+                     .where(id: member_user_ids)
+                     .index_by(&:id)
 
     rows = MessageReadRange.where(user_id: memberships.map(&:first), topic_id: topic_ids)
                            .select(:topic_id, :user_id, "MAX(range_end_message_id) AS max_end")

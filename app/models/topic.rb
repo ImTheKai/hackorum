@@ -95,6 +95,7 @@ class Topic < ApplicationRecord
       stat = stats[alias_record.id]
       {
         alias: alias_record,
+        person: alias_record.person,
         message_count: stat&.read_attribute(:message_count)&.to_i,
         last_at: stat&.read_attribute(:last_at)
       }
@@ -162,6 +163,7 @@ class Topic < ApplicationRecord
 
         {
           alias: alias_record,
+          person: person,
           message_count: row.read_attribute(:message_count).to_i,
           last_at: row.read_attribute(:last_at)
         }

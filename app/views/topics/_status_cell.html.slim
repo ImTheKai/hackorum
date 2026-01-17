@@ -4,7 +4,7 @@
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - if status.to_s == "reading"
     - read_count = state[:read_count].to_i
-    - total_count = topic.messages.count
+    - total_count = topic.message_count
     - unread_count = [total_count - read_count, 0].max
     .topic-icon.topic-icon-reading title="Unread messages: #{unread_count}"
       i.fa-solid.fa-envelope

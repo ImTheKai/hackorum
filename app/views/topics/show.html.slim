@@ -193,8 +193,13 @@
     .thread-actions data-controller="thread-actions" data-thread-actions-topic-id-value=@topic.id data-thread-actions-read-all-url-value=read_all_topic_path(@topic, format: :json)
       button.button-secondary data-action="click->thread-actions#markAllRead" Mark all messages read
 
+  - first_unread_found = false
   - @messages.each do |message|
-    = render 'message', message: message, number: @message_numbers[message.id]
+    - is_first_unread = false
+    - if user_signed_in? && !first_unread_found && !@read_message_ids&.dig(message.id)
+      - is_first_unread = true
+      - first_unread_found = true
+    = render 'message', message: message, number: @message_numbers[message.id], is_first_unread: is_first_unread
 
 .topic-navigation
   = link_to "← Back to Topics", topics_path, class: "back-link"

@@ -6,10 +6,13 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
     - read_count = state[:read_count].to_i
     - total_count = topic.message_count
     - unread_count = [total_count - read_count, 0].max
-    .topic-icon.topic-icon-reading title="Unread messages: #{unread_count}"
-      i.fa-solid.fa-envelope
-      - if unread_count.positive?
+    - if unread_count.positive?
+      = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{unread_count} unread)" do
+        i.fa-solid.fa-envelope
         span.topic-icon-badge.topic-icon-badge-sup = unread_count
+    - else
+      .topic-icon.topic-icon-reading title="All messages read"
+        i.fa-solid.fa-envelope
   = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
   = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
   = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }

@@ -104,6 +104,15 @@
   position: relative;
 }
 
+a.topic-icon {
+  text-decoration: none;
+  color: var(--color-text-primary);
+
+  &:hover {
+    filter: brightness(0.95);
+  }
+}
+
 .topic-icon-badge {
   position: absolute;
   bottom: -6px;

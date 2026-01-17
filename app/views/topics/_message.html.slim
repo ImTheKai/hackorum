@@ -1,6 +1,8 @@
 .message-card id=message_dom_id(message) class=("reply-message" if message.reply_to_id)
   - if (mid_anchor = message_id_anchor(message))
     a.message-id-anchor id=mid_anchor aria-hidden="true"
+  - if local_assigns[:is_first_unread]
+    a.message-id-anchor id="first-unread" aria-hidden="true"
   - display_number = number || (@message_numbers && @message_numbers[message.id])
   - is_read = defined?(@read_message_ids) && @read_message_ids[message.id]
   - if user_signed_in?

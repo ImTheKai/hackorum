@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_17_162050) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -199,8 +199,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
     t.bigint "alias_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "person_id", null: false
     t.index ["alias_id"], name: "index_mentions_on_alias_id"
     t.index ["message_id"], name: "index_mentions_on_message_id"
+    t.index ["person_id"], name: "index_mentions_on_person_id"
   end
 
   create_table "message_read_ranges", force: :cascade do |t|
@@ -228,6 +230,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
     t.text "import_log"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "sender_person_id", null: false
     t.index ["body"], name: "index_messages_on_body_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["created_at", "sender_id"], name: "index_messages_on_created_at_and_sender_id"
     t.index ["created_at", "topic_id"], name: "index_messages_on_created_at_and_topic_id"
@@ -235,6 +238,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
     t.index ["message_id"], name: "index_messages_on_message_id", unique: true
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["sender_id"], name: "index_messages_on_sender_id"
+    t.index ["sender_person_id"], name: "index_messages_on_sender_person_id"
     t.index ["topic_id", "created_at", "id"], name: "index_messages_on_topic_id_and_created_at_desc_id_desc", order: { created_at: :desc, id: :desc }
     t.index ["topic_id"], name: "index_messages_on_topic_id"
   end
@@ -552,8 +556,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
     t.bigint "creator_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "creator_person_id", null: false
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
+    t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
     t.index ["title"], name: "index_topics_on_title_trgm", opclass: :gin_trgm_ops, using: :gin
   end
 
@@ -604,10 +610,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
   add_foreign_key "identities", "users"
   add_foreign_key "mentions", "aliases"
   add_foreign_key "mentions", "messages"
+  add_foreign_key "mentions", "people"
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
   add_foreign_key "messages", "messages", column: "reply_to_id"
+  add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
   add_foreign_key "note_edits", "notes"
   add_foreign_key "note_edits", "users", column: "editor_id"
@@ -626,6 +634,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_10_175026) do
   add_foreign_key "topic_stars", "topics"
   add_foreign_key "topic_stars", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
+  add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

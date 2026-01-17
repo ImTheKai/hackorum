@@ -10,10 +10,11 @@
     .topic-column.participants-col
       .participants-avatars
         - participants = topic.participant_aliases(limit: 5)
+        - creator_person_id = topic.creator_person_id
+        - last_message = topic.messages.order(:created_at).last
         - participants.each_with_index do |participant, index|
-          - is_creator = (participant.id == topic.creator.id)
-          - last_message = topic.messages.order(:created_at).last
-          - is_last_poster = (participant.id == last_message&.sender_id)
+          - is_creator = (participant.person_id == creator_person_id)
+          - is_last_poster = (participant.person_id == last_message&.sender_person_id)
           - css_classes = ["participant-avatar"]
           - css_classes << "is-creator" if is_creator
           - css_classes << "is-last-poster" if is_last_poster
@@ -26,16 +27,16 @@
           - badge_text = "#{participant.name} (#{role_label})"
           = link_to person_path(participant.email), class: "participant-avatar-link" do
             = image_tag participant.display_gravatar_url(size: 32), class: css_classes.join(" "), alt: participant.name, title: badge_text
-      - total_participants = topic.messages.select(:sender_id).distinct.count
+      - total_participants = topic.messages.select(:sender_person_id).distinct.count
       - if total_participants > participants.count
         span.participants-count +#{total_participants - participants.count}
     .topic-column.replies-col
       = topic.messages.count - 1
     .topic-column.activity-col
-      - last_message = topic.messages.order(:created_at).last
+      - last_message ||= topic.messages.order(:created_at).last
       .activity-info
         .activity-time title=absolute_time_display(last_message.created_at) = time_ago_in_words(last_message.created_at) + " ago"
-        small.activity-author by #{last_message.sender.name}
+        small.activity-author by #{last_message.sender_display_alias.name}
 
 / Next page Turbo Frame for infinite scroll
 - if topics.next_page

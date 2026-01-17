@@ -30,12 +30,18 @@ class EmailIngestor
       import_log = [import_log, "Resolved by subject fallback"].reject(&:blank?).join(" | ") if reply_to_msg
     end
 
-    topic = reply_to_msg ? reply_to_msg.topic : Topic.create!(creator: from[0], title: subject, created_at: sent_at)
+    topic = reply_to_msg ? reply_to_msg.topic : Topic.create!(
+      creator: from[0],
+      creator_person_id: from[0].person_id,
+      title: subject,
+      created_at: sent_at
+    )
     import_log = nil if import_log == ''
 
     msg = Message.create!(
       topic: topic,
       sender: from[0],
+      sender_person_id: from[0].person_id,
       reply_to: reply_to_msg,
       subject: subject,
       body: body,
@@ -256,7 +262,7 @@ class EmailIngestor
   def add_mentions(msg, users)
     users.each do |usr|
       next if usr.email.end_with?('postgresql.org')
-      Mention.create!(message: msg, alias: usr)
+      Mention.create!(message: msg, alias: usr, person_id: usr.person_id)
     end
   end
 

@@ -1,7 +1,12 @@
 FactoryBot.define do
   factory :message do
+    transient do
+      sender_alias { association(:alias, strategy: :create) }
+    end
+
     topic
-    sender factory: :alias
+    sender { sender_alias }
+    sender_person_id { sender_alias.person_id }
     reply_to { nil }
     sequence(:subject) { |n| "Re: PostgreSQL Feature Discussion #{n}" }
     sequence(:message_id) { |n| "<message#{n}@postgresql.org>" }

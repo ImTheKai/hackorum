@@ -2,31 +2,28 @@ class PeopleController < ApplicationController
   before_action :load_person
 
   def show
-    alias_ids = @aliases.select(:id)
-    @first_message_at = Message.where(sender_id: alias_ids).minimum(:created_at)
-    @last_message_at = Message.where(sender_id: alias_ids).maximum(:created_at)
-    @activity_entries = build_activity_entries(alias_ids)
-    @contribution_years = contribution_years(alias_ids)
+    @first_message_at = Message.where(sender_person_id: @person.id).minimum(:created_at)
+    @last_message_at = Message.where(sender_person_id: @person.id).maximum(:created_at)
+    @activity_entries = build_activity_entries
+    @contribution_years = contribution_years
     @contribution_year = select_contribution_year(@contribution_years)
-    @contribution_weeks, @contribution_month_spans = build_contribution_weeks(alias_ids, @contribution_year)
+    @contribution_weeks, @contribution_month_spans = build_contribution_weeks(@contribution_year)
     @profile_email = profile_email
   end
 
   def contributions
-    alias_ids = @aliases.select(:id)
-    @contribution_years = contribution_years(alias_ids)
+    @contribution_years = contribution_years
     @contribution_year = select_contribution_year(@contribution_years)
-    @contribution_weeks, @contribution_month_spans = build_contribution_weeks(alias_ids, @contribution_year)
+    @contribution_weeks, @contribution_month_spans = build_contribution_weeks(@contribution_year)
     @profile_email = profile_email
 
     render :contributions
   end
 
   def daily_activity
-    alias_ids = @aliases.select(:id)
     date = parse_activity_date
-    messages_scope = Message.where(sender_id: alias_ids, created_at: date.beginning_of_day..date.end_of_day)
-    @activity_entries = build_activity_entries(alias_ids, scope: messages_scope)
+    messages_scope = Message.where(sender_person_id: @person.id, created_at: date.beginning_of_day..date.end_of_day)
+    @activity_entries = build_activity_entries(scope: messages_scope)
     @activity_date = date
 
     render :recent_threads
@@ -56,8 +53,8 @@ class PeopleController < ApplicationController
     @primary_alias&.email || @aliases.first&.email || params[:email].to_s
   end
 
-  def build_activity_entries(alias_ids, scope: nil)
-    scope ||= Message.where(sender_id: alias_ids)
+  def build_activity_entries(scope: nil)
+    scope ||= Message.where(sender_person_id: @person.id)
     topic_rows = scope.group(:topic_id)
                       .select('topic_id, MAX(created_at) AS last_at')
                       .order('last_at DESC')
@@ -67,7 +64,7 @@ class PeopleController < ApplicationController
     return [] if topic_ids.empty?
 
     topics = Topic.where(id: topic_ids).index_by(&:id)
-    started_ids = Topic.where(id: topic_ids, creator_id: alias_ids).pluck(:id)
+    started_ids = Topic.where(id: topic_ids, creator_person_id: @person.id).pluck(:id)
     patch_ids = scope.joins(:attachments).distinct.pluck(:topic_id)
 
     topic_rows.map do |row|
@@ -83,13 +80,13 @@ class PeopleController < ApplicationController
     end.compact
   end
 
-  def build_contribution_weeks(alias_ids, year)
+  def build_contribution_weeks(year)
     year = year.to_i
     start_date = Date.new(year, 1, 1)
     end_date = Date.new(year, 12, 31)
     start_date -= start_date.wday
     end_date += (6 - end_date.wday)
-    counts = Message.where(sender_id: alias_ids, created_at: start_date.beginning_of_day..end_date.end_of_day)
+    counts = Message.where(sender_person_id: @person.id, created_at: start_date.beginning_of_day..end_date.end_of_day)
                     .group(Arel.sql("DATE(messages.created_at)"))
                     .count
 
@@ -137,8 +134,8 @@ class PeopleController < ApplicationController
     Date.current
   end
 
-  def contribution_years(alias_ids)
-    Message.where(sender_id: alias_ids)
+  def contribution_years
+    Message.where(sender_person_id: @person.id)
            .distinct
            .pluck(Arel.sql("EXTRACT(YEAR FROM messages.created_at)"))
            .map(&:to_i)

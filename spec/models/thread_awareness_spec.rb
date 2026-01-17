@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe ThreadAwareness, type: :model do
   let(:user) { create(:user) }
   let(:alias_record) { Alias.create!(name: "Test", email: "test@example.com", user: user, person: user.person) }
-  let(:topic) { Topic.create!(title: "Topic", creator: alias_record) }
+  let(:topic) { Topic.create!(title: "Topic", creator: alias_record, creator_person_id: alias_record.person_id) }
 
   describe ".mark_until" do
     it "creates a new awareness marker" do

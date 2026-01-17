@@ -19,18 +19,19 @@
                      title: "Copy message link",
                      "aria-label": "Copy message link" do
           i.fa-regular.fa-copy
-        - profile_path = message.sender.person ? person_path(message.sender.email) : nil
+        - display_alias = message.sender_display_alias
+        - profile_path = message.sender_person ? person_path(display_alias.email) : nil
         - if profile_path
           = link_to profile_path, class: "author-avatar-link" do
-            = image_tag message.sender.display_gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
+            = image_tag display_alias.display_gravatar_url(size: 42), class: "message-avatar", alt: display_alias.name
         - else
-          = image_tag message.sender.display_gravatar_url(size: 42), class: "message-avatar", alt: message.sender.name
+          = image_tag display_alias.display_gravatar_url(size: 42), class: "message-avatar", alt: display_alias.name
         .author-details
           - if profile_path
-            .author-name = link_to message.sender.name, profile_path, class: "author-name-link"
+            .author-name = link_to display_alias.name, profile_path, class: "author-name-link"
           - else
-            .author-name = message.sender.name
-          .author-email = message.sender.email
+            .author-name = display_alias.name
+          .author-email = display_alias.email
     .message-meta
       .message-date
         time datetime=message.created_at.iso8601 title=absolute_time_display(message.created_at)
@@ -39,7 +40,7 @@
       - if message.reply_to
         - parent_number = (@message_numbers && @message_numbers[message.reply_to.id]) || "-"
         .reply-indicator
-          span.reply-to In reply to: #{message.reply_to.sender.name} (##{parent_number})
+          span.reply-to In reply to: #{message.reply_to.sender_display_alias.name} (##{parent_number})
       - if message.attachments.any?
         .attachment-indicator
           span.attachment-count #{message.attachments.size} attachment(s)

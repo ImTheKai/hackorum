@@ -479,7 +479,7 @@ class TopicsController < ApplicationController
     topic_ids = @topics.map(&:id)
     return if topic_ids.empty?
 
-    my_alias_ids = Alias.where(person_id: current_user.person_id).pluck(:id)
+    my_person_id = current_user.person_id
 
     team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
     teammate_user_ids = if team_ids.any?
@@ -488,23 +488,25 @@ class TopicsController < ApplicationController
                           [current_user.id]
                         end
     teammate_person_ids = User.where(id: teammate_user_ids).pluck(:person_id)
-    teammate_alias_ids = Alias.where(person_id: teammate_person_ids).pluck(:id)
 
-    rows = Message.where(topic_id: topic_ids, sender_id: teammate_alias_ids)
-                  .select(:topic_id, :sender_id)
+    rows = Message.where(topic_id: topic_ids, sender_person_id: teammate_person_ids)
+                  .select(:topic_id, :sender_person_id)
                   .distinct
 
-    alias_map = Alias.includes(:person).where(id: teammate_alias_ids).index_by(&:id)
+    person_map = Person.includes(:default_alias).where(id: teammate_person_ids).index_by(&:id)
 
     @participation_flags = Hash.new { |h, k| h[k] = { mine: false, team: false, aliases: [] } }
 
     rows.each do |row|
       entry = @participation_flags[row.topic_id]
-      alias_record = alias_map[row.sender_id]
+      person = person_map[row.sender_person_id]
+      next unless person
+
+      alias_record = person.default_alias
       next unless alias_record
 
       entry[:aliases] << alias_record
-      entry[:mine] ||= my_alias_ids.include?(row.sender_id)
+      entry[:mine] ||= row.sender_person_id == my_person_id
       entry[:team] = true
     end
 
@@ -639,25 +641,21 @@ class TopicsController < ApplicationController
       end
     when "started_by_me"
       if current_user_id
-        my_alias_ids = Alias.where(person_id: current_user.person_id).select(:id)
-        base_query = base_query.where(creator_id: my_alias_ids)
+        base_query = base_query.where(creator_person_id: current_user.person_id)
       end
     when "messaged_by_me"
       if current_user_id
-        my_alias_ids = Alias.where(person_id: current_user.person_id).select(:id)
-        base_query = base_query.joins(:messages).where(messages: { sender_id: my_alias_ids }).distinct
+        base_query = base_query.joins(:messages).where(messages: { sender_person_id: current_user.person_id }).distinct
       end
     when "team_started"
       if team_id
         member_person_ids = User.joins(:team_members).where(team_members: { team_id: team_id }).select(:person_id)
-        member_alias_ids = Alias.where(person_id: member_person_ids).select(:id)
-        base_query = base_query.where(creator_id: member_alias_ids)
+        base_query = base_query.where(creator_person_id: member_person_ids)
       end
     when "team_messaged"
       if team_id
         member_person_ids = User.joins(:team_members).where(team_members: { team_id: team_id }).select(:person_id)
-        member_alias_ids = Alias.where(person_id: member_person_ids).select(:id)
-        base_query = base_query.where(id: Message.where(sender_id: member_alias_ids).select(:topic_id))
+        base_query = base_query.where(id: Message.where(sender_person_id: member_person_ids).select(:topic_id))
       end
     when "starred_by_me"
       if current_user_id

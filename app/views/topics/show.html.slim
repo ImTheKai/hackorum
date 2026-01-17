@@ -114,7 +114,7 @@
             - first_num = segment.first[:message_number]
             - last_num = segment.last[:message_number]
             - number_range = first_num == last_num ? "##{first_num}" : "##{first_num}...##{last_num}"
-            - participants = segment.map { |entry| entry[:message].sender }.uniq(&:id).first(6)
+            - participants = segment.map { |entry| entry[:message].sender_display_alias }.uniq(&:id).first(6)
             - if can_toggle
               details class=details_classes open=(details_open ? true : nil) style="margin-left: #{indent_px}px"
                 summary class="outline-summary" title="Toggle branch with #{segment_size} messages"
@@ -130,10 +130,11 @@
                       span.branch-toggle = "▸"
                       - if is_reply && first_msg.reply_to
                         - parent_num = @message_numbers[first_msg.reply_to.id]
-                        span.outline-parent = "to #{first_msg.reply_to.sender.name} (##{parent_num})"
+                        span.outline-parent = "to #{first_msg.reply_to.sender_display_alias.name} (##{parent_num})"
                     .outline-time = smart_time_display(first_msg.created_at)
                 - segment.each do |entry|
                   - msg = entry[:message]
+                  - msg_display = msg.sender_display_alias
                   - is_reply = msg.reply_to_id.present?
                   - branch_class = "branch-#{entry[:branch_index]}"
                   - item_indent = entry[:branch_depth].to_i * 10
@@ -141,17 +142,18 @@
                     .outline-content
                       .outline-meta
                         span.outline-number = "##{entry[:message_number]}"
-                        = image_tag msg.sender.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                        = image_tag msg_display.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg_display.name
                         - if is_reply
                           span.outline-icon ↳
-                        span.outline-author = msg.sender.name
+                        span.outline-author = msg_display.name
                         - if is_reply && msg.reply_to
                           - parent_num = @message_numbers[msg.reply_to.id]
-                          span.outline-parent = "to #{msg.reply_to.sender.name} (##{parent_num})"
+                          span.outline-parent = "to #{msg.reply_to.sender_display_alias.name} (##{parent_num})"
                       .outline-time = smart_time_display(msg.created_at)
             - else
               - segment.each do |entry|
                 - msg = entry[:message]
+                - msg_display = msg.sender_display_alias
                 - is_reply = msg.reply_to_id.present?
                 - branch_class = "branch-#{entry[:branch_index]}"
                 - item_indent = entry[:branch_depth].to_i * 10
@@ -159,13 +161,13 @@
                   .outline-content
                     .outline-meta
                       span.outline-number = "##{entry[:message_number]}"
-                      = image_tag msg.sender.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg.sender.name
+                      = image_tag msg_display.display_gravatar_url(size: 32), class: "outline-avatar", alt: msg_display.name
                       - if is_reply
                         span.outline-icon ↳
-                      span.outline-author = msg.sender.name
+                      span.outline-author = msg_display.name
                       - if is_reply && msg.reply_to
                         - parent_num = @message_numbers[msg.reply_to.id]
-                        span.outline-parent = "to #{msg.reply_to.sender.name} (##{parent_num})"
+                        span.outline-parent = "to #{msg.reply_to.sender_display_alias.name} (##{parent_num})"
                     .outline-time = smart_time_display(msg.created_at)
       - else
         p No messages yet
@@ -177,7 +179,7 @@
         = render "star_button", topic: @topic, starred: @is_starred
       h1 = @topic.title
     .topic-meta
-      span.creator Started by #{@topic.creator.name}
+      span.creator Started by #{@topic.creator_display_alias.name}
       span.date #{time_ago_in_words(@topic.created_at)} ago
       span.message-count #{@messages.size} messages
 

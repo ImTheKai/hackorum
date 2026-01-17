@@ -10,6 +10,7 @@ class Alias < ApplicationRecord
   validates :name, uniqueness: { scope: :email }
 
   after_commit :auto_star_recent_topics, if: :saved_change_to_user_id?
+  after_commit :queue_person_id_propagation, if: :saved_change_to_person_id?
 
 
   scope :by_email, ->(email) {
@@ -95,6 +96,12 @@ class Alias < ApplicationRecord
   end
 
   private
+
+  def queue_person_id_propagation
+    return unless person_id.present?
+
+    PersonIdPropagationJob.perform_later(id, person_id)
+  end
 
   def auto_star_recent_topics
     return unless user_id.present?

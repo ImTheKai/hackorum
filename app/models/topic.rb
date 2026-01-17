@@ -1,5 +1,6 @@
 class Topic < ApplicationRecord
   belongs_to :creator, class_name: 'Alias', inverse_of: :topics
+  belongs_to :creator_person, class_name: 'Person'
   has_many :messages
   has_many :attachments, through: :messages
   has_many :notes, dependent: :destroy
@@ -9,6 +10,10 @@ class Topic < ApplicationRecord
   has_many :starring_users, through: :topic_stars, source: :user
 
   validates :title, presence: true
+
+  def creator_display_alias
+    creator_person&.default_alias || creator
+  end
 
   def participant_count
     messages.select(:sender_id).distinct.count

@@ -2,6 +2,9 @@ class Person < ApplicationRecord
   has_one :user
   has_many :aliases
   has_many :contributor_memberships, dependent: :destroy
+  has_many :created_topics, class_name: 'Topic', foreign_key: 'creator_person_id'
+  has_many :sent_messages, class_name: 'Message', foreign_key: 'sender_person_id'
+  has_many :mentions
 
   belongs_to :default_alias, class_name: 'Alias', optional: true
 

@@ -17,6 +17,10 @@ module Hackorum
     config.autoload_lib(ignore: %w[assets tasks])
 
     require_relative "../app/middleware/pending_migration_catcher"
-    config.middleware.insert_before 0, PendingMigrationCatcher
+    initializer "pending_migration_catcher.middleware", after: "active_record.migration_error" do |app|
+      if app.config.active_record.migration_error
+        app.middleware.insert_before ActiveRecord::Migration::CheckPending, PendingMigrationCatcher
+      end
+    end
   end
 end

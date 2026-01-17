@@ -1,0 +1,24 @@
+- content_for :title, @title || "Help"
+
+- content_for :sidebar do
+  .sidebar.help-sidebar
+
+    - if @outline.present?
+      .help-outline
+        .help-outline-header On this page
+        nav.help-outline-nav
+          - @outline.each do |heading|
+            = link_to "##{heading[:id]}", class: "help-outline-link level-#{heading[:level]}" do
+              = heading[:title]
+
+    nav.help-nav
+      = link_to help_index_path, class: help_nav_link_class(nil) do
+        i.fas.fa-home
+        span Help Home
+      .help-nav-divider
+      - HelpController::PAGES.each do |slug, title|
+        = link_to help_path(slug), class: help_nav_link_class(slug) do
+          i.fas.fa-file-alt
+          span = title
+
+= render template: 'layouts/application'

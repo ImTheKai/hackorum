@@ -74,6 +74,12 @@
     details.sidebar-section open=true
       summary.sidebar-heading Attachments
       .sidebar-section
+        - if @has_patches
+          .download-patchset style="margin-bottom: 1rem;"
+            = link_to latest_patchset_topic_path(@topic), class: "button download-button", download: "topic-#{@topic.id}-patchset.tar.gz", data: { turbo: false } do
+              i.fas.fa-download
+              span Download Latest Patchset
+
         - if attachment_messages.any?
           ul.attachments-list
             - attachment_messages.sort_by(&:created_at).reverse_each do |msg|

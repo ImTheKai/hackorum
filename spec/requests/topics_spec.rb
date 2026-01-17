@@ -223,4 +223,80 @@ RSpec.describe "Topics", type: :request do
       end
     end
   end
+
+  describe "GET /topics/:id/latest_patchset" do
+    let!(:creator) { create(:alias) }
+    let!(:topic) { create(:topic, creator: creator) }
+
+    context "with patches in topic" do
+      let!(:old_message) { create(:message, topic: topic, sender: creator, created_at: 1.day.ago) }
+      let!(:old_patch) { create(:attachment, :patch_file, message: old_message, file_name: "old.patch") }
+
+      let!(:latest_message) { create(:message, topic: topic, sender: creator, created_at: 1.hour.ago) }
+      let!(:patch1) { create(:attachment, :patch_file, message: latest_message, file_name: "0001-foo.patch") }
+      let!(:patch2) { create(:attachment, :patch_file, message: latest_message, file_name: "0002-bar.patch") }
+
+      it "returns patchset from latest message as tar.gz" do
+        get latest_patchset_topic_path(topic)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.content_type).to eq("application/gzip")
+        expect(response.headers["Content-Disposition"]).to include("attachment")
+        expect(response.headers["Content-Disposition"]).to include("topic-#{topic.id}-patchset.tar.gz")
+      end
+
+      it "includes all patches from latest message" do
+        get latest_patchset_topic_path(topic)
+
+        # Extract and verify tar.gz contents
+        require 'zlib'
+        require 'rubygems/package'
+
+        io = StringIO.new(response.body)
+        extracted_files = {}
+        Zlib::GzipReader.wrap(io) do |gz|
+          Gem::Package::TarReader.new(gz) do |tar|
+            tar.each do |entry|
+              extracted_files[entry.full_name] = entry.read
+            end
+          end
+        end
+
+        # Should include both patches from latest message
+        expect(extracted_files).to have_key("0001-foo.patch")
+        expect(extracted_files).to have_key("0002-bar.patch")
+        expect(extracted_files["0001-foo.patch"]).to eq(patch1.decoded_body_utf8)
+        expect(extracted_files["0002-bar.patch"]).to eq(patch2.decoded_body_utf8)
+
+        # Should NOT include old patch
+        expect(extracted_files.keys).not_to include("old.patch")
+      end
+    end
+
+    context "without patches" do
+      let!(:message) { create(:message, topic: topic, sender: creator) }
+
+      it "returns 404" do
+        get latest_patchset_topic_path(topic)
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context "with non-patch attachments only" do
+      let!(:message) { create(:message, topic: topic, sender: creator) }
+      let!(:attachment) { create(:attachment, message: message, file_name: "document.pdf") }
+
+      it "returns 404" do
+        get latest_patchset_topic_path(topic)
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context "with nonexistent topic" do
+      it "returns 404" do
+        get latest_patchset_topic_path(id: 99999)
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
 end

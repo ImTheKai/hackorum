@@ -1,0 +1,523 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'optparse'
+require 'net/http'
+require 'uri'
+require 'fileutils'
+require 'tmpdir'
+require 'rubygems/package'
+require 'zlib'
+require 'stringio'
+require 'shellwords'
+
+class HackorumPatch
+  VERSION = '1.0.0'
+
+  def initialize(argv)
+    @options = {}
+    @topic_id = nil
+    @branch_name = nil
+    @temp_dir = nil
+    @local_archive = nil
+    @using_local_file = false
+
+    parse_options!(argv)
+
+    if argv.empty?
+      puts @option_parser
+      exit 0
+    end
+
+    first_arg = argv.shift
+
+    # Auto-detect: numeric = topic_id, otherwise = local tar.gz file
+    if first_arg =~ /^\d+$/
+      @topic_id = first_arg
+      @branch_name = argv.shift || "review/t#{@topic_id}"
+      @server_url = @options[:server] || 'https://hackorum.dev'
+    else
+      @local_archive = first_arg
+      @using_local_file = true
+      # Extract topic id from filename if present, otherwise use generic name
+      if File.basename(@local_archive) =~ /topic-(\d+)-patchset/
+        @topic_id = $1
+        @branch_name = argv.shift || "review/t#{@topic_id}"
+      else
+        @branch_name = argv.shift || "review/patches"
+      end
+    end
+  end
+
+  def run
+    print_banner
+    validate_arguments!
+    validate_git_repository!
+
+    worktree_info = detect_worktree_usage
+    use_worktree = should_use_worktree?(worktree_info)
+
+    validate_clean_working_directory! unless use_worktree
+    check_worktree_directory!(worktree_info) if use_worktree
+    check_branch_existence!(use_worktree)
+
+    patch_files = if @using_local_file
+      extract_local_patchset
+    else
+      download_and_extract_patchset
+    end
+
+    base_commit = detect_base_commit(File.dirname(patch_files.first))
+
+    if use_worktree
+      worktree_path = determine_worktree_path(worktree_info)
+      create_worktree(base_commit, worktree_path)
+      Dir.chdir(worktree_path)
+    else
+      create_branch(base_commit)
+    end
+
+    apply_patches(patch_files)
+    cleanup_temp_files
+
+    print_success_message(use_worktree ? worktree_path : nil)
+  rescue => e
+    cleanup_temp_files
+    puts "\nERROR: #{e.message}"
+    exit 1
+  end
+
+  private
+
+  def parse_options!(argv)
+    @option_parser = OptionParser.new do |opts|
+      opts.banner = "Usage: hackorum-patch <topic_id|archive.tar.gz> [<branch_name>] [OPTIONS]"
+      opts.separator ""
+      opts.separator "Download and apply PostgreSQL patches from Hackorum"
+      opts.separator ""
+      opts.separator "Arguments:"
+      opts.separator "  topic_id          Topic ID from Hackorum (numeric)"
+      opts.separator "  archive.tar.gz    Local patchset archive file"
+      opts.separator "  branch_name       Custom branch name (optional)"
+      opts.separator ""
+      opts.separator "Options:"
+
+      opts.on("--force", "Overwrite existing branch") do
+        @options[:force] = true
+      end
+
+      opts.on("--base-commit=COMMIT", "Specify base commit (default: auto-detect)") do |commit|
+        @options[:base_commit] = commit
+      end
+
+      opts.on("--worktree-path=PATH", "Specify worktree location") do |path|
+        @options[:worktree_path] = path
+      end
+
+      opts.on("--worktree=MODE", [:yes, :no, :auto], "Worktree mode: yes, no, auto (default: auto)") do |mode|
+        @options[:worktree] = mode
+      end
+
+      opts.on("--server=URL", "Server URL (default: https://hackorum.dev)") do |url|
+        @options[:server] = url
+      end
+
+      opts.on("-h", "--help", "Show this help") do
+        puts opts
+        exit
+      end
+
+      opts.on("-v", "--version", "Show version") do
+        puts "hackorum-patch v#{VERSION}"
+        exit
+      end
+    end
+    @option_parser.parse!(argv)
+  end
+
+  def print_banner
+    puts "Hackorum Patch Downloader v#{VERSION}"
+    puts "=" * 35
+    puts ""
+    if @using_local_file
+      puts "Archive: #{@local_archive}"
+      puts "Branch: #{@branch_name}"
+    else
+      puts "Topic: #{@topic_id}"
+      puts "Branch: #{@branch_name}"
+      puts "Server: #{@server_url}"
+    end
+    puts ""
+  end
+
+  def validate_arguments!
+    if @using_local_file
+      unless File.exist?(@local_archive)
+        raise "Archive file not found: #{@local_archive}"
+      end
+      unless @local_archive =~ /\.tar\.gz$/i || @local_archive =~ /\.tgz$/i
+        raise "Archive must be a .tar.gz or .tgz file"
+      end
+    else
+      unless @topic_id && @topic_id =~ /^\d+$/
+        raise "Invalid topic ID. Must be a number."
+      end
+    end
+  end
+
+  def validate_git_repository!
+    print "Checking git repository... "
+    unless system("git rev-parse --git-dir > /dev/null 2>&1")
+      puts "[FAIL]"
+      raise "Not a git repository"
+    end
+    puts "[OK]"
+  end
+
+  def validate_clean_working_directory!
+    print "Checking working directory... "
+    status = `git status --porcelain`.strip
+    unless status.empty?
+      puts "[FAIL]"
+      raise "Working directory has uncommitted changes. Commit or stash first."
+    end
+    puts "[OK]"
+  end
+
+  def check_worktree_directory!(worktree_info)
+    worktree_path = determine_worktree_path(worktree_info)
+    print "Checking worktree directory... "
+
+    if File.exist?(worktree_path)
+      if @options[:force]
+        puts "[OK] (will overwrite)"
+      else
+        puts "[FAIL]"
+        raise "Worktree directory already exists: #{worktree_path}. Use --force to overwrite."
+      end
+    else
+      puts "[OK]"
+    end
+  end
+
+  def detect_worktree_usage
+    print "Detecting worktree configuration... "
+
+    git_dir = `git rev-parse --git-dir 2>/dev/null`.strip
+    is_worktree = git_dir.include?('.git/worktrees/')
+
+    worktree_list = `git worktree list 2>/dev/null`.strip
+    worktree_lines = worktree_list.lines
+    has_worktrees = worktree_lines.size > 1
+
+    parent_dir = nil
+    if has_worktrees
+      last_line = worktree_lines.last.strip
+      # Parse worktree list format: "path commit [branch]"
+      if last_line =~ /^(\S+)\s+\S+\s+\[(.+)\]$/
+        worktree_path = $1
+        branch_name = $2
+
+        # Strip branch name from path to get parent (handles branches with /)
+        branch_path_component = branch_name.gsub('/', File::SEPARATOR)
+
+        if worktree_path.end_with?(branch_path_component)
+          parent_dir = worktree_path[0...-branch_path_component.length].chomp(File::SEPARATOR)
+        else
+          parent_dir = File.dirname(worktree_path)
+        end
+      end
+    end
+
+    info = {
+      should_use: has_worktrees || is_worktree,
+      parent_dir: parent_dir
+    }
+
+    puts "[OK]"
+    if info[:parent_dir]
+      puts "  Found existing worktrees at: #{info[:parent_dir]}"
+    end
+
+    info
+  end
+
+  def should_use_worktree?(worktree_info)
+    use_worktree = case @options[:worktree]
+    when :yes
+      true
+    when :no
+      false
+    when :auto, nil
+      worktree_info[:should_use]  # Auto-detect from existing worktrees
+    else
+      raise "Invalid --worktree value: #{@options[:worktree]}"
+    end
+
+    mode_str = @options[:worktree] ? "--worktree=#{@options[:worktree]}" : "--worktree=auto"
+    puts "  Will use #{use_worktree ? 'worktree' : 'branch'} mode (#{mode_str})"
+    puts ""
+
+    use_worktree
+  end
+
+  def check_branch_existence!(use_worktree)
+    print "Checking if branch exists... "
+
+    branch_exists = system("git rev-parse --verify #{@branch_name} > /dev/null 2>&1")
+
+    if branch_exists && !@options[:force]
+      puts "[FAIL]"
+      raise "Branch '#{@branch_name}' already exists. Use --force to overwrite."
+    end
+
+    puts "[OK]"
+    puts "  Branch does not exist" unless branch_exists
+    puts ""
+  end
+
+  def download_and_extract_patchset
+    url = "#{@server_url}/topics/#{@topic_id}/latest_patchset"
+    uri = URI(url)
+
+    puts "Downloading patchset from #{url}..."
+
+    response = Net::HTTP.get_response(uri)
+    unless response.is_a?(Net::HTTPSuccess)
+      raise "Failed to download patchset (HTTP #{response.code})"
+    end
+
+    @temp_dir = Dir.mktmpdir("hackorum-patches-")
+
+    io = StringIO.new(response.body)
+    Zlib::GzipReader.wrap(io) do |gz|
+      Gem::Package::TarReader.new(gz) do |tar|
+        tar.each do |entry|
+          next unless entry.file?
+          dest = File.join(@temp_dir, entry.full_name)
+          File.write(dest, entry.read)
+          puts "  Extracted: #{entry.full_name}"
+        end
+      end
+    end
+
+    all_files = Dir.glob(File.join(@temp_dir, "*")).sort
+    patch_files = all_files.select { |f| f.end_with?(".patch") }
+    skipped = all_files.size - patch_files.size
+    msg = "[OK] Downloaded and extracted #{patch_files.size} patches"
+    msg += " (skipped #{skipped} non-patch files)" if skipped > 0
+    puts msg
+    puts ""
+
+    patch_files
+  end
+
+  def extract_local_patchset
+    puts "Extracting local patchset from #{@local_archive}..."
+
+    @temp_dir = Dir.mktmpdir("hackorum-patches-")
+
+    File.open(@local_archive, 'rb') do |file|
+      Zlib::GzipReader.wrap(file) do |gz|
+        Gem::Package::TarReader.new(gz) do |tar|
+          tar.each do |entry|
+            next unless entry.file?
+            dest = File.join(@temp_dir, entry.full_name)
+            File.write(dest, entry.read)
+            puts "  Extracted: #{entry.full_name}"
+          end
+        end
+      end
+    end
+
+    all_files = Dir.glob(File.join(@temp_dir, "*")).sort
+    patch_files = all_files.select { |f| f.end_with?(".patch") }
+    skipped = all_files.size - patch_files.size
+    msg = "[OK] Extracted #{patch_files.size} patches"
+    msg += " (skipped #{skipped} non-patch files)" if skipped > 0
+    puts msg
+    puts ""
+
+    patch_files
+  end
+
+  def detect_base_commit(patch_files_dir)
+    if @options[:base_commit]
+      puts "Using specified base commit: #{@options[:base_commit]}"
+      puts ""
+      return @options[:base_commit]
+    end
+
+    puts "Detecting base commit from patch index entries..."
+
+    patch_files = Dir.glob(File.join(patch_files_dir, "*.patch")).sort
+    first_patch = patch_files.first
+    return detect_default_branch_head unless first_patch
+
+    index_hashes = []
+    new_file_count = 0
+    content = File.read(first_patch)
+    content.scan(/^index ([0-9a-f]+)\.\.([0-9a-f]+)/) do |before_hash, after_hash|
+      if before_hash =~ /^0+$/
+        new_file_count += 1
+      else
+        index_hashes << before_hash
+      end
+    end
+
+    if index_hashes.empty?
+      puts "  No index entries found in first patch (#{new_file_count} new files)"
+      return detect_default_branch_head
+    end
+
+    puts "  Found #{index_hashes.size} index entries in first patch (skipped #{new_file_count} new files)"
+    puts "  Searching for base commit (this may take a moment)..."
+
+    candidates = []
+    index_hashes.each_with_index do |hash, idx|
+      puts "  Checking index #{idx + 1}/#{index_hashes.size}..."
+
+      output = `git log --all --pretty=format:%H --find-object=#{hash} -n 1 2>/dev/null`.strip
+      if !output.empty? && output =~ /^[0-9a-f]{40}$/
+        candidates << output
+        puts "    Found commit: #{output[0..7]}..."
+      end
+    end
+
+    if candidates.empty?
+      puts "  Could not detect base commit from index entries"
+      return detect_default_branch_head
+    end
+
+    base_commit = candidates.first
+    puts "  Using commit: #{base_commit[0..7]}... as base"
+    puts "[OK] Base commit: #{base_commit}"
+    puts ""
+
+    base_commit
+  end
+
+  def detect_default_branch_head
+    %w[origin/master master].each do |ref|
+      if system("git rev-parse --verify #{ref} > /dev/null 2>&1")
+        return ref
+      end
+    end
+    'HEAD'
+  end
+
+  def determine_worktree_path(worktree_info)
+    return @options[:worktree_path] if @options[:worktree_path]
+
+    if worktree_info[:parent_dir]
+      File.join(worktree_info[:parent_dir], @branch_name)
+    else
+      repo_root = `git rev-parse --show-toplevel`.strip
+      File.join(File.dirname(repo_root), @branch_name)
+    end
+  end
+
+  def create_worktree(base_commit, worktree_path)
+    print "Creating worktree at: #{worktree_path}... "
+
+    if @options[:force]
+      if File.exist?(worktree_path)
+        system("git worktree remove #{worktree_path} --force > /dev/null 2>&1")
+      end
+
+      if system("git rev-parse --verify #{@branch_name} > /dev/null 2>&1")
+        system("git branch -D #{@branch_name} > /dev/null 2>&1")
+      end
+    end
+
+    parent_dir = File.dirname(worktree_path)
+    FileUtils.mkdir_p(parent_dir) unless File.exist?(parent_dir)
+
+    unless system("git worktree add #{worktree_path} -b #{@branch_name} #{base_commit} > /dev/null 2>&1")
+      puts "[FAIL]"
+      raise "Failed to create worktree"
+    end
+
+    puts "[OK]"
+    puts ""
+  end
+
+  def create_branch(base_commit)
+    print "Creating branch #{@branch_name}... "
+
+    if @options[:force]
+      system("git branch -D #{@branch_name} > /dev/null 2>&1")
+    end
+
+    unless system("git checkout -b #{@branch_name} #{base_commit} > /dev/null 2>&1")
+      puts "[FAIL]"
+      raise "Failed to create branch"
+    end
+
+    puts "[OK]"
+    puts ""
+  end
+
+  def apply_patches(patch_files)
+    puts "Applying #{patch_files.size} patches with git am..."
+    puts ""
+
+    patch_files.each_with_index do |patch_file, idx|
+      puts "  [#{idx + 1}/#{patch_files.size}] #{File.basename(patch_file)}"
+    end
+    puts ""
+
+    patch_list = patch_files.map { |f| Shellwords.escape(f) }.join(" ")
+    output = `git am --3way #{patch_list} 2>&1`
+    success = $?.success?
+
+    output.each_line { |line| puts "  #{line}" }
+
+    unless success
+      puts ""
+      puts "[FAIL] Patch application failed"
+      puts ""
+      puts "You can resolve conflicts and continue with:"
+      puts "  cd #{Dir.pwd}"
+      puts "  git am --continue"
+      puts ""
+      puts "Or abort with:"
+      puts "  git am --abort"
+      raise "Patch application failed"
+    end
+
+    puts ""
+    puts "[OK] All patches applied successfully"
+    puts ""
+  end
+
+  def cleanup_temp_files
+    FileUtils.rm_rf(@temp_dir) if @temp_dir && File.exist?(@temp_dir)
+  end
+
+  def print_success_message(worktree_path = nil)
+    puts "[SUCCESS]"
+    puts "=========="
+    puts ""
+    puts "Branch: #{@branch_name}"
+    if worktree_path
+      puts "Location: #{worktree_path}"
+      puts ""
+      puts "Review the patches:"
+      puts "  cd #{worktree_path}"
+    end
+    puts ""
+  end
+end
+
+if __FILE__ == $0
+  begin
+    HackorumPatch.new(ARGV).run
+  rescue Interrupt
+    puts "\n\nInterrupted by user"
+    exit 130
+  rescue => e
+    puts "\nERROR: #{e.message}"
+    exit 1
+  end
+end

@@ -1,5 +1,5 @@
 class TopicsController < ApplicationController
-  before_action :set_topic, only: [:show, :aware, :read_all, :star, :unstar]
+  before_action :set_topic, only: [:show, :aware, :read_all, :star, :unstar, :latest_patchset]
   before_action :require_authentication, only: [:aware, :aware_bulk, :aware_all, :read_all, :star, :unstar]
   before_action :require_team_membership, only: [:index, :new_topics_count]
 
@@ -49,6 +49,9 @@ class TopicsController < ApplicationController
       load_notes
       load_star_state
     end
+
+    # Check if topic has any patches (for sidebar button)
+    @has_patches = @messages.any? { |msg| msg.attachments.any?(&:patch?) }
   end
 
   def aware
@@ -118,6 +121,40 @@ class TopicsController < ApplicationController
       format.json { render json: { starred: false } }
       format.html { redirect_to topic_path(@topic) }
     end
+  end
+
+  def latest_patchset
+    latest_message = @topic.messages
+                           .where(id: Attachment.where(message_id: @topic.messages.select(:id))
+                                                .select(:message_id))
+                           .order(created_at: :desc)
+                           .find { |msg| msg.attachments.any?(&:patch?) }
+
+    return head :not_found unless latest_message
+
+    patches = latest_message.attachments.select(&:patch?).sort_by(&:file_name)
+    return head :not_found if patches.empty?
+
+    require 'zlib'
+    require 'rubygems/package'
+
+    tar_gz_data = StringIO.new
+    Zlib::GzipWriter.wrap(tar_gz_data) do |gz|
+      Gem::Package::TarWriter.new(gz) do |tar|
+        patches.each do |patch|
+          content = patch.decoded_body_utf8
+          tar.add_file_simple(patch.file_name, 0644, content.bytesize) do |io|
+            io.write(content)
+          end
+        end
+      end
+    end
+
+    filename = "topic-#{@topic.id}-patchset.tar.gz"
+    send_data tar_gz_data.string,
+              filename: filename,
+              type: "application/gzip",
+              disposition: "attachment"
   end
 
   def search

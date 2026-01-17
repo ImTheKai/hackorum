@@ -48,6 +48,7 @@ Rails.application.routes.draw do
       post :read_all
       post :star
       delete :unstar
+      get :latest_patchset
     end
   end
   resources :activities, only: [:index] do
@@ -56,6 +57,9 @@ Rails.application.routes.draw do
   resources :notes, only: [:create, :update, :destroy]
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
+
+  # Help pages
+  resources :help, only: [:index, :show], param: :slug
   get "person/*email/contributions/:year", to: "people#contributions", as: :person_contributions, format: false
   get "person/*email/activity/:date", to: "people#daily_activity", as: :person_activity, format: false
   get "person/*email", to: "people#show", as: :person, format: false

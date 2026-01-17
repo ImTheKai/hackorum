@@ -1,0 +1,15 @@
+.help-page
+  h1 Help & Documentation
+
+  .help-intro
+    p Welcome to Hackorum's help section. Here you'll find guides and documentation to help you get the most out of the platform.
+
+  .help-topics
+    h2 Available Topics
+
+    ul.help-topic-list
+      - @pages.each do |slug, title|
+        li
+          = link_to help_path(slug) do
+            i.fas.fa-file-alt
+            span = title

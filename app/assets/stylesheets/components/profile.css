@@ -451,7 +451,7 @@
 .contrib-calendar {
   border-collapse: separate;
   border-spacing: 4px;
-  width: 100%;
+  width: max-content;
 }
 
 .contrib-calendar th,

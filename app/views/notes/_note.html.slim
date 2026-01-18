@@ -16,7 +16,11 @@
     .note-mentions
       span.note-mentions-label Mentions:
       - note.note_mentions.each do |mention|
-        span.note-mention = note_mention_label(mention)
+        span.note-mention
+          = note_mention_label(mention)
+          - if can_remove_note_mention?(mention, current_user)
+            = button_to note_mention_path(mention), method: :delete, class: "mention-remove-button", title: "Remove this mention", form: { data: { turbo_confirm: "Remove yourself from this note's mentions?" } } do
+              i.fa-solid.fa-xmark
 
   - if current_user&.id == note.author_id
     .note-actions-row

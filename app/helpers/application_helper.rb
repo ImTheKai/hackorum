@@ -75,4 +75,18 @@ module ApplicationHelper
       "@unknown"
     end
   end
+
+  def can_remove_note_mention?(mention, user)
+    return false unless user
+    mentionable = mention.mentionable
+
+    case mentionable
+    when User
+      mentionable.id == user.id
+    when Team
+      mentionable.admin?(user)
+    else
+      false
+    end
+  end
 end

@@ -60,6 +60,7 @@ Rails.application.routes.draw do
     post :mark_all_read, on: :collection
   end
   resources :notes, only: [:create, :update, :destroy]
+  resources :note_mentions, only: [:destroy]
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
 

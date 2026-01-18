@@ -47,14 +47,22 @@
     - if @team_members.any?
       ul.member-list
         - @team_members.each do |member|
-          li
-            = member.user.aliases.first&.name || "User ##{member.user.id}"
-            - if member.role_admin?
-              span.role-badge Admin
-            - if @can_manage && member.user_id != current_user&.id
-              = button_to "Remove", settings_team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Remove this member?" }
-            - if member.user_id == current_user&.id && !member.role_admin?
-              = button_to "Leave team", settings_team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Leave this team?" }
+          li.member-item
+            .member-info
+              = member.user.aliases.first&.name || "User ##{member.user.id}"
+              - if member.role_admin?
+                span.role-badge Admin
+            .member-actions
+              - if @can_manage && member.user_id != current_user&.id
+                - if member.role_admin?
+                  = button_to "Make member", settings_team_team_member_path(@team, member), method: :patch, params: { role: "member" }, class: "button-secondary", data: { turbo_confirm: "Demote this admin to regular member?" }
+                - else
+                  = button_to "Make admin", settings_team_team_member_path(@team, member), method: :patch, params: { role: "admin" }, class: "button-secondary"
+                = button_to "Remove", settings_team_team_member_path(@team, member), method: :delete, class: "button-danger-secondary", data: { turbo_confirm: "Remove this member from the team?" }
+              - elsif member.user_id == current_user&.id
+                - if member.role_admin?
+                  span.hint You cannot change your own admin status
+                = button_to "Leave team", settings_team_team_member_path(@team, member), method: :delete, class: "button-secondary", data: { turbo_confirm: "Leave this team?" }
     - else
       p No members yet.
 

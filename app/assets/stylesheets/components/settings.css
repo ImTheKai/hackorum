@@ -82,6 +82,7 @@
 .settings-page .button-primary,
 .settings-page .button-secondary,
 .settings-page .button-danger,
+.settings-page .button-danger-secondary,
 .settings-page input[type="submit"] {
   display: inline-flex;
   align-items: center;
@@ -304,7 +305,8 @@
   margin-left: var(--spacing-2);
 }
 
-.settings-page .member-list .button-secondary {
+.settings-page .member-list .button-secondary,
+.settings-page .member-list .button-danger-secondary {
   font-size: var(--font-size-xs);
   padding: var(--spacing-2) var(--spacing-3);
 }
@@ -381,4 +383,43 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   margin-top: var(--spacing-1);
+}
+
+/* Member management */
+.settings-page .member-list .member-item {
+  flex-wrap: nowrap;
+}
+
+.settings-page .member-list .member-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-page .member-list .member-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-shrink: 0;
+}
+
+.settings-page .member-list .member-actions .hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.settings-page .button-danger-secondary {
+  background: var(--color-bg-card);
+  color: var(--color-danger-text);
+  border-color: var(--color-border);
+}
+
+.settings-page .button-danger-secondary:hover {
+  border-color: var(--color-danger-text);
+  background: var(--color-danger-bg-hover);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }

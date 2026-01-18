@@ -29,7 +29,7 @@ Rails.application.routes.draw do
     resource :deletion, only: [:show, :create]
 
     resources :teams, only: [:index, :show, :create, :update, :destroy] do
-      resources :team_members, only: [:create, :destroy]
+      resources :team_members, only: [:create, :update, :destroy]
     end
 
     resource :username, only: [:update]

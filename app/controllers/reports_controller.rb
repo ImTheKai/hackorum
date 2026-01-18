@@ -5,6 +5,8 @@ class ReportsController < ApplicationController
   ACTIVE_THREADS_LIMIT = 10
   NEWCOMERS_LIMIT = 5
 
+  LiveStats = Struct.new(:messages_total, :participants_active, :topics_new, :participants_new)
+
   def index
     if params[:year].present?
       year = params[:year].to_i
@@ -136,8 +138,7 @@ class ReportsController < ApplicationController
       participants_new = first_messages.count { |_, first_at| @period_range.cover?(first_at) }
     end
 
-    Struct.new(:messages_total, :participants_active, :topics_new, :participants_new)
-      .new(messages_total, participants_active, topics_new, participants_new)
+    LiveStats.new(messages_total, participants_active, topics_new, participants_new)
   end
 
   def load_rankings

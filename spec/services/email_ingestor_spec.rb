@@ -93,7 +93,7 @@ RSpec.describe EmailIngestor do
     end
 
     context "activity creation" do
-      it "creates activities for users who have starred the topic" do
+      it "creates activities for users who have starred the topic (excluding sender)" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
 
@@ -109,15 +109,16 @@ RSpec.describe EmailIngestor do
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([reply_sender_alias])
 
         reply_message = nil
+        # Activities created for user1 and user2 (not reply_sender since they're the sender)
         expect {
           reply_message = ingestor.ingest_raw(reply_email)
-        }.to change { Activity.where(activity_type: "topic_message_received").count }.by(3)
+        }.to change { Activity.where(activity_type: "topic_message_received").count }.by(2)
 
         activities = Activity.where(activity_type: "topic_message_received", subject: reply_message)
-        expect(activities.pluck(:user_id)).to match_array([user1.id, user2.id, reply_sender.id])
+        expect(activities.pluck(:user_id)).to match_array([user1.id, user2.id])
       end
 
-      it "marks sender's activity as read when they have topic starred" do
+      it "does not create activity for the sender even if they starred the topic" do
         sender_alias = create(:alias, email: "sender@example.com", user: user1)
         allow_any_instance_of(described_class).to receive(:build_from_aliases).and_return([sender_alias])
 
@@ -129,12 +130,16 @@ RSpec.describe EmailIngestor do
         reply_email = raw_email.gsub("<test123@example.com>", "<reply456@example.com>")
         reply_email = reply_email.gsub("Subject: Test Subject", "Subject: Re: Test Subject\nIn-Reply-To: <test123@example.com>")
 
-        ingestor.ingest_raw(reply_email)
+        # user1 is the sender of the reply (build_from_aliases still returns sender_alias)
+        reply_message = ingestor.ingest_raw(reply_email)
 
-        sender_activity = Activity.find_by(user: user1, activity_type: "topic_message_received")
-        expect(sender_activity.read_at).to be_present
+        # Sender (user1) should not get an activity
+        sender_activity = Activity.find_by(user: user1, activity_type: "topic_message_received", subject: reply_message)
+        expect(sender_activity).to be_nil
 
-        other_activity = Activity.find_by(user: user2, activity_type: "topic_message_received")
+        # Other starred user (user2) should get an unread activity
+        other_activity = Activity.find_by(user: user2, activity_type: "topic_message_received", subject: reply_message)
+        expect(other_activity).to be_present
         expect(other_activity.read_at).to be_nil
       end
 

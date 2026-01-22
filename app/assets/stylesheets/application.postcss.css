@@ -12,6 +12,7 @@
 @import "components/session.css";
 @import "components/sidebar.css";
 @import "components/topics.css";
+@import "components/roles.css";
 @import "components/avatars.css";
 @import "components/participants.css";
 @import "components/messages.css";

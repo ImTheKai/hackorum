@@ -89,4 +89,37 @@ module ApplicationHelper
       false
     end
   end
+
+  def contributor_role_badge(contributor, compact: false)
+    return nil unless contributor&.respond_to?(:contributor_type)
+    contributor_type = contributor.contributor_type
+    return nil unless contributor_type
+
+    label = contributor.respond_to?(:contributor_badge) ? contributor.contributor_badge : contributor_type
+    label = label.presence || "Contributor"
+
+    icon_class =
+      case contributor_type
+      when "core_team"
+        "fa-people-group"
+      when "committer"
+        "fa-code-branch"
+      when "major_contributor"
+        "fa-star"
+      when "significant_contributor"
+        "fa-award"
+      when "past_major_contributor", "past_significant_contributor"
+        "fa-clock-rotate-left"
+      end
+
+    return nil unless icon_class
+
+    classes = ["role-badge", "role-badge-#{contributor_type.tr('_', '-')}"]
+    classes << "is-compact" if compact
+
+    content_tag(:span, class: classes.join(" "), title: label, "aria-label": label) do
+      concat content_tag(:i, "", class: "fa-solid #{icon_class}")
+      concat content_tag(:span, label, class: "role-badge-label") unless compact
+    end
+  end
 end

@@ -1,0 +1,64 @@
+name: Dev Setup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dev-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare dev env file
+        run: cp .env.development.example .env.development
+
+      - name: Start dev stack
+        run: make dev-detach
+
+      - name: Wait for Rails to be healthy
+        run: |
+          echo "Waiting for Rails to start..."
+          for i in {1..60}; do
+            if docker compose -f docker-compose.dev.yml exec -T web curl -fs http://localhost:3000/up 2>/dev/null; then
+              echo "Rails is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/60 - waiting 5s..."
+            sleep 5
+          done
+          echo "Rails failed to start. Showing logs:"
+          docker compose -f docker-compose.dev.yml logs --tail=200 web db
+          exit 1
+
+      - name: Run db-reset while stack is running
+        run: make db-reset
+
+      - name: Wait for web to restart
+        run: |
+          echo "Waiting for web to restart after db-reset..."
+          for i in {1..30}; do
+            if docker compose -f docker-compose.dev.yml exec -T web curl -fs http://localhost:3000/up 2>/dev/null; then
+              echo "Web is healthy after db-reset!"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting 5s..."
+            sleep 5
+          done
+          echo "Web failed to restart. Showing logs:"
+          docker compose -f docker-compose.dev.yml logs --tail=200 web db
+          exit 1
+
+      - name: Run RSpec tests
+        run: make test
+
+      - name: Teardown
+        if: always()
+        run: make down

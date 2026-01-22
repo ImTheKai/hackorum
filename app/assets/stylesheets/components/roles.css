@@ -66,9 +66,3 @@
   border-color: var(--color-purple-200);
   background: var(--color-purple-50);
 }
-
-@media (max-width: 900px) {
-  .role-badge .role-badge-label {
-    display: none;
-  }
-}

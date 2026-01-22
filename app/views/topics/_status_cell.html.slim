@@ -28,10 +28,6 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
     = link_to topic.title, topic_path(topic), class: "topic-link"
     - creator = topic.creator_display_alias
     - last_sender = topic.last_sender_person&.default_alias
-    - if creator
-      = contributor_role_badge(creator)
-    - if last_sender
-      = contributor_role_badge(last_sender)
   .topic-title-mobile
     = link_to topic.title, topic_path(topic), class: "topic-link"
     - if creator || last_sender
@@ -40,12 +36,10 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
           span.topic-byline-item
             = image_tag creator.gravatar_url(size: 20), class: "topic-byline-avatar", alt: creator.name
             span.topic-byline-name = creator.name
-            = contributor_role_badge(creator, compact: true)
         - if last_sender
           span.topic-byline-item.topic-byline-right
             = image_tag last_sender.gravatar_url(size: 20), class: "topic-byline-avatar", alt: last_sender.name
             span.topic-byline-name = last_sender.name
-            = contributor_role_badge(last_sender, compact: true)
     .topic-row-footer
       .topic-footer-icons
         .topic-icons

@@ -57,7 +57,7 @@ html data-theme="light"
                 span data-theme-target="label" Theme
               - if user_signed_in?
                 - if current_user&.person&.default_alias
-                  span.nav-user = current_user.person.default_alias.name
+                  = link_to current_user.person.default_alias.name, person_path(current_user.person.default_alias.email), class: "nav-link nav-user"
                 = link_to "Settings", settings_root_path, class: "nav-link"
                 = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
               - else
@@ -84,7 +84,7 @@ html data-theme="light"
           .nav-auth
             - if user_signed_in?
               - if current_user&.person&.default_alias
-                span.nav-user = current_user.person.default_alias.name
+                = link_to current_user.person.default_alias.name, person_path(current_user.person.default_alias.email), class: "nav-link nav-user"
               - unread = activity_unread_count
               = link_to activities_path, class: "nav-link nav-link-activity", title: "Activity" do
                 i.fa-regular.fa-bell

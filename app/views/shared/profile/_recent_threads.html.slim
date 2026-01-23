@@ -8,9 +8,9 @@
     - when :month
       h2 Messages in #{Date.new(activity_period[:year], activity_period[:month], 1).strftime('%B %Y')}
     - when :recent
-      h2 Recent messages (last month)
+      h2 Recent messages (last 30 days)
   - else
-    h2 Recent messages (last month)
+    h2 Recent messages (last 30 days)
 
   - if activity_entries.any?
     - summary = local_assigns[:activity_summary] || {}

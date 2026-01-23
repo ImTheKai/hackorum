@@ -16,9 +16,15 @@ tr id=dom_id(topic) class="topic-row topic-#{state[:status] || 'new'}" data-topi
       .activity-replies = pluralize(replies_count, "reply")
       .activity-time title=absolute_time_display(topic.last_message_at) = smart_time_display(topic.last_message_at)
   td.topic-participants data-label="Participants"
-    - participants = top_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
-    - participants = topic.participant_alias_stats(limit: 5) if participants.empty? && top_participants.empty?
-    = render partial: "avatar_list", locals: { participants: participants, total_participants: topic.participant_count }
+    - creator_alias = topic.creator_display_alias
+    - last_sender_alias = topic.last_sender_person&.default_alias
+    - participants = []
+    - if creator_alias
+      - participants << { alias: creator_alias, person: topic.creator_person }
+    - if last_sender_alias && last_sender_alias.id != creator_alias&.id
+      - participants << { alias: last_sender_alias, person: topic.last_sender_person }
+    - total_participants = [topic.participant_count.to_i, participants.size].max
+    = render partial: "avatar_list", locals: { participants: participants, total_participants: total_participants }
     - if topic.contributor_participant_count.positive?
       - contributor_data = contributor_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
       - contributor_data = topic.contributor_participants if contributor_data.empty? && contributor_participants.empty?

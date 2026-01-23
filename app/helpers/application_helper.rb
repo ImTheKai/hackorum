@@ -54,6 +54,27 @@ module ApplicationHelper
     "fa-code-branch"
   end
 
+  def contributor_role_overlay_for_types(types)
+    types = Array(types).compact
+    return nil if types.empty?
+
+    role_type = types.min_by { |type| Alias::CONTRIBUTOR_RANK[type] || 99 }
+    return nil unless role_type
+
+    case role_type
+    when "core_team"
+      { type: role_type, icon: "fa-solid fa-people-group", label: "Core Team" }
+    when "committer"
+      { type: role_type, icon: "fa-solid fa-code-branch", label: "Committer" }
+    when "major_contributor"
+      { type: role_type, icon: "fa-solid fa-star", label: "Major Contributor" }
+    when "significant_contributor"
+      { type: role_type, icon: "fa-solid fa-award", label: "Significant Contributor" }
+    when "past_major_contributor", "past_significant_contributor"
+      { type: role_type, icon: "fa-solid fa-clock-rotate-left", label: "Past Contributor" }
+    end
+  end
+
   def read_visibility_seconds
     5
   end

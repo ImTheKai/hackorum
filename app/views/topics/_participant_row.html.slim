@@ -13,6 +13,7 @@
 - avatar_classes = ["participant-avatar"]
 - membership_icons = []
 - membership_types = person&.contributor_membership_types || []
+- role_badge = contributor_role_overlay_for_types(membership_types)
 - if membership_types.include?("core_team")
   - membership_icons << { icon: "fa-solid fa-people-group", label: "Core Team" }
 - if membership_types.include?("committer")
@@ -27,6 +28,9 @@
   .participant-left
     = link_to person_path(alias_record.email), class: "participant-avatar-link" do
       = image_tag alias_record.gravatar_url(size: avatar_size), class: avatar_classes.join(" "), alt: alias_record.name, title: tooltip
+      - if role_badge
+        span.participant-role-badge class="participant-role-badge-#{role_badge[:type].to_s.tr('_', '-')}" title=tooltip
+          i class=role_badge[:icon]
     .participant-details
       - name_classes = ["participant-name-link"]
       - name_classes << "is-committer" if membership_types.include?("committer")

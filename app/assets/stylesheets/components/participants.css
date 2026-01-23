@@ -45,6 +45,7 @@
 
 .participant-avatar-link {
   display: inline-block;
+  position: relative;
 }
 
 .participant-name-link {
@@ -58,6 +59,59 @@
 
 .participant-name-link.is-committer {
   font-weight: var(--font-weight-semibold);
+}
+
+.participant-role-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-bg-card);
+  background: var(--color-gray-200);
+  color: var(--color-text-secondary);
+  font-size: 0.55rem;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.participant-role-badge-core-team {
+  background: var(--color-primary-500);
+  color: var(--color-text-contrast);
+}
+
+.participant-role-badge-committer {
+  background: var(--color-success);
+  color: var(--color-text-contrast);
+}
+
+.participant-role-badge-major-contributor {
+  background: var(--color-warning);
+  color: var(--color-text-contrast);
+}
+
+.participant-role-badge-significant-contributor {
+  background: var(--color-primary-500);
+  color: var(--color-text-contrast);
+}
+
+.participant-role-badge-past-major-contributor,
+.participant-role-badge-past-significant-contributor {
+  background: var(--color-gray-400);
+  color: var(--color-text-contrast);
+}
+
+.participant-empty {
+  display: block;
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .participants-count {

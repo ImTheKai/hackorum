@@ -3,7 +3,8 @@
 - classes << "is-hidden" unless participation[:mine] || participation[:team]
 - aliases = participation[:aliases] || []
 - count = aliases.size
-div class=classes.join(" ") id=dom_id(topic, "participation") data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+- tooltip_label = count.positive? ? "Team participants (#{count})" : "Team participants"
+div class=classes.join(" ") id=dom_id(topic, "participation") title=tooltip_label data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
   i.fa-solid.fa-user-group
   - if count > 1
     span.topic-icon-badge = count

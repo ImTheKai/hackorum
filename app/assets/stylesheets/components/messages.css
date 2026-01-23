@@ -40,6 +40,11 @@
   gap: var(--spacing-3);
 }
 
+.author-avatar-link {
+  position: relative;
+  display: inline-block;
+}
+
 .message-number {
   font-weight: var(--font-weight-bold);
   color: var(--color-gray-600);

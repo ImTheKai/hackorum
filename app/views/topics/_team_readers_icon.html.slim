@@ -1,7 +1,8 @@
 - count = readers&.size.to_i
 - classes = ["topic-icon", "activity-team-read"]
 - classes << "is-hidden" if count.zero?
-div class=classes.join(" ") id=dom_id(topic, "team_readers") data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+- tooltip_label = count.positive? ? "Team readers (#{count})" : "Team readers"
+div class=classes.join(" ") id=dom_id(topic, "team_readers") title=tooltip_label data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
   i.fa-solid.fa-users
   - if count.positive?
     span.topic-icon-badge = count

@@ -24,11 +24,19 @@
           i.fa-regular.fa-copy
         - display_alias = message.sender_display_alias
         - profile_path = message.sender_person ? person_path(display_alias.email) : nil
+        - role_badge = contributor_role_overlay_for_types(display_alias.person&.contributor_membership_types)
         - if profile_path
-          = link_to profile_path, class: "author-avatar-link" do
+          = link_to profile_path, class: "author-avatar-link", title: (role_badge ? "#{display_alias.name} (#{role_badge[:label]})" : display_alias.name) do
             = image_tag display_alias.display_gravatar_url(size: 42), class: "message-avatar", alt: display_alias.name
+            - if role_badge
+              span.participant-role-badge class="participant-role-badge-#{role_badge[:type].to_s.tr('_', '-')}" title=role_badge[:label]
+                i class=role_badge[:icon]
         - else
-          = image_tag display_alias.display_gravatar_url(size: 42), class: "message-avatar", alt: display_alias.name
+          span.author-avatar-link title=(role_badge ? "#{display_alias.name} (#{role_badge[:label]})" : display_alias.name)
+            = image_tag display_alias.display_gravatar_url(size: 42), class: "message-avatar", alt: display_alias.name
+            - if role_badge
+              span.participant-role-badge class="participant-role-badge-#{role_badge[:type].to_s.tr('_', '-')}" title=role_badge[:label]
+                i class=role_badge[:icon]
         .author-details
           - if profile_path
             .author-name = link_to display_alias.name, profile_path, class: "author-name-link"

@@ -28,11 +28,13 @@ tr id=dom_id(topic) class="topic-row topic-#{state[:status] || 'new'}" data-topi
     - if topic.contributor_participant_count.positive?
       - contributor_data = contributor_participants.map { |tp| { alias: tp.person.default_alias, person: tp.person, message_count: tp.message_count, last_at: tp.last_message_at } }
       - contributor_data = topic.contributor_participants if contributor_data.empty? && contributor_participants.empty?
-      div class="topic-icon activity-#{topic.highest_contributor_type || 'contributor'}" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+      div class="topic-icon activity-#{topic.highest_contributor_type || 'contributor'}" title="Contributors and committers in this thread" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
         i.fa-solid.fa-users-rays
         span.topic-icon-badge = topic.contributor_participant_count
-        - if contributor_data.any?
-          .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+        .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+          - if contributor_data.any?
             - contributor_data.each do |participant|
               = render partial: "participant_row", locals: { participant: participant, avatar_size: 32 }
+          - else
+            span.participant-empty Contributors list unavailable
     = render partial: "topics/participation_icon", locals: { topic: topic, participation: participation }

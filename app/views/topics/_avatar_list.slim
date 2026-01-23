@@ -13,6 +13,8 @@
       - role_label = person&.contributor_badge
       - tooltip_parts << role_label if role_label
       - badge_text = tooltip_parts.join(", ")
+      - membership_types = person&.contributor_membership_types || []
+      - role_badge = contributor_role_overlay_for_types(membership_types)
       - css_classes = ["participant-avatar"]
       - css_classes << "is-core-team" if person&.core_team?
       - css_classes << "is-committer" if !person&.core_team? && person&.committer?
@@ -21,5 +23,9 @@
       - css_classes << "is-past-contributor" if person&.past_contributor?
       = link_to person_path(alias_record.email), class: "participant-avatar-link" do
         = image_tag alias_record.gravatar_url(size: 32), class: css_classes.join(" "), alt: alias_record.name, title: badge_text
+        - if role_badge
+          span.participant-role-badge class="participant-role-badge-#{role_badge[:type].to_s.tr('_', '-')}" title=badge_text
+            i class=role_badge[:icon]
     - if total_participants > participants.count
-      span.participants-count +#{total_participants - participants.count}
+      - remaining_count = total_participants - participants.count
+      span.participants-count title="#{remaining_count} more participants" +#{remaining_count}

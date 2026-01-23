@@ -1,1 +1,1 @@
-= render "shared/profile/activity_filters", activity_filters: @activity_filters, activity_period: @activity_period, profile_routes: person_profile_routes(@profile_email), turbo_frame: "person-activity"
+= render "shared/profile/activity_filters", activity_filters: @activity_filters, activity_period: @activity_period, profile_routes: person_profile_routes(@profile_email, week_start: WeekCalculation.week_start_param(@week_start_day)), week_start_param: WeekCalculation.week_start_param(@week_start_day), turbo_frame: "person-activity"

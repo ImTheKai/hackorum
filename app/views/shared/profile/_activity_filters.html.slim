@@ -2,6 +2,8 @@
 
 .activity-filters data-controller="activity-filter"
   = form_with url: profile_filter_url(profile_routes, activity_period), method: :get, data: { turbo_frame: turbo_frame, activity_filter_target: "form" } do |f|
+    - if local_assigns[:week_start_param].present?
+      = hidden_field_tag :week_start, week_start_param
     span.filter-label Filter:
     label.filter-checkbox
       = check_box_tag "filters[]", "started_thread", filter_types.include?("started_thread"), data: { action: "change->activity-filter#submit" }

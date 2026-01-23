@@ -1,1 +1,1 @@
-= render "shared/profile/activity_filters", activity_filters: @activity_filters, activity_period: @activity_period, profile_routes: team_profile_routes(@team.name), turbo_frame: "team-activity"
+= render "shared/profile/activity_filters", activity_filters: @activity_filters, activity_period: @activity_period, profile_routes: team_profile_routes(@team.name, week_start: WeekCalculation.week_start_param(@week_start_day)), week_start_param: WeekCalculation.week_start_param(@week_start_day), turbo_frame: "team-activity"

@@ -34,8 +34,9 @@ class TeamsProfileController < ApplicationController
   def weekly_activity
     year = params[:year].to_i
     week = params[:week].to_i
-    start_date = Date.commercial(year, week, 1)
-    end_date = start_date + 6.days
+    wday_start = WeekCalculation.parse_week_start(params[:week_start])
+    start_date = WeekCalculation.week_start_date(year, week, wday_start)
+    end_date = start_date + 6
     @activity_period = { type: :week, year: year, week: week, start_date: start_date, end_date: end_date }
     load_activity_data(scope: messages_scope_for_range(start_date, end_date), year: year)
     render :activity

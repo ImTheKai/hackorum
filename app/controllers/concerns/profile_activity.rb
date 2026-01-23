@@ -21,6 +21,7 @@ module ProfileActivity
   end
 
   def load_activity_data(scope: nil, year: nil)
+    @week_start_day = parse_week_start_day
     @activity_filters = parse_activity_filters
     effective_scope = scope || default_recent_scope
     @activity_entries = build_activity_entries(scope: effective_scope, filters: @activity_filters)
@@ -29,6 +30,7 @@ module ProfileActivity
     @contribution_years = contribution_years
     @contribution_year = year || select_contribution_year(@contribution_years)
     @contribution_weeks, @contribution_month_spans = build_contribution_weeks(@contribution_year, filters: @activity_filters)
+    @weekday_labels = WeekCalculation.weekday_labels(@week_start_day)
   end
 
   def default_recent_scope
@@ -179,28 +181,29 @@ module ProfileActivity
     return [[], []] if ids.blank?
 
     year = year.to_i
-    start_date = Date.commercial(year, 1, 1)
-    end_date = Date.commercial(year, Date.new(year, 12, 28).cweek, 7)
+    wday_start = @week_start_day || WeekCalculation::DEFAULT_WEEK_START
+    start_date, end_date = WeekCalculation.year_weeks_range(year, wday_start)
 
     counts = build_filtered_contribution_counts(start_date, end_date, filters)
 
     total_days = (end_date - start_date).to_i + 1
     days = (0...total_days).map do |idx|
-      date = start_date + idx.days
+      date = start_date + idx
       count = counts[date] || 0
       { date: date, count: count, level: contribution_level(count) }
     end
 
     weeks_data = days.each_slice(7).map do |week_days|
       first_day = week_days.first[:date]
-      { days: week_days, year: first_day.cwyear, week: first_day.cweek, count: week_days.sum { |d| d[:count] } }
+      week_num = WeekCalculation.week_number(first_day, year, wday_start)
+      { days: week_days, year: year, week: week_num, count: week_days.sum { |d| d[:count] } }
     end
 
     weeks_data.each do |week|
       next if week[:days].length == 7
       missing = 7 - week[:days].length
       missing.times do |idx|
-        date = week[:days].last[:date] + (idx + 1).days
+        date = week[:days].last[:date] + (idx + 1)
         week[:days] << { date: date, count: 0, level: 0 }
       end
     end
@@ -303,6 +306,10 @@ module ProfileActivity
   def parse_activity_filters
     return ALL_ACTIVITY_FILTERS.dup unless params[:filters].present?
     params[:filters].select { |f| ALL_ACTIVITY_FILTERS.include?(f) }
+  end
+
+  def parse_week_start_day
+    WeekCalculation.parse_week_start(params[:week_start])
   end
 
   def parse_activity_date

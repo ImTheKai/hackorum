@@ -14,23 +14,25 @@ module ProfileHelper
     end
   end
 
-  def person_profile_routes(email)
+  def person_profile_routes(email, week_start: nil)
+    ws = week_start ? { week_start: week_start } : {}
     {
-      default: person_path(email),
-      daily: ->(date) { person_activity_path(email, date) },
-      weekly: ->(year, week) { person_weekly_activity_path(email, year, week) },
-      monthly: ->(year, month) { person_monthly_activity_path(email, year, month) },
-      contributions: ->(year) { person_contributions_path(email, year: year) }
+      default: person_path(email, **ws),
+      daily: ->(date) { person_activity_path(email, date, **ws) },
+      weekly: ->(year, week) { person_weekly_activity_path(email, year, week, **ws) },
+      monthly: ->(year, month) { person_monthly_activity_path(email, year, month, **ws) },
+      contributions: ->(year) { person_contributions_path(email, year: year, **ws) }
     }
   end
 
-  def team_profile_routes(name)
+  def team_profile_routes(name, week_start: nil)
+    ws = week_start ? { week_start: week_start } : {}
     {
-      default: team_profile_path(name),
-      daily: ->(date) { team_activity_path(name, date) },
-      weekly: ->(year, week) { team_weekly_activity_path(name, year, week) },
-      monthly: ->(year, month) { team_monthly_activity_path(name, year, month) },
-      contributions: ->(year) { team_contributions_path(name, year: year) }
+      default: team_profile_path(name, **ws),
+      daily: ->(date) { team_activity_path(name, date, **ws) },
+      weekly: ->(year, week) { team_weekly_activity_path(name, year, week, **ws) },
+      monthly: ->(year, month) { team_monthly_activity_path(name, year, month, **ws) },
+      contributions: ->(year) { team_contributions_path(name, year: year, **ws) }
     }
   end
 end

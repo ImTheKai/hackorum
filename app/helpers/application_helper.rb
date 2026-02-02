@@ -1,4 +1,31 @@
 module ApplicationHelper
+  def meta_title
+    return content_for(:meta_title) if content_for?(:meta_title)
+    return "#{content_for(:title)} - Hackorum" if content_for?(:title)
+
+    "Hackorum"
+  end
+
+  def meta_description
+    "PostgreSQL Hackers Archive"
+  end
+
+  def meta_image_url
+    "https://hackorum.dev/icon.png"
+  end
+
+  def meta_url
+    "https://hackorum.dev"
+  end
+
+  def meta_type
+    "website"
+  end
+
+  def twitter_card
+    "summary"
+  end
+
   # Smart time display: relative for recent, absolute for old
   def smart_time_display(time)
     return "" if time.nil?

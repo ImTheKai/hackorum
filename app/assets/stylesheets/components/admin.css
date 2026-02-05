@@ -1,3 +1,10 @@
+/* Admin Styles */
+
+/* Admin Users Table */
+.settings-page .email-table-wrap {
+  overflow-x: auto;
+}
+
 /* Admin Topic Merge Styles */
 
 .admin-merge-container {

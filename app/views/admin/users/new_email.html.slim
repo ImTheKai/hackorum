@@ -1,0 +1,16 @@
+- content_for :title, "Admin — Add Email"
+
+.settings-page
+  h1 Add Email for #{@user.username || "User ##{@user.id}"}
+
+  .settings-section
+    p Associate an email address with this user. This bypasses email verification.
+
+    = form_tag confirm_email_admin_user_path(@user), method: :post, data: { turbo: false } do
+      .form-group
+        = label_tag :email, "Email address"
+        = email_field_tag :email, nil, required: true, placeholder: "user@example.com", autofocus: true, class: "form-input"
+      = submit_tag "Look up email", class: "button-primary"
+
+  p
+    = link_to "← Back to users", admin_users_path

@@ -2,6 +2,10 @@
 
 class Admin::TopicMergesController < Admin::BaseController
   before_action :set_source_topic, only: [ :new, :preview, :create ]
+
+  def active_admin_section
+    :topic_merges
+  end
   before_action :set_target_topic, only: [ :preview, :create ]
 
   def index

@@ -1,0 +1,22 @@
+- content_for :title, "Admin"
+
+- content_for :sidebar do
+  .sidebar.settings-sidebar
+    nav.settings-nav
+      = link_to admin_root_path, class: admin_nav_link_class(:dashboard) do
+        i.fas.fa-tachometer-alt
+        span Dashboard
+      = link_to admin_users_path, class: admin_nav_link_class(:users) do
+        i.fas.fa-users
+        span Users
+      = link_to admin_email_changes_path, class: admin_nav_link_class(:email_changes) do
+        i.fas.fa-envelope
+        span Email Changes
+      = link_to admin_topic_merges_path, class: admin_nav_link_class(:topic_merges) do
+        i.fas.fa-code-branch
+        span Topic Merges
+      = link_to admin_imap_sync_states_path, class: admin_nav_link_class(:imap_sync) do
+        i.fas.fa-sync
+        span IMAP Sync
+
+= render template: 'layouts/application'

@@ -1,0 +1,45 @@
+- content_for :title, "Admin — Users"
+
+.settings-page
+  h1 Users
+
+  .email-table-wrap
+    table.email-table
+      thead
+        tr
+          th Username
+          th Emails
+          th Admin
+          th Created
+          th Actions
+      tbody
+        - @users.each do |user|
+          tr
+            td
+              - if user.primary_alias
+                = link_to (user.username || "—"), person_path(user.primary_alias.email)
+              - else
+                = user.username || "—"
+              - if user == current_user
+                span.alias-badge.mention-only
+                  | (you)
+            td
+              - emails = user.person&.aliases&.map(&:email)&.uniq || []
+              - if emails.any?
+                - default_email = user.primary_alias&.email
+                - emails.each do |email|
+                  div
+                    = email
+                    - if email == default_email
+                      span.role-badge primary
+              - else
+                | —
+            td
+              - if user.admin?
+                span.role-badge Admin
+              - if user != current_user
+                = button_to toggle_admin_admin_user_path(user), method: :post, class: "button-secondary button-small", data: { turbo_confirm: "#{user.admin? ? 'Remove' : 'Grant'} admin privileges for #{user.username}?" } do
+                  = user.admin? ? "Remove admin" : "Make admin"
+            td = user.created_at.strftime('%Y-%m-%d')
+            td
+              = link_to "Add email", new_email_admin_user_path(user), class: "button-secondary button-small"

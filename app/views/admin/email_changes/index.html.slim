@@ -1,0 +1,35 @@
+- content_for :title, "Email Change Audit Log"
+
+.admin-merge-container
+  h1 Email Change Audit Log
+
+  - if @email_changes.empty?
+    .empty-state
+      p No email associations have been performed yet.
+  - else
+    .merge-log-table
+      table
+        thead
+          tr
+            th Date
+            th Admin
+            th Target User
+            th Email Added
+            th Details
+        tbody
+          - @email_changes.each do |change|
+            tr
+              td.merge-date = change.created_at.strftime('%Y-%m-%d %H:%M')
+              td.merged-by
+                = change.performed_by.username || change.performed_by.person&.default_alias&.name || "User ##{change.performed_by.id}"
+              td.target-topic
+                - if change.target_user.person&.default_alias
+                  = link_to change.target_user.username || change.target_user.person.default_alias.name, person_path(change.target_user.person.default_alias.email)
+                - else
+                  = change.target_user.username || "User ##{change.target_user.id}"
+              td = change.email
+              td.merge-reason
+                - if change.created_new_alias
+                  | New alias created
+                - else
+                  = "#{change.aliases_attached} existing #{'alias'.pluralize(change.aliases_attached)} attached"

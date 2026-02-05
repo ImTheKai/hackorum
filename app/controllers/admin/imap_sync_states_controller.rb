@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
-class Admin::ImapSyncStatesController < ApplicationController
+class Admin::ImapSyncStatesController < Admin::BaseController
+  def active_admin_section
+    :imap_sync
+  end
+
   def index
     @states = ImapSyncState.order(:mailbox_label)
     respond_to do |format|

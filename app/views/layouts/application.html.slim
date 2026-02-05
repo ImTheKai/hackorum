@@ -67,6 +67,8 @@ html data-theme="light"
                 - if current_user&.person&.default_alias
                   = link_to current_user.person.default_alias.name, person_path(current_user.person.default_alias.email), class: "nav-link nav-user"
                 = link_to "Settings", settings_root_path, class: "nav-link"
+                - if current_admin?
+                  = link_to "Admin", admin_root_path, class: "nav-link"
                 = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
               - else
                 = link_to "Sign in", new_session_path, class: "nav-link"
@@ -99,6 +101,8 @@ html data-theme="light"
                 - if unread.positive?
                   span.nav-badge = unread
               = link_to "Settings", settings_root_path, class: "nav-link"
+              - if current_admin?
+                = link_to "Admin", admin_root_path, class: "nav-link"
               = button_to "Sign out", session_path, method: :delete, class: "nav-link", form: { style: 'display:inline' }, data: { turbo: false }
             - else
               = link_to "Sign in", new_session_path, class: "nav-link"

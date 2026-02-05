@@ -1,5 +1,15 @@
 Rails.application.routes.draw do
   namespace :admin do
+    root "dashboard#show"
+    resources :users, only: [:index] do
+      member do
+        post :toggle_admin
+        get :new_email
+        post :confirm_email
+        post :add_email
+      end
+    end
+    resources :email_changes, only: [:index]
     resources :imap_sync_states, only: [:index]
     resources :topic_merges, only: [:index]
     resources :topics, only: [] do

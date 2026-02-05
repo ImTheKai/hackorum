@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_20_184149) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_05_191041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -37,6 +37,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_184149) do
     t.index ["user_id", "id"], name: "index_activities_on_user_id_and_id"
     t.index ["user_id", "read_at"], name: "index_activities_on_user_id_and_read_at"
     t.index ["user_id"], name: "index_activities_on_user_id"
+  end
+
+  create_table "admin_email_changes", force: :cascade do |t|
+    t.bigint "performed_by_id", null: false
+    t.bigint "target_user_id", null: false
+    t.string "email", null: false
+    t.integer "aliases_attached", default: 0, null: false
+    t.boolean "created_new_alias", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["performed_by_id"], name: "index_admin_email_changes_on_performed_by_id"
+    t.index ["target_user_id"], name: "index_admin_email_changes_on_target_user_id"
   end
 
   create_table "aliases", force: :cascade do |t|
@@ -651,6 +663,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_20_184149) do
   end
 
   add_foreign_key "activities", "users"
+  add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
+  add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
   add_foreign_key "aliases", "users"
   add_foreign_key "attachments", "messages"

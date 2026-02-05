@@ -1,0 +1,64 @@
+- content_for :title, "Admin — Confirm Email Association"
+
+.settings-page
+  h1 Confirm Email Association
+
+  .settings-section
+    h2 Summary
+
+    table.email-table
+      tbody
+        tr
+          td
+            strong Target user
+          td = @user.username || "User ##{@user.id}"
+        tr
+          td
+            strong User's primary email
+          td = @user.primary_alias&.email || "—"
+        tr
+          td
+            strong Email to add
+          td = @email
+
+    - if @owned_by_other
+      .settings-warning
+        i.fas.fa-exclamation-triangle
+        |  This email is already linked to another user account. The association cannot proceed.
+
+      p
+        = link_to "← Back to users", admin_users_path
+
+    - else
+      - if @existing_aliases.any?
+        .settings-section
+          h2 Existing aliases for this email
+          table.email-table
+            thead
+              tr
+                th Name
+                th Email
+                th Current owner
+            tbody
+              - @existing_aliases.each do |al|
+                tr
+                  td = al.name
+                  td = al.email
+                  td
+                    - if al.user
+                      = al.user.username || "User ##{al.user.id}"
+                    - elsif al.person
+                      | Person ##{al.person.id} (no user)
+                    - else
+                      span.text-muted Unowned
+
+      .settings-section
+        .merge-warning
+          i.fas.fa-exclamation-triangle
+          |  This will associate the email immediately, bypassing email verification.
+
+        = form_tag add_email_admin_user_path(@user), method: :post, data: { turbo: false } do
+          = hidden_field_tag :email, @email
+          .merge-actions
+            = link_to "Cancel", admin_users_path, class: "button-secondary"
+            = submit_tag "Confirm association", class: "button-primary"

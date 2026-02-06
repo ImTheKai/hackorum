@@ -29,14 +29,18 @@
       p No connected accounts yet.
 
   .settings-section
-    h2 Email addresses
+    h2 Add alias
     = form_with url: settings_emails_path, method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
       .form-group
-        = f.label :email, "Add email"
+        = f.label :name, "Display name"
+        = f.text_field :name, placeholder: "Your Name"
+      .form-group
+        = f.label :email, "Email address"
         = f.email_field :email, required: true, placeholder: "user@example.com"
-      = f.submit "Send verification", class: "button-primary"
+      = f.submit "Add email", class: "button-primary"
 
     - if @aliases.any?
+      h2 Aliases
       table.email-table
         thead
           tr

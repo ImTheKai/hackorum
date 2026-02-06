@@ -88,14 +88,23 @@ class VerificationsController < ApplicationController
       return redirect_to settings_account_path, alert: 'Email is linked to another account. Delete that account first to release it.'
     end
 
+    metadata = JSON.parse(token.metadata || '{}') rescue {}
+    name = metadata['name'].presence
+
     aliases = Alias.by_email(email)
     if aliases.exists?
+      # Associate all existing aliases with this email
       aliases.find_each do |al|
         person.attach_alias!(al, user: user)
         al.update_columns(verified_at: Time.current)
       end
+      # If a name was provided and no existing alias has that name, create a new alias
+      if name.present? && !aliases.where(name: name).exists?
+        Alias.create!(person: person, user: user, name: name, email: email, verified_at: Time.current)
+      end
     else
-      al = Alias.create!(person: person, user: user, name: email, email: email, verified_at: Time.current)
+      # No existing aliases - create new one with provided name
+      al = Alias.create!(person: person, user: user, name: name, email: email, verified_at: Time.current)
       person.update!(default_alias_id: al.id) if person.default_alias_id.nil?
     end
 

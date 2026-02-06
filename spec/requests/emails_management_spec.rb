@@ -26,7 +26,7 @@ RSpec.describe 'Emails management', type: :request do
     sign_in(email: 'me@example.com')
 
     perform_enqueued_jobs do
-      post settings_emails_path, params: { email: 'new-address@example.com' }
+      post settings_emails_path, params: { email: 'new-address@example.com', name: 'My New Name' }
       expect(response).to redirect_to(settings_account_path)
     end
 
@@ -38,7 +38,9 @@ RSpec.describe 'Emails management', type: :request do
     get verification_path(token: raw)
     expect(response).to redirect_to(settings_account_path)
 
-    expect(Alias.by_email('new-address@example.com').where(user_id: user.id)).to exist
+    new_alias = Alias.by_email('new-address@example.com').where(user_id: user.id).first
+    expect(new_alias).to be_present
+    expect(new_alias.name).to eq('My New Name')
 
     post session_path, params: { email: 'new-address@example.com', password: 'secret' }
     expect(response).to redirect_to(root_path)
@@ -102,6 +104,101 @@ RSpec.describe 'Emails management', type: :request do
     expect(Alias.by_email('token-user@example.com').pluck(:user_id).uniq).to eq([token_user.id])
   ensure
     token&.destroy
+  end
+
+  it 'requires name when adding a completely new email' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+
+    sign_in(email: 'me@example.com')
+
+    expect {
+      post settings_emails_path, params: { email: 'brand-new@example.com' }
+    }.not_to change { UserToken.count }
+
+    expect(response).to redirect_to(settings_account_path)
+    expect(flash[:alert]).to match(/provide a display name/)
+  end
+
+  it 'requires name when email is already verified by user' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+
+    sign_in(email: 'me@example.com')
+
+    expect {
+      post settings_emails_path, params: { email: 'me@example.com' }
+    }.not_to change { UserToken.count }
+
+    expect(response).to redirect_to(settings_account_path)
+    expect(flash[:alert]).to match(/already verified/)
+  end
+
+  it 'creates alias directly without verification when email is already verified by user' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+
+    sign_in(email: 'me@example.com')
+
+    expect {
+      post settings_emails_path, params: { email: 'me@example.com', name: 'Alternative Name' }
+    }.to change { Alias.by_email('me@example.com').count }.by(1)
+
+    expect(UserToken.count).to eq(0) # No verification token created
+
+    expect(response).to redirect_to(settings_account_path)
+    expect(flash[:notice]).to eq('Alias added.')
+
+    new_alias = Alias.by_email('me@example.com').find_by(name: 'Alternative Name')
+    expect(new_alias).to be_present
+    expect(new_alias.user_id).to eq(user.id)
+    expect(new_alias.verified_at).to be_present
+  end
+
+  it 'creates additional alias with new name when associating existing aliases' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+
+    # Legacy alias for another email
+    create(:alias, email: 'legacy@example.com', name: 'Old Name')
+
+    sign_in(email: 'me@example.com')
+
+    perform_enqueued_jobs do
+      post settings_emails_path, params: { email: 'legacy@example.com', name: 'New Name' }
+      expect(response).to redirect_to(settings_account_path)
+    end
+
+    raw = extract_raw_token_from_mailer
+    get verification_path(token: raw)
+    expect(response).to redirect_to(settings_account_path)
+
+    aliases = Alias.by_email('legacy@example.com').where(user_id: user.id)
+    expect(aliases.count).to eq(2)
+    expect(aliases.pluck(:name)).to contain_exactly('Old Name', 'New Name')
+  end
+
+  it 'does not create duplicate alias when name matches existing' do
+    user = create(:user, password: 'secret', password_confirmation: 'secret')
+    attach_verified_alias(user, email: 'me@example.com')
+
+    # Legacy alias for another email
+    create(:alias, email: 'legacy2@example.com', name: 'Existing Name')
+
+    sign_in(email: 'me@example.com')
+
+    perform_enqueued_jobs do
+      post settings_emails_path, params: { email: 'legacy2@example.com', name: 'Existing Name' }
+      expect(response).to redirect_to(settings_account_path)
+    end
+
+    raw = extract_raw_token_from_mailer
+    get verification_path(token: raw)
+    expect(response).to redirect_to(settings_account_path)
+
+    aliases = Alias.by_email('legacy2@example.com').where(user_id: user.id)
+    expect(aliases.count).to eq(1)
+    expect(aliases.first.name).to eq('Existing Name')
   end
 
   def extract_raw_token_from_mailer

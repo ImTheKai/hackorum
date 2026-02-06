@@ -1,30 +1,34 @@
 - status = state[:status] || "new"
+- reading_unread_count = nil
+- if status.to_s == "reading"
+  - read_count = state[:read_count].to_i
+  - total_count = topic.message_count
+  - reading_unread_count = [total_count - read_count, 0].max
 - status_class = "status-#{status}"
+- status_class = "#{status_class} has-new-replies" if status.to_s == "reading" && reading_unread_count.to_i.positive?
 - star_data = star_data || {}
 td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") data-label="Topic"
   - creator = topic.creator_display_alias
   - last_sender = topic.last_sender_person&.default_alias
   .topic-title-main
-    - if status.to_s == "reading"
-      - read_count = state[:read_count].to_i
-      - total_count = topic.message_count
-      - unread_count = [total_count - read_count, 0].max
-      - if unread_count.positive?
-        = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{unread_count} unread)" do
-          i.fa-solid.fa-envelope
-          span.topic-icon-badge.topic-icon-badge-sup = unread_count
-      - else
-        .topic-icon.topic-icon-reading title="All messages read"
-          i.fa-solid.fa-envelope
-    = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
-    = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
-    = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
-    - commitfest_summary = @commitfest_summaries&.dig(topic.id)
-    - if commitfest_summary
-      = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
-    - elsif topic.has_attachments?
-      .topic-icon title="Attachments"
-        i.fa-solid.fa-paperclip
+    .topic-title-icons
+      - if status.to_s == "reading"
+        - if reading_unread_count.to_i.positive?
+          = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
+            i.fa-solid.fa-envelope
+            span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
+        - else
+          .topic-icon.topic-icon-reading title="All messages read"
+            i.fa-solid.fa-envelope
+      = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
+      = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
+      = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
+      - commitfest_summary = @commitfest_summaries&.dig(topic.id)
+      - if commitfest_summary
+        = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
+      - elsif topic.has_attachments?
+        .topic-icon title="Attachments"
+          i.fa-solid.fa-paperclip
     = link_to topic.title, topic_path(topic), class: "topic-link"
   .topic-title-mobile
     = link_to topic.title, topic_path(topic), class: "topic-link"
@@ -41,26 +45,24 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
     .topic-row-footer
       .topic-footer-icons
         .topic-icons
-          - if status.to_s == "reading"
-            - read_count = state[:read_count].to_i
-            - total_count = topic.message_count
-            - unread_count = [total_count - read_count, 0].max
-            - if unread_count.positive?
-              = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{unread_count} unread)" do
-                i.fa-solid.fa-envelope
-                span.topic-icon-badge.topic-icon-badge-sup = unread_count
-            - else
-              .topic-icon.topic-icon-reading title="All messages read"
-                i.fa-solid.fa-envelope
-          = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
-          = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
-          = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
-          - commitfest_summary = @commitfest_summaries&.dig(topic.id)
-          - if commitfest_summary
-            = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
-          - elsif topic.has_attachments?
-            .topic-icon title="Attachments"
-              i.fa-solid.fa-paperclip
+          .topic-title-icons
+            - if status.to_s == "reading"
+              - if reading_unread_count.to_i.positive?
+                = link_to topic_path(topic, anchor: "first-unread"), class: "topic-icon topic-icon-reading", title: "Jump to first unread message (#{reading_unread_count} unread)" do
+                  i.fa-solid.fa-envelope
+                  span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
+              - else
+                .topic-icon.topic-icon-reading title="All messages read"
+                  i.fa-solid.fa-envelope
+            = render partial: "topics/star_icon", locals: { topic: topic, star_data: star_data }
+            = render partial: "topics/note_icon", locals: { topic: topic, count: note_count.to_i }
+            = render partial: "topics/team_readers_icon", locals: { topic: topic, readers: team_readers }
+            - commitfest_summary = @commitfest_summaries&.dig(topic.id)
+            - if commitfest_summary
+              = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }
+            - elsif topic.has_attachments?
+              .topic-icon title="Attachments"
+                i.fa-solid.fa-paperclip
       - replies_count = [topic.message_count - 1, 0].max
       .topic-footer-replies = pluralize(replies_count, "reply")
       .topic-footer-time title=absolute_time_display(topic.last_message_at) = smart_time_display(topic.last_message_at)

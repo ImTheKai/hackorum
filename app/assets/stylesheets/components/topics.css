@@ -142,6 +142,13 @@ a.topic-icon {
 
 .status-border {
   border-left: 8px solid transparent;
+  position: relative;
+}
+
+.topic-title-main,
+.topic-title-mobile {
+  position: relative;
+  z-index: 1;
 }
 
 .status-border.status-new {
@@ -279,9 +286,54 @@ a.topic-icon {
   }
 }
 
+.topic-row.topic-new,
+.topic-row.topic-reading {
+  background: var(--color-bg-unread);
+
+  &:hover {
+    background: var(--color-bg-unread-hover);
+  }
+}
+
+.topic-row.topic-reading {
+  background: var(--color-bg-read);
+
+  &:hover {
+    background: var(--color-bg-read-hover);
+  }
+}
+
 .topic-row.topic-read {
   color: var(--color-text-muted);
+  background: var(--color-bg-read);
+
+  &:hover {
+    background: var(--color-bg-read-hover);
+  }
 }
+
+.topic-title-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  position: relative;
+  padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-2);
+  align-self: stretch;
+  height: 100%;
+}
+
+.status-border.has-new-replies::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--topic-new-replies-strip-width, 260px);
+  background: var(--color-bg-unread);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 0 100%);
+  z-index: 0;
+}
+
 
 .topic-icon-hover {
   display: none;
@@ -376,9 +428,12 @@ a.topic-icon {
 
 
 .topic-title-main {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: stretch;
   gap: var(--spacing-2);
+  height: 100%;
 }
 
 .topic-title-mobile {

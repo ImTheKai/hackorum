@@ -146,6 +146,7 @@ a.topic-icon {
 .status-border {
   border-left: 8px solid transparent;
   position: relative;
+  overflow: visible;
 }
 
 .topic-title-main,
@@ -332,6 +333,7 @@ a.topic-icon {
   align-items: center;
   gap: var(--spacing-2);
   position: relative;
+  z-index: 2;
   padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-2);
   align-self: stretch;
   height: 100%;
@@ -357,7 +359,7 @@ a.topic-icon {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 20;
+  z-index: 50;
   background: var(--color-bg-hoverbox);
   border-radius: var(--border-radius-md);
   padding: var(--spacing-3);

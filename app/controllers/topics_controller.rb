@@ -36,19 +36,20 @@ class TopicsController < ApplicationController
   end
 
   def show
-    messages_scope = @topic.messages.includes(
-      :attachments,
-      :sender,
-      :sender_person,
-      { sender_person: :default_alias },
-      {
-        reply_to: [
-          :sender,
-          :sender_person,
-          { sender_person: :default_alias }
-        ]
-      }
-    )
+    messages_scope = @topic.messages
+      .eager_load(
+        :sender,
+        :sender_person,
+        { sender_person: :default_alias },
+        {
+          reply_to: [
+            :sender,
+            :sender_person,
+            { sender_person: :default_alias }
+          ]
+        }
+      )
+      .preload(:attachments)
 
     @messages = messages_scope.order(created_at: :asc)
     @message_numbers = @messages.each_with_index.to_h { |msg, idx| [msg.id, idx + 1] }
@@ -56,7 +57,7 @@ class TopicsController < ApplicationController
     auto_mark_aware!
 
     build_participants_sidebar_data(messages_scope)
-    build_thread_outline(messages_scope)
+    build_thread_outline(@messages)
     load_commitfest_sidebar
     if user_signed_in?
       load_notes
@@ -324,6 +325,7 @@ class TopicsController < ApplicationController
 
       {
         alias: alias_record,
+        person: tp.person,
         message_count: tp.message_count,
         first_at: tp.first_message_at,
         last_at: tp.last_message_at
@@ -331,10 +333,9 @@ class TopicsController < ApplicationController
     end.compact
   end
 
-  def build_thread_outline(messages_scope)
-    ordered_messages = messages_scope.order(:created_at)
+  def build_thread_outline(messages)
     children = Hash.new { |h, k| h[k] = [] }
-    ordered_messages.each do |msg|
+    messages.each do |msg|
       children[msg.reply_to_id] << msg
     end
 

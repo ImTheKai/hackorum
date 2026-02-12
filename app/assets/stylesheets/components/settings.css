@@ -444,6 +444,13 @@
   flex-shrink: 0;
 }
 
+.settings-page .radio-group input[type="checkbox"] {
+  width: auto;
+  margin: var(--spacing-1) 0 0 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 .settings-page .radio-group .radio-text {
   flex: 1;
 }

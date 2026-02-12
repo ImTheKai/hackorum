@@ -29,7 +29,7 @@ module Search
 
       # Bracketed text (treated as plain text, not dependent conditions)
       rule(:bracketed_text) do
-        str('[') >> (str(']').absent? >> any).repeat.as(:bracketed_content) >> str(']')
+        str("[") >> (str("]").absent? >> any).repeat.as(:bracketed_content) >> str("]")
       end
 
       # Selector keywords - IMPORTANT: longer strings must come before shorter prefixes

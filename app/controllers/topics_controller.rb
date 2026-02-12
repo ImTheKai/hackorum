@@ -1008,7 +1008,7 @@ class TopicsController < ApplicationController
 
     latest_topic = @topics.first
     watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
-    [ "topics-index", watermark ]
+    [ "topics-index", watermark, topic_link_pref_cache_key ]
   end
 
   def topics_turbo_stream_cache_key
@@ -1016,7 +1016,8 @@ class TopicsController < ApplicationController
       "topics-index-turbo",
       params[:filter],
       params[:team_id],
-      params[:cursor].presence || "root"
+      params[:cursor].presence || "root",
+      topic_link_pref_cache_key
     ]
   end
 
@@ -1028,6 +1029,12 @@ class TopicsController < ApplicationController
     return yield if params[:filter].present? || params[:team_id].present? || params[:note_tag].present?
 
     Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) { yield }
+  end
+
+  def topic_link_pref_cache_key
+    return "top" unless user_signed_in?
+
+    current_user.open_threads_at_first_unread? ? "first-unread" : "top"
   end
 
   def require_team_membership

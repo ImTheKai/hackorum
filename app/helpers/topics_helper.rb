@@ -226,4 +226,12 @@ module TopicsHelper
       safe_join(parts)
     end
   end
+
+  def topic_title_link(topic)
+    if user_signed_in? && current_user.open_threads_at_first_unread?
+      topic_path(topic, anchor: "first-unread")
+    else
+      topic_path(topic)
+    end
+  end
 end

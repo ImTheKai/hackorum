@@ -40,4 +40,13 @@
             span.radio-text
               strong Teammates only
               span.radio-description Only users who share a team with you can @mention you
+      h2 Thread Navigation
+      p.settings-hint Control where thread titles open.
+      .form-group
+        .radio-group
+          label
+            = f.check_box :open_threads_at_first_unread
+            span.radio-text
+              strong Open at first unread
+              span.radio-description Jump to first unread message in the thread if the title was clicked
       = f.submit "Save", class: "button-primary"

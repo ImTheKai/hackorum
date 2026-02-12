@@ -27,9 +27,9 @@ td.topic-title.status-border class=status_class id=dom_id(topic, "status_cell") 
   .topic-title-main
     .topic-title-icons
       == icons_html
-    = link_to topic.title, topic_path(topic), class: "topic-link"
+    = link_to topic.title, topic_title_link(topic), class: "topic-link"
   .topic-title-mobile
-    = link_to topic.title, topic_path(topic), class: "topic-link"
+    = link_to topic.title, topic_title_link(topic), class: "topic-link"
     - if creator || last_sender
       .topic-byline
         - if creator

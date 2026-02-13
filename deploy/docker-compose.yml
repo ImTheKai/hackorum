@@ -26,6 +26,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    shm_size: 4g
     restart: unless-stopped
     labels:
       autoheal: "true"

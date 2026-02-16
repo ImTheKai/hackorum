@@ -108,7 +108,7 @@ class HackorumPatch
       # Match sequence number: digits followed by hyphen before the actual patch name
       # e.g., "0001-subject.patch" or "nocfbot.v2-0005-subject.patch"
       if basename =~ /(\d+)-[^-]+\.(patch|diff)$/i
-        $1.to_i
+        [$1.to_i, basename]
       else
         # Fallback: sort alphabetically but after numbered patches
         [Float::INFINITY, basename]

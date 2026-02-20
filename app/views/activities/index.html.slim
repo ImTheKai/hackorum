@@ -1,6 +1,6 @@
 - content_for :title, "Activity"
 
-.section-header
+.activities-header
   h2 Activity
   - if @unread_count.positive?
     = button_to "Mark all read (#{@unread_count})", mark_all_read_activities_path, method: :post, class: "button-secondary"

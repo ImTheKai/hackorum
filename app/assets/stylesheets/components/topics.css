@@ -59,22 +59,6 @@
 
 /* ─────────────────────────────────────────────────────────────────── */
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-6);
-  padding-bottom: var(--spacing-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-
-  & h2 {
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin: 0;
-  }
-}
-
 .new-topics-banner {
   background: linear-gradient(to right, var(--color-primary-50), var(--color-primary-100));
   border: var(--border-width) solid var(--color-primary-300);

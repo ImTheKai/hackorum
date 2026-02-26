@@ -3,7 +3,9 @@
 - content_for :sidebar do
   .sidebar
     .sidebar-section
-      h2.sidebar-heading Members
+      h2.sidebar-heading
+        i.fa-solid.fa-users.sidebar-heading-icon aria-hidden="true"
+        span Members
       - if @members.any?
         .member-list
           - @members.each do |tm|

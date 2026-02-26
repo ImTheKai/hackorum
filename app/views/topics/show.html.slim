@@ -4,7 +4,10 @@
   .sidebar
     - if @commitfest_sidebar_entries.present?
       details.sidebar-section open=true
-        summary.sidebar-heading Commitfests
+        summary.sidebar-heading
+          i.fa-solid.fa-code-branch.sidebar-heading-icon aria-hidden="true"
+          span Commitfests
+          i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
         .sidebar-section
           .commitfest-list
             - @commitfest_sidebar_entries.each do |entry|
@@ -22,7 +25,10 @@
 
     - if @commitfest_reviewers.present?
       details.sidebar-section open=true
-        summary.sidebar-heading Reviewers
+        summary.sidebar-heading
+          i.fa-solid.fa-users.sidebar-heading-icon aria-hidden="true"
+          span Reviewers
+          i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
         .sidebar-section
           ul.commitfest-reviewers
             - @commitfest_reviewers.each do |reviewer|
@@ -30,7 +36,10 @@
 
     - if @commitfest_committers.present?
       details.sidebar-section open=true
-        summary.sidebar-heading Committer
+        summary.sidebar-heading
+          i.fa-solid.fa-user-check.sidebar-heading-icon aria-hidden="true"
+          span Committer
+          i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
         .sidebar-section
           ul.commitfest-committers
             - @commitfest_committers.each do |committer|
@@ -48,7 +57,10 @@
       - message_note_entries = message_note_entries.sort_by { |entry| entry[1] }
       - if message_note_entries.any?
         details.sidebar-section open=true
-          summary.sidebar-heading Notes
+          summary.sidebar-heading
+            i.fa-solid.fa-note-sticky.sidebar-heading-icon aria-hidden="true"
+            span Notes
+            i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
           .sidebar-section
             ul.note-overview
               - message_note_entries.each do |message_id, number, notes|
@@ -58,7 +70,10 @@
                     span.note-overview-count = "(#{notes.size})"
 
     details.sidebar-section open=true
-      summary.sidebar-heading Participants
+      summary.sidebar-heading
+        i.fa-solid.fa-people-group.sidebar-heading-icon aria-hidden="true"
+        span Participants
+        i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
       .sidebar-section
         - if @participants.present?
           .participants-list
@@ -72,7 +87,10 @@
 
     - attachment_messages = @messages.select { |msg| msg.attachments.any? }
     details.sidebar-section open=true
-      summary.sidebar-heading Attachments
+      summary.sidebar-heading
+        i.fa-solid.fa-paperclip.sidebar-heading-icon aria-hidden="true"
+        span Attachments
+        i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
       .sidebar-section
         - if @has_patches
           .download-patchset
@@ -102,7 +120,10 @@
 
 
     details.sidebar-section open=true
-      summary.sidebar-heading Thread Outline
+      summary.sidebar-heading
+        i.fa-solid.fa-list.sidebar-heading-icon aria-hidden="true"
+        span Thread Outline
+        i.fa-solid.fa-chevron-right.sidebar-heading-chevron aria-hidden="true"
       - if @thread_outline.present?
         .thread-outline data-controller="thread-outline"
           - @thread_outline.chunk_while { |a, b| a[:branch_segment_index] == b[:branch_segment_index] }.each do |segment|

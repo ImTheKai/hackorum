@@ -1,5 +1,7 @@
 .sidebar-section
-  h2.sidebar-heading Notable Threads
+  h2.sidebar-heading
+    i.fa-solid.fa-star.sidebar-heading-icon aria-hidden="true"
+    span Notable Threads
 
   - if @most_active_thread
     .notable-thread
@@ -23,7 +25,9 @@
     p.sidebar-empty No notable threads in this period.
 
 .sidebar-section
-  h2.sidebar-heading Jump To Period
+  h2.sidebar-heading
+    i.fa-solid.fa-calendar.sidebar-heading-icon aria-hidden="true"
+    span Jump To Period
 
   = form_tag(reports_path, method: :get, class: "jump-to-form") do
     .jump-to-fields

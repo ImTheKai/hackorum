@@ -57,31 +57,9 @@
 }
 
 .sidebar-section {
-  margin-bottom: var(--spacing-8);
+  margin-bottom: var(--spacing-6);
 }
 
-.sidebar-section.is-search-focus .sidebar-heading {
-  background: linear-gradient(135deg, var(--color-bg-sidebar-header), var(--color-primary-2));
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-}
-
-.sidebar-section.is-search-focus .sidebar-content {
-  border-radius: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-  background: var(--color-bg-card);
-  border: var(--border-width) solid var(--color-primary-200);
-}
-
-.sidebar-section.is-search-focus .search-input {
-  border-color: var(--color-primary-300);
-  box-shadow: var(--shadow-focus);
-}
-
-.sidebar-section.is-search-focus .search-button {
-  border-color: var(--color-primary-300);
-  background: var(--color-bg-hover);
-}
 
 .sidebar .search-input {
   width: 100%;
@@ -117,9 +95,51 @@
   transform: translateY(-1px);
 }
 
+.search-card {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  background: var(--color-bg-input);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search-card:focus-within {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.search-card .search-input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+}
+
+.search-card .search-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.search-card .search-button {
+  border: none;
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.search-card .search-button:hover {
+  background: var(--color-bg-hover);
+  transform: none;
+  box-shadow: none;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
 .sidebar-section summary.sidebar-heading {
   list-style: none;
-  display: block;
+  display: flex;
+  align-items: center;
   cursor: pointer;
 }
 
@@ -127,29 +147,42 @@
   display: none;
 }
 
-.sidebar-section summary.sidebar-heading::after {
-  content: "▾";
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  margin-left: var(--spacing-2);
-}
-
-.sidebar-section:not([open]) summary.sidebar-heading::after {
-  content: "▸";
-}
 
 .sidebar-content {
   padding: var(--spacing-3);
 }
 
 .sidebar-heading {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--spacing-4);
-  padding: var(--spacing-3);
-  background-color: var(--color-bg-sidebar-header);
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: none;
+  text-align: left;
+  margin-bottom: var(--spacing-2);
+  cursor: default;
+}
+
+.sidebar-heading-icon {
+  width: 14px;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.sidebar-heading-chevron {
+  margin-left: auto;
+  font-size: 0.65rem;
+  transition: transform var(--transition-fast);
+  opacity: 0.5;
+}
+
+details[open] summary.sidebar-heading .sidebar-heading-chevron {
+  transform: rotate(90deg);
 }
 
 .filter-subsection {
@@ -177,7 +210,7 @@
   margin: 0;
 
   & li {
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
   }
 
@@ -192,21 +225,21 @@
     text-decoration: none;
     font-weight: var(--font-weight-medium);
     font-size: var(--font-size-sm);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius-lg);
     transition: background var(--transition-fast), color var(--transition-fast);
   }
 
   & a:hover {
     background: var(--color-bg-hover);
     text-decoration: none;
+    border-radius: var(--border-radius-lg);
   }
 
   & a.is-active {
-    background: var(--color-primary-50);
+    background: var(--color-primary-100);
     color: var(--color-primary-700);
     font-weight: var(--font-weight-semibold);
-    border-left: 3px solid var(--color-primary-500);
-    padding-left: calc(var(--spacing-3) - 3px);
+    border-radius: var(--border-radius-lg);
   }
 }
 

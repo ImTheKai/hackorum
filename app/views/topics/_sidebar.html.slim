@@ -2,29 +2,31 @@
   - content_for :search_sidebar, true
   .sidebar
 
-    - if user_signed_in?
-      .sidebar-section
-        .sidebar-content
-          .topics-actions data-controller="topics-aware" data-topics-aware-aware-url-value=aware_bulk_topics_path data-topics-aware-aware-all-url-value=aware_all_topics_path data-topics-aware-confirm-visible-value="Mark the displayed threads as aware?" data-topics-aware-confirm-all-value="Mark ALL threads as aware up to now? This will clear the 'New' status everywhere."
-            button.mark-aware-button data-action="click->topics-aware#markVisibleAware" title="Mark the displayed threads as aware" aria-label="Mark displayed threads aware"
-              i.fa-regular.fa-eye aria-hidden="true"
-              span Mark visible
-            button.mark-aware-button.secondary data-action="click->topics-aware#markAllAware" title="Mark ALL threads as aware up to now. This clears the New status everywhere." aria-label="Mark all threads aware"
-              i.fa-regular.fa-circle-check aria-hidden="true"
-              span Mark all
-
     .sidebar-section#search data-controller="search-focus" data-search-focus-target="section"
       .sidebar-search.sidebar-content
-        = form_with url: search_topics_path, method: :get, local: true do |f|
-          = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: search_query, data: { "search-focus-target": "input" }
-          = f.submit "Search", class: "search-button"
+        .search-card
+          = form_with url: search_topics_path, method: :get, local: true do |f|
+            = f.text_field :q, placeholder: "Search topics and messages...", class: "search-input", value: search_query, data: { "search-focus-target": "input" }
+            = f.submit "Search", class: "search-button"
         .search-help-link
           = link_to help_path("search") do
             i.fas.fa-question-circle
             |  Search syntax help
 
+    - if user_signed_in?
+      .mark-actions data-controller="topics-aware" data-topics-aware-aware-url-value=aware_bulk_topics_path data-topics-aware-aware-all-url-value=aware_all_topics_path data-topics-aware-confirm-visible-value="Mark the displayed threads as aware?" data-topics-aware-confirm-all-value="Mark ALL threads as aware up to now? This will clear the 'New' status everywhere."
+        button.mark-action-btn data-action="click->topics-aware#markVisibleAware" title="Mark the displayed threads as aware" aria-label="Mark displayed threads aware"
+          i.fa-regular.fa-eye aria-hidden="true"
+          span Mark visible
+        span.mark-actions-separator aria-hidden="true" ·
+        button.mark-action-btn data-action="click->topics-aware#markAllAware" title="Mark ALL threads as aware up to now. This clears the New status everywhere." aria-label="Mark all threads aware"
+          i.fa-regular.fa-circle-check aria-hidden="true"
+          span Mark all
+
     .sidebar-section
-      h3.sidebar-heading Quick filters
+      h3.sidebar-heading
+        i.fa-solid.fa-sliders.sidebar-heading-icon aria-hidden="true"
+        span Quick filters
       .sidebar-content
         - active_filter = params[:filter]
         - active_team_id = params[:team_id]&.to_i
@@ -58,7 +60,9 @@
 
     - if user_signed_in? && @available_note_tags.present?
       .sidebar-section
-        h3.sidebar-heading My tags
+        h3.sidebar-heading
+          i.fa-solid.fa-tag.sidebar-heading-icon aria-hidden="true"
+          span My tags
         ul.quick-filters.tags-list
           - @available_note_tags.each do |tag, count|
             li = link_to "##{tag} (#{count})", topics_path(note_tag: tag), class: ("quick-filter-link is-active" if params[:note_tag] == tag)

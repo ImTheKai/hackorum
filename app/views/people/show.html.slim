@@ -4,7 +4,9 @@
   .sidebar
     - if @teams.any?
       .sidebar-section
-        h2.sidebar-heading Teams
+        h2.sidebar-heading
+          i.fa-solid.fa-users.sidebar-heading-icon aria-hidden="true"
+          span Teams
         .team-list
           - @teams.each do |team|
             .team-row
@@ -13,7 +15,9 @@
                 span.team-badge.badge-private Private
 
     .sidebar-section
-      h2.sidebar-heading Additional aliases
+      h2.sidebar-heading
+        i.fa-solid.fa-at.sidebar-heading-icon aria-hidden="true"
+        span Additional aliases
       - additional_aliases = @aliases.reject { |al| al.id == @primary_alias&.id }
       - if additional_aliases.any?
         .alias-list

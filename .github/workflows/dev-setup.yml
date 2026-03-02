@@ -10,6 +10,8 @@ jobs:
   dev-setup:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      ENGINE: docker
 
     steps:
       - uses: actions/checkout@v4

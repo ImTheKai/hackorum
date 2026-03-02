@@ -5,8 +5,8 @@ module Settings
     class SavedSearchesController < Settings::BaseController
       before_action :set_team
       before_action :require_team_member!
-      before_action :set_saved_search, only: [:edit, :update, :destroy]
-      before_action :require_team_admin!, only: [:new, :create, :edit, :update, :destroy]
+      before_action :set_saved_search, only: [ :edit, :update, :destroy ]
+      before_action :require_team_admin!, only: [ :new, :create, :edit, :update, :destroy ]
 
       def index
         @saved_searches = @team.saved_searches.order(:position, :name)

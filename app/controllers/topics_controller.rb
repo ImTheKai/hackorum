@@ -903,5 +903,4 @@ class TopicsController < ApplicationController
 
     current_user.open_threads_at_first_unread? ? "first-unread" : "top"
   end
-
 end

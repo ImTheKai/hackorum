@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Admin::SavedSearchesController < Admin::BaseController
-  before_action :set_saved_search, only: [:edit, :update, :destroy]
+  before_action :set_saved_search, only: [ :edit, :update, :destroy ]
 
   def active_admin_section
     :saved_searches

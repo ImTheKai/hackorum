@@ -61,7 +61,6 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).to include("topics-table")
       end
     end
-
   end
 
   describe "GET /topics/:id" do

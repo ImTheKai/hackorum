@@ -7,7 +7,7 @@ class SavedSearch < ApplicationRecord
 
   validates :name, presence: true
   validates :query, presence: true
-  validates :name, uniqueness: { scope: [:scope, :user_id, :team_id] }
+  validates :name, uniqueness: { scope: [ :scope, :user_id, :team_id ] }
   validate :single_owner
 
   scope :global_searches, -> { scope_global }
@@ -36,7 +36,7 @@ class SavedSearch < ApplicationRecord
       "(scope = 'user' AND (user_id = :user_id OR user_id IS NULL)) OR " \
       "(scope = 'team' AND (team_id IN (:team_ids) OR team_id IS NULL))",
       user_id: user.id,
-      team_ids: team_ids.presence || [nil]
+      team_ids: team_ids.presence || [ nil ]
     )
   end
 

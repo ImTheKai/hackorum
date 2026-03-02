@@ -2,7 +2,7 @@
 
 module Settings
   class SavedSearchesController < Settings::BaseController
-    before_action :set_saved_search, only: [:edit, :update, :destroy]
+    before_action :set_saved_search, only: [ :edit, :update, :destroy ]
 
     def index
       @saved_searches = current_user.saved_searches.order(:position, :name)

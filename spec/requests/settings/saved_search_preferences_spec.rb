@@ -38,6 +38,47 @@ RSpec.describe "Settings::SavedSearchPreferences", type: :request do
       expect(pref.reload.hidden).to be false
     end
 
+    it "hides a team-specific saved search for a team member" do
+      user = create(:user)
+      team = create(:team)
+      create(:team_member, team: team, user: user)
+      saved_search = create(:saved_search, scope: "team", team: team)
+      sign_in(user)
+
+      expect {
+        post settings_saved_search_preferences_path, params: { saved_search_id: saved_search.id, hidden: true }
+      }.to change(SavedSearchPreference, :count).by(1)
+
+      pref = SavedSearchPreference.last
+      expect(pref.hidden).to be true
+    end
+
+    it "hides a team template saved search" do
+      user = create(:user)
+      saved_search = create(:saved_search, scope: "team", team: nil)
+      sign_in(user)
+
+      expect {
+        post settings_saved_search_preferences_path, params: { saved_search_id: saved_search.id, hidden: true }
+      }.to change(SavedSearchPreference, :count).by(1)
+
+      pref = SavedSearchPreference.last
+      expect(pref.hidden).to be true
+    end
+
+    it "rejects hiding a search not visible to the user" do
+      user = create(:user)
+      other_user = create(:user)
+      saved_search = create(:saved_search, scope: "user", user: other_user)
+      sign_in(user)
+
+      expect {
+        post settings_saved_search_preferences_path, params: { saved_search_id: saved_search.id, hidden: true }
+      }.not_to change(SavedSearchPreference, :count)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
     it "redirects guests to new_session_path" do
       saved_search = create(:saved_search)
 

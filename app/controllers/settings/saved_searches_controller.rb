@@ -47,7 +47,7 @@ module Settings
 
     def destroy
       @saved_search.destroy
-      redirect_to settings_saved_searches_path, notice: "Saved search deleted"
+      redirect_back fallback_location: settings_saved_searches_path, notice: "Saved search deleted"
     end
 
     private

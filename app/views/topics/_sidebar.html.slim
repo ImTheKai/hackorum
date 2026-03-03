@@ -36,7 +36,10 @@
               span.filter-subsection-label Global
               ul.quick-filters
                 - global_searches.each do |ss|
-                  li = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
+                  li
+                    = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
+                    = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
+                      i.fa-solid.fa-eye-slash aria-hidden="true"
 
           - if user_signed_in?
             - user_searches = @saved_searches.select { |ss| ss.scope_user? && ss.user_id.present? }
@@ -47,7 +50,14 @@
                 span.filter-subsection-label My searches
                 ul.quick-filters
                   - all_user.each do |ss|
-                    li = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
+                    li
+                      = link_to ss.name, search_topics_path(saved_search_id: ss.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id)
+                      - if ss.user_id == current_user.id
+                        = button_to settings_saved_search_path(ss), method: :delete, form_class: "quick-filter-action-form", data: { turbo_confirm: "Delete this search?" } do
+                          i.fa-solid.fa-trash-can aria-hidden="true"
+                      - else
+                        = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
+                          i.fa-solid.fa-eye-slash aria-hidden="true"
 
             - team_templates = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.nil? }
             - team_specific = @saved_searches.select { |ss| ss.scope_team? && ss.team_id.present? }
@@ -59,7 +69,10 @@
                   span.filter-subsection-label = "#{team.name} searches"
                   ul.quick-filters
                     - all_team.each do |ss|
-                      li = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))
+                      li
+                        = link_to ss.name, search_topics_path(saved_search_id: ss.id, team_id: team.id), class: ("quick-filter-link is-active" if active_ss_id == ss.id && (!ss.scope_team? || active_team_id == team.id))
+                        = button_to settings_saved_search_preferences_path(saved_search_id: ss.id, hidden: true), method: :post, form_class: "quick-filter-action-form", data: { turbo_confirm: "Hide this search?" } do
+                          i.fa-solid.fa-eye-slash aria-hidden="true"
 
     - if user_signed_in? && @available_note_tags.present?
       .sidebar-section

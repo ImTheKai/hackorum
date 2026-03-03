@@ -3,7 +3,7 @@
 module Settings
   class SavedSearchPreferencesController < Settings::BaseController
     def create
-      saved_search = SavedSearch.find(params[:saved_search_id])
+      saved_search = SavedSearch.visible_to(current_user).find(params[:saved_search_id])
       hidden = ActiveModel::Type::Boolean.new.cast(params[:hidden])
 
       pref = SavedSearchPreference.find_or_initialize_by(

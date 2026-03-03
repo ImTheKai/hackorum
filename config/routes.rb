@@ -73,9 +73,11 @@ Rails.application.routes.draw do
     member do
       post :aware
       post :read_all
+      post :unread_all
       post :star
       delete :unstar
       get :latest_patchset
+      get :message_batch
     end
   end
   resources :activities, only: [ :index ] do

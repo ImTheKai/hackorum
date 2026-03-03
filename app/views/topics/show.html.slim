@@ -197,26 +197,36 @@
   .thread-notes-container
     = render "notes/note_stack", topic: @topic, message: nil, notes: thread_notes
 
-.messages-container.flat.asc
+.messages-container.flat.asc data-controller="batch-loader" data-batch-loader-url-value=message_batch_topic_path(@topic) data-batch-loader-signed-in-value=(user_signed_in? ? true : false)
   - last_message = @messages.last
   - if last_message.present?
-    .thread-actions data-controller="thread-actions" data-thread-actions-topic-id-value=@topic.id data-thread-actions-read-all-url-value=read_all_topic_path(@topic, format: :json)
+    .thread-actions data-controller="thread-actions" data-thread-actions-topic-id-value=@topic.id data-thread-actions-read-all-url-value=read_all_topic_path(@topic, format: :json) data-thread-actions-unread-all-url-value=unread_all_topic_path(@topic, format: :json)
       - if user_signed_in?
-        button.button.button-secondary.button-small data-action="click->thread-actions#markAllRead" Mark all messages read
+        button.button.button-secondary.button-small data-action="click->thread-actions#markAllRead" Mark all read
+        button.button.button-secondary.button-small data-action="click->thread-actions#markAllUnread" Mark all unread
+      button.button.button-secondary.button-small data-action="click->thread-actions#collapseAll" Collapse all
+      button.button.button-secondary.button-small data-action="click->thread-actions#expandAll" Show all
       = link_to "Jump to latest", "#message-#{last_message.id}", class: "button button-secondary button-small", title: "Jump to latest message", "aria-label": "Jump to latest message"
       - if user_signed_in?
         = link_to "Jump to unread", "#first-unread", class: "button button-secondary button-small", title: "Jump to first unread message", "aria-label": "Jump to first unread message"
 
   - first_unread_found = false
+  - unread_inline_count = 0
   - @messages.each do |message|
     - is_read = user_signed_in? && @read_message_ids&.dig(message.id)
     - is_first_unread = false
     - if user_signed_in? && !is_read && !first_unread_found
       - is_first_unread = true
       - first_unread_found = true
-    - render_mode = (user_signed_in? && is_read) ? :collapsed : :inline
+    - if is_read
+      - render_mode = :shell
+    - elsif unread_inline_count < 20
+      - render_mode = :inline
+      - unread_inline_count += 1
+    - else
+      - render_mode = :shell
     - branch_index = @message_branch_index&.dig(message.id)
-    = render 'message', message: message, number: @message_numbers[message.id], is_first_unread: is_first_unread, branch_index: branch_index, render_mode: render_mode
+    = render 'message', message: message, number: @message_numbers[message.id], is_first_unread: is_first_unread, branch_index: branch_index, render_mode: render_mode, is_read: !!is_read
 
 .topic-navigation
   = link_to "← Back to Topics", topics_path, class: "back-link"

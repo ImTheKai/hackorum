@@ -1,0 +1,32 @@
+.message-batch-skeleton {
+  padding: var(--spacing-5);
+}
+
+.skeleton-line {
+  height: 1em;
+  background: var(--color-bg-hover);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-3);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}
+
+.skeleton-line-short {
+  width: 40%;
+}
+
+.skeleton-line-medium {
+  width: 70%;
+}
+
+.skeleton-line-long {
+  width: 90%;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}

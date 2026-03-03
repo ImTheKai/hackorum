@@ -8,6 +8,10 @@ export default class extends Controller {
   }
 
   connect() {
+    if (this.element.classList.contains("is-read")) {
+      this.marked = true
+      return
+    }
     this.marked = false
     this.timer = null
     this.pollInterval = null

@@ -1,7 +1,8 @@
 - message_classes = [("reply-message" if message.reply_to_id), ("message-branch-#{local_assigns[:branch_index]}" unless local_assigns[:branch_index].nil?)].compact.join(" ")
 - render_mode = local_assigns.fetch(:render_mode, :inline)
-- is_collapsed = render_mode != :inline
-.message-card id=message_dom_id(message) class=message_classes data-controller="message-collapse" data-message-collapse-collapsed-value=is_collapsed
+- is_read = local_assigns.fetch(:is_read, false)
+- is_collapsed = (render_mode == :collapsed) || (render_mode == :shell && is_read)
+.message-card id=message_dom_id(message) class=message_classes data-controller="message-collapse" data-message-collapse-collapsed-value=is_collapsed data-message-id=message.id data-read=(is_read ? "true" : "false")
   - if (mid_anchor = message_id_anchor(message))
     a.message-id-anchor id=mid_anchor aria-hidden="true"
   - if local_assigns[:is_first_unread]
@@ -56,3 +57,12 @@
       = render "topics/message_body", message: message
     - elsif render_mode == :collapsed
       = turbo_frame_tag "message-body-#{message.id}", src: message_content_path(message)
+    - elsif render_mode == :shell
+      .message-batch-skeleton data-batch-loader-target="skeleton"
+        .skeleton-line.skeleton-line-long
+        .skeleton-line.skeleton-line-medium
+        .skeleton-line.skeleton-line-long
+        .skeleton-line.skeleton-line-short
+    - if user_signed_in?
+      - notes_for_message = @notes_by_message&.[](message.id) || []
+      = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message

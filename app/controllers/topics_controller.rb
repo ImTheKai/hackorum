@@ -1,6 +1,6 @@
 class TopicsController < ApplicationController
-  before_action :set_topic, only: [ :show, :aware, :read_all, :star, :unstar, :latest_patchset ]
-  before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :star, :unstar ]
+  before_action :set_topic, only: [ :show, :message_batch, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
+  before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
 
   def index
     @search_query = nil
@@ -51,25 +51,22 @@ class TopicsController < ApplicationController
   end
 
   def show
+    message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
     messages_scope = @topic.messages
-      .eager_load(
+      .select(message_columns)
+      .preload(
         :sender,
         :sender_person,
         { sender_person: :default_alias },
-        {
-          reply_to: [
-            :sender,
-            :sender_person,
-            { sender_person: :default_alias }
-          ]
-        }
+        :attachments
       )
-      .preload(:attachments)
 
     @messages = messages_scope.order(created_at: :asc)
     @message_numbers = @messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+    wire_reply_to_from_loaded_messages!
     preload_read_state!
     auto_mark_aware!
+    load_inline_message_bodies!
 
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(@messages)
@@ -93,6 +90,20 @@ class TopicsController < ApplicationController
         @latest_patchset_stats = totals
       end
     end
+  end
+
+  def message_batch
+    ids = params[:ids].to_s.split(",").map(&:to_i).reject(&:zero?).first(50)
+    return head :bad_request if ids.empty?
+
+    @messages = @topic.messages
+      .where(id: ids)
+      .eager_load(:sender, :sender_person, { sender_person: :default_alias })
+      .preload(:attachments)
+      .order(:created_at)
+
+    expires_in 1.year, public: true
+    render layout: false
   end
 
   def aware
@@ -133,6 +144,15 @@ class TopicsController < ApplicationController
       MessageReadRange.add_range(user: current_user, topic: @topic, start_id: first_id, end_id: last_id)
       ThreadAwareness.mark_until(user: current_user, topic: @topic, until_message_id: last_id)
     end
+
+    respond_to do |format|
+      format.json { render json: { status: "ok" } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  end
+
+  def unread_all
+    MessageReadRange.where(user: current_user, topic: @topic).delete_all
 
     respond_to do |format|
       format.json { render json: { status: "ok" } }
@@ -411,6 +431,39 @@ class TopicsController < ApplicationController
     @message_branch_index = @thread_outline.each_with_object({}) do |entry, hash|
       hash[entry[:message].id] = entry[:branch_index]
     end
+  end
+
+  def wire_reply_to_from_loaded_messages!
+    messages_by_id = @messages.index_by(&:id)
+    @messages.each do |msg|
+      target = msg.reply_to_id ? messages_by_id[msg.reply_to_id] : nil
+      msg.association(:reply_to).target = target
+    end
+  end
+
+  def load_inline_message_bodies!
+    inline_ids = compute_inline_message_ids
+    return if inline_ids.empty?
+
+    full_messages = Message
+      .where(id: inline_ids)
+      .eager_load(:sender, :sender_person, { sender_person: :default_alias },
+                  { reply_to: [ :sender, :sender_person, { sender_person: :default_alias } ] })
+      .preload(:attachments)
+      .index_by(&:id)
+
+    @messages = @messages.map { |msg| full_messages[msg.id] || msg }
+  end
+
+  def compute_inline_message_ids
+    ids = []
+    @messages.each do |msg|
+      is_read = user_signed_in? && @read_message_ids&.dig(msg.id)
+      next if is_read
+      ids << msg.id
+      break if ids.size >= 20
+    end
+    ids
   end
 
   def preload_read_state!

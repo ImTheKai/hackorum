@@ -1,0 +1,3 @@
+- @messages.each do |message|
+  div data-message-id=message.id
+    = render "topics/message_body", message: message, include_read_status: false

@@ -114,21 +114,21 @@ RSpec.describe "Topics", type: :request do
         sign_in(email: "reader@example.com")
       end
 
-      it "renders read messages as collapsed with turbo frame placeholder" do
+      it "renders read messages as shells with skeleton placeholder" do
         MessageReadRange.add_range(user: user, topic: topic, start_id: root_message.id, end_id: root_message.id)
 
         get topic_path(topic)
         expect(response).to have_http_status(:success)
 
-        # Read message should have turbo frame placeholder, not inline body
-        expect(response.body).to include("message-body-#{root_message.id}")
+        # Read message should have skeleton placeholder, not inline body
+        expect(response.body).to include("message-batch-skeleton")
         expect(response.body).not_to include(root_message.body)
 
         # Unread message should be rendered inline
         expect(response.body).to include(reply_message.body)
       end
 
-      it "renders all unread messages inline" do
+      it "renders first 20 unread messages inline and rest as shells" do
         messages = (1..25).map do |i|
           create(:message, topic: topic, sender: creator, created_at: i.hours.ago, body: "Unread message body #{i}")
         end
@@ -136,10 +136,13 @@ RSpec.describe "Topics", type: :request do
         get topic_path(topic)
         expect(response).to have_http_status(:success)
 
-        # All unread messages rendered inline
-        messages.each do |msg|
-          expect(response.body).to include(msg.body)
-        end
+        # First 20 unread messages rendered inline (root_message and reply_message are also unread, so they count)
+        # Total unread = root_message + reply_message + 25 created = 27
+        # First 20 get inline, remaining 7 get shells
+        inline_count = response.body.scan("message-content message-content").size
+        skeleton_count = response.body.scan("message-batch-skeleton").size
+        expect(inline_count).to eq(20)
+        expect(skeleton_count).to eq(7)
       end
     end
 

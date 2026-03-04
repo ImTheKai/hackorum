@@ -197,6 +197,7 @@
       - if user_signed_in?
         = link_to "Jump to unread", "#first-unread", class: "button button-secondary button-small", title: "Jump to first unread message", "aria-label": "Jump to first unread message"
 
+  - collapse_read = !user_signed_in? || current_user.collapse_read_messages?
   - first_unread_found = false
   - unread_inline_count = 0
   - @messages.each do |message|
@@ -213,7 +214,7 @@
     - else
       - render_mode = :shell
     - branch_index = @message_branch_index&.dig(message.id)
-    = render 'message', message: message, number: @message_numbers[message.id], is_first_unread: is_first_unread, branch_index: branch_index, render_mode: render_mode, is_read: !!is_read
+    = render 'message', message: message, number: @message_numbers[message.id], is_first_unread: is_first_unread, branch_index: branch_index, render_mode: render_mode, is_read: !!is_read, collapse_read: collapse_read
 
 .topic-navigation
   = link_to "← Back to Topics", topics_path, class: "back-link"

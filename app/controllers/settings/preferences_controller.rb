@@ -13,7 +13,7 @@ module Settings
     private
 
     def preferences_params
-      params.require(:user).permit(:mention_restriction, :open_threads_at_first_unread)
+      params.require(:user).permit(:mention_restriction, :open_threads_at_first_unread, :collapse_read_messages)
     end
   end
 end

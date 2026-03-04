@@ -4,7 +4,7 @@
       - @attachment_messages.sort_by(&:created_at).reverse_each do |msg|
         - number = @message_numbers[msg.id]
         li
-          = link_to "#message-#{msg.id}-attachments", class: "attachment-link", data: { turbo: false } do
+          = link_to "##{message_dom_id(msg)}", class: "attachment-link", data: { turbo: false } do
             span.attachment-target = "##{number}"
             span.attachment-date = smart_time_display(msg.created_at)
           - names = msg.attachments.map(&:file_name)

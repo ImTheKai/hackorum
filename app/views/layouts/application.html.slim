@@ -134,14 +134,16 @@ html data-theme="light"
         .layout-sidebar-overlay data-sidebar-target="overlay" data-action="click->sidebar#closeMobile"
         main.container
           - flash.each do |type, message|
-            .flash class=type
+            .flash class=type data-controller="flash"
               = flash_icon(type)
-              = message
+              span.flash-message = message
+              button.flash-close type="button" aria-label="Dismiss message" data-action="flash#dismiss" x
           = yield
     - else
       main.container
         - flash.each do |type, message|
-          .flash class=type
+          .flash class=type data-controller="flash"
             = flash_icon(type)
-            = message
+            span.flash-message = message
+            button.flash-close type="button" aria-label="Dismiss message" data-action="flash#dismiss" x
         = yield

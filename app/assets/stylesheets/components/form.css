@@ -31,6 +31,27 @@ input[type=submit], input[type=button] {
   gap: var(--spacing-2);
 }
 
+.flash-message {
+  flex: 1;
+}
+
+.flash-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
 .flash.alert {
   background-color: var(--color-danger-soft);
   color: var(--color-danger);

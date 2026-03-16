@@ -87,5 +87,24 @@ RSpec.describe "TeamsProfile", type: :request do
       get team_profile_path("non-existent")
       expect(response).to have_http_status(:not_found)
     end
+
+    it "shows the sender column and links team activity rows to the sender profile" do
+      team.update!(visibility: :visible)
+
+      member_alias = attach_verified_alias(member, email: "member@example.com")
+      create(:team_member, team: team, user: non_member, role: "member")
+      sender_alias = attach_verified_alias(non_member, email: "sender@example.com")
+
+      topic = create(:topic, creator_alias: member_alias, title: "Sender activity thread")
+      create(:message, topic: topic, sender: sender_alias, sender_person_id: non_member.person.id, created_at: 2.days.ago, updated_at: 2.days.ago)
+
+      get team_profile_path("test-team")
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include("<th>Sender</th>")
+      expect(response.body).to include("sender@example.com")
+      expect(response.body).to include(person_path("sender@example.com"))
+      expect(response.body).to include("Sender activity thread")
+    end
   end
 end

@@ -13,6 +13,7 @@
     h2 Recent messages (last 30 days)
 
   - if activity_entries.any?
+    - show_sender = local_assigns.fetch(:show_sender, false)
     - summary = local_assigns[:activity_summary] || {}
     - total = summary[:total] || activity_entries.size
     - started = summary[:started_thread] || 0
@@ -45,11 +46,14 @@
       thead
         tr
           th Activity
+          - if show_sender
+            th Sender
           th Thread
           th Sent
       tbody
         - activity_entries.each do |entry|
           - topic = entry[:topic]
+          - message = entry[:message]
           - types = entry[:activity_types] || []
           tr
             td.activity-types
@@ -65,8 +69,21 @@
                   span.activity-tag.tag-patch First patch
                 - when :sent_followup_patch
                   span.activity-tag.tag-patch Follow-up patch
+            - if show_sender
+              - sender_alias = message.sender_display_alias
+              td
+                - if sender_alias && message.sender_person
+                  = link_to person_path(sender_alias.email), class: "activity-sender", data: { turbo_frame: "_top" } do
+                    = image_tag sender_alias.gravatar_url(size: 32), class: "activity-sender-avatar", alt: sender_alias.name
+                    span.activity-sender-name = sender_alias.name
+                - elsif sender_alias
+                  .activity-sender
+                    = image_tag sender_alias.gravatar_url(size: 32), class: "activity-sender-avatar", alt: sender_alias.name
+                    span.activity-sender-name = sender_alias.name
+                - else
+                  span.activity-sender-name Unknown
             td
-              = link_to topic.title, topic_path(topic, anchor: "message-#{entry[:message].id}"), class: "activity-topic", data: { turbo_frame: "_top" }
+              = link_to topic.title, topic_path(topic, anchor: "message-#{message.id}"), class: "activity-topic", data: { turbo_frame: "_top" }
             td
               = time_ago_in_words(entry[:sent_at])
               |  ago

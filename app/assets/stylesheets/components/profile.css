@@ -218,6 +218,29 @@
   text-decoration: underline;
 }
 
+.activity-sender {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.activity-sender:hover .activity-sender-name {
+  text-decoration: underline;
+}
+
+.activity-sender-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.activity-sender-name {
+  font-weight: var(--font-weight-medium);
+}
+
 .activity-filters {
   padding: var(--spacing-4);
   background: var(--color-bg-card);

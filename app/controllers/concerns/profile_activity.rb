@@ -44,7 +44,7 @@ module ProfileActivity
     return [] if ids.blank?
 
     scope ||= Message.where(sender_person_id: ids)
-    messages = scope.includes(:topic, :attachments)
+    messages = scope.includes(:topic, :attachments, :sender, sender_person: :default_alias)
                     .order(created_at: :desc)
 
     return [] if messages.empty?

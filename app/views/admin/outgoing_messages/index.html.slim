@@ -1,0 +1,48 @@
+.admin-page
+  h1 Outgoing messages
+
+  section
+    h2 Pending (#{@pending.size})
+    - if @pending.any?
+      table.admin-table
+        thead
+          tr
+            th Sent at
+            th Subject
+            th To
+            th Age
+        tbody
+          - @pending.each do |m|
+            tr
+              td = m.sent_at ? l(m.sent_at, format: :short) : "—"
+              td
+                = link_to m.subject.to_s.truncate(80),
+                          topic_path(m.topic, anchor: "message-#{m.id}")
+              td = m.sent_to_address
+              td
+                - if m.sent_at
+                  = "#{((Time.current - m.sent_at) / 60).round} min"
+                - else
+                  | —
+    - else
+      p.empty None.
+
+  section
+    h2 Recently sent (echoed)
+    - if @recent.any?
+      table.admin-table
+        thead
+          tr
+            th Sent
+            th Subject
+            th To
+        tbody
+          - @recent.each do |m|
+            tr
+              td = m.sent_at ? l(m.sent_at, format: :short) : "—"
+              td
+                = link_to m.subject.to_s.truncate(80),
+                          topic_path(m.topic, anchor: "message-#{m.id}")
+              td = m.sent_to_address
+    - else
+      p.empty None.

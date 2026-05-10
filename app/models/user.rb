@@ -15,6 +15,7 @@ class User < ApplicationRecord
   has_many :starred_topics, through: :topic_stars, source: :topic
   has_many :saved_searches
   has_many :saved_search_preferences
+  has_many :outgoing_drafts, dependent: :destroy
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 
@@ -22,6 +23,10 @@ class User < ApplicationRecord
 
   def primary_alias
     person&.default_alias
+  end
+
+  def can_send_email?
+    identities.send_authorized.exists?
   end
 
   def mentionable_by?(mentioner)

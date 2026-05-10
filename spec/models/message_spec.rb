@@ -64,4 +64,25 @@ RSpec.describe Message, type: :model do
       expect(message.attachments.count).to eq(2)
     end
   end
+
+  describe 'state' do
+    it 'defaults to sent' do
+      expect(create(:message).state).to eq('sent')
+    end
+
+    it 'has helper predicates' do
+      msg = build(:message, state: 'pending')
+      expect(msg).to be_pending
+      expect(msg).not_to be_sent
+    end
+
+    it 'scopes pending and sent' do
+      sent = create(:message, state: 'sent')
+      pending = create(:message, state: 'pending')
+      expect(Message.pending).to include(pending)
+      expect(Message.pending).not_to include(sent)
+      expect(Message.sent).to include(sent)
+      expect(Message.sent).not_to include(pending)
+    end
+  end
 end

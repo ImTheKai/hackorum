@@ -1,0 +1,136 @@
+require 'rails_helper'
+
+RSpec.describe DraftsController, type: :request do
+  let(:user) { create(:user) }
+  let!(:identity) {
+    create(:identity, user: user, email: 'a@b',
+           refresh_token: 'r', send_authorized_at: 1.hour.ago)
+  }
+  let!(:sender) { create(:alias, user: user, email: 'a@b', name: 'Alice') }
+  let(:list)    { create(:mailing_list, post_address: 'real@list.example') }
+  let(:topic)   { create(:topic, mailing_lists: [list]) }
+  let(:parent)  { create(:message, topic: topic, subject: 'Hi') }
+
+  before { sign_in_as(user) }
+
+  describe 'POST /drafts' do
+    it 'creates a draft' do
+      expect {
+        post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      }.to change(OutgoingDraft, :count).by(1)
+      expect(response).to have_http_status(:ok)
+      json = JSON.parse(response.body)
+      expect(json['id']).to be_present
+    end
+
+    it 'returns existing draft on second post' do
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      first_id = JSON.parse(response.body)['id']
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      second_id = JSON.parse(response.body)['id']
+      expect(first_id).to eq(second_id)
+    end
+
+    it 'sets default subject by stripping a single Re:/Fwd:/Aw: prefix' do
+      parent.update!(subject: 'RE: Hello world')
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      draft = OutgoingDraft.last
+      expect(draft.subject).to eq('Re: Hello world')
+    end
+
+    it 'forbids when user has no send-authorized identity' do
+      identity.update!(send_revoked_at: Time.current)
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'errors when no alias matches the identity email' do
+      sender.update!(email: 'different@b')
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
+  describe 'PATCH /drafts/:id' do
+    let(:draft) {
+      create(:outgoing_draft, user: user, topic: topic,
+             reply_to_message: parent, identity: identity, sender_alias: sender)
+    }
+
+    it 'updates body and subject' do
+      patch draft_path(draft), params: {
+        outgoing_draft: { body: 'new body', subject: 'Re: new subject' }
+      }
+      expect(response).to have_http_status(:no_content)
+      expect(draft.reload.body).to eq('new body')
+      expect(draft.subject).to eq('Re: new subject')
+    end
+
+    it 'returns 409 when sending' do
+      draft.update!(status: 'sending', sending_started_at: 1.second.ago)
+      patch draft_path(draft), params: { outgoing_draft: { body: 'x' } }
+      expect(response).to have_http_status(:conflict)
+    end
+
+    it "forbids editing another user's draft" do
+      other = create(:outgoing_draft)
+      patch draft_path(other), params: { outgoing_draft: { body: 'x' } }
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe 'DELETE /drafts/:id' do
+    let!(:draft) {
+      create(:outgoing_draft, user: user, topic: topic,
+             reply_to_message: parent, identity: identity, sender_alias: sender)
+    }
+
+    it 'destroys' do
+      expect { delete draft_path(draft) }.to change(OutgoingDraft, :count).by(-1)
+      expect(response).to have_http_status(:no_content)
+    end
+  end
+
+  describe 'GET /drafts/:id/confirm' do
+    let(:draft) {
+      create(:outgoing_draft, user: user, topic: topic,
+             reply_to_message: parent, identity: identity, sender_alias: sender)
+    }
+
+    it 'renders the confirm modal with resolved recipient' do
+      with_env('HACKORUM_DEV_REPLY_TO' => 'test@example.com') do
+        get confirm_draft_path(draft)
+        expect(response).to be_successful
+        expect(response.body).to include('test@example.com')
+      end
+    end
+
+    it 'returns 422 when dev override is missing' do
+      with_env('HACKORUM_DEV_REPLY_TO' => nil) do
+        get confirm_draft_path(draft)
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+    end
+  end
+
+  describe 'POST /drafts/:id/send_now' do
+    let(:draft) {
+      create(:outgoing_draft, user: user, topic: topic,
+             reply_to_message: parent, identity: identity, sender_alias: sender)
+    }
+
+    it 'transitions to sending and runs the job inline' do
+      expect(SendOutgoingMessageJob).to receive(:perform_now).with(draft.id)
+      post send_now_draft_path(draft)
+      draft.reload
+      expect(draft.status).to eq('sending')
+      expect(draft.sending_started_at).not_to be_nil
+    end
+
+    it 'returns 409 when already sending' do
+      draft.update!(status: 'sending', sending_started_at: 1.second.ago)
+      post send_now_draft_path(draft)
+      expect(response).to have_http_status(:conflict)
+    end
+  end
+end

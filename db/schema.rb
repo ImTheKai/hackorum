@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_10_103205) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -185,6 +185,13 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
     t.datetime "last_used_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "refresh_token"
+    t.text "access_token"
+    t.datetime "access_token_expires_at"
+    t.text "scopes"
+    t.datetime "send_authorized_at"
+    t.datetime "send_revoked_at"
+    t.text "last_send_error"
     t.index "lower(TRIM(BOTH FROM email))", name: "index_identities_on_lower_trim_email"
     t.index ["provider", "uid"], name: "index_identities_on_provider_and_uid", unique: true
     t.index ["user_id"], name: "index_identities_on_user_id"
@@ -219,6 +226,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "alternate_emails", default: [], array: true
+    t.string "post_address"
     t.index ["email"], name: "index_mailing_lists_on_email", unique: true, where: "(email IS NOT NULL)"
     t.index ["identifier"], name: "index_mailing_lists_on_identifier", unique: true
   end
@@ -282,6 +290,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
     t.bigint "sender_person_id", null: false
     t.string "reply_to_message_id"
     t.virtual "body_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, COALESCE(body, ''::text))", stored: true
+    t.string "state", default: "sent", null: false
+    t.datetime "sent_at"
+    t.bigint "sent_via_identity_id"
+    t.string "sent_to_address"
     t.index ["body"], name: "index_messages_on_body_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["body_tsv"], name: "index_messages_on_body_tsv", using: :gin
     t.index ["created_at", "sender_id"], name: "index_messages_on_created_at_and_sender_id"
@@ -291,6 +303,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["sender_id"], name: "index_messages_on_sender_id"
     t.index ["sender_person_id"], name: "index_messages_on_sender_person_id"
+    t.index ["state"], name: "index_messages_on_state"
     t.index ["topic_id", "created_at", "id"], name: "index_messages_on_topic_id_and_created_at_desc_id_desc", order: { created_at: :desc, id: :desc }
     t.index ["topic_id"], name: "index_messages_on_topic_id"
   end
@@ -349,6 +362,27 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
     t.index ["last_editor_id"], name: "index_notes_on_last_editor_id"
     t.index ["message_id"], name: "index_notes_on_message_id"
     t.index ["topic_id"], name: "index_notes_on_topic_id"
+  end
+
+  create_table "outgoing_drafts", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.bigint "reply_to_message_id", null: false
+    t.bigint "sender_alias_id", null: false
+    t.bigint "identity_id", null: false
+    t.string "subject", null: false
+    t.text "body", default: "", null: false
+    t.string "status", default: "idle", null: false
+    t.text "last_send_error"
+    t.datetime "sending_started_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["identity_id"], name: "index_outgoing_drafts_on_identity_id"
+    t.index ["reply_to_message_id"], name: "index_outgoing_drafts_on_reply_to_message_id"
+    t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"
+    t.index ["topic_id"], name: "index_outgoing_drafts_on_topic_id"
+    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_unique", unique: true
+    t.index ["user_id"], name: "index_outgoing_drafts_on_user_id"
   end
 
   create_table "page_load_stats", force: :cascade do |t|
@@ -762,6 +796,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
+  add_foreign_key "messages", "identities", column: "sent_via_identity_id"
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
@@ -773,6 +808,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_26_074352) do
   add_foreign_key "notes", "topics"
   add_foreign_key "notes", "users", column: "author_id"
   add_foreign_key "notes", "users", column: "last_editor_id"
+  add_foreign_key "outgoing_drafts", "aliases", column: "sender_alias_id"
+  add_foreign_key "outgoing_drafts", "identities"
+  add_foreign_key "outgoing_drafts", "messages", column: "reply_to_message_id"
+  add_foreign_key "outgoing_drafts", "topics"
+  add_foreign_key "outgoing_drafts", "users"
   add_foreign_key "patch_files", "attachments"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "saved_search_preferences", "saved_searches"

@@ -1,0 +1,29 @@
+= turbo_frame_tag "confirm-#{@draft.id}"
+  .modal-backdrop data-controller="send-confirmation" data-send-confirmation-cooldown-value="1500"
+    .modal-dialog.confirm-modal role="dialog" aria-modal="true" aria-labelledby="confirm-title-#{@draft.id}"
+      h2 id="confirm-title-#{@draft.id}" Confirm send
+
+      .confirm-row
+        strong From
+        .confirm-value = "#{@draft.sender_alias.name} <#{@draft.sender_alias.email}>"
+      .confirm-row
+        strong To
+        .confirm-value = @recipient
+      .confirm-row
+        strong Subject
+        .confirm-value = @draft.subject
+
+      - unless Rails.env.production?
+        .dev-warning
+          i.fa-solid.fa-flask
+          |  Dev mode — sending to override address (HACKORUM_DEV_REPLY_TO).
+
+      p.confirm-disclaimer
+        | Once sent, the message will be visible to all list subscribers and cannot be unsent.
+
+      .confirm-actions
+        = button_tag "Cancel", type: "button", class: "button-secondary",
+                     data: { action: "click->send-confirmation#cancel" }
+        = button_to "Send to #{@recipient}", send_now_draft_path(@draft),
+                    method: :post, class: "button-primary",
+                    data: { send_confirmation_target: "submit", disabled: true }

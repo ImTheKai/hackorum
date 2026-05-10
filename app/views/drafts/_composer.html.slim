@@ -1,0 +1,38 @@
+= turbo_frame_tag "draft-#{draft.reply_to_message_id}"
+  .composer-card data-controller="reply-composer" data-reply-composer-draft-id-value=draft.id
+    .composer-meta
+      span.composer-from
+        i.fa-regular.fa-envelope
+        |  Sending as
+        '
+        strong = draft.sender_alias.name
+        span.composer-from-email
+          | &lt;
+          = draft.sender_alias.email
+          | &gt;
+      span.composer-status data-reply-composer-target="status"
+        | Saved
+    = form_with model: draft, url: draft_path(draft), method: :patch, local: false, html: { data: { reply_composer_target: "form", action: "input->reply-composer#dirty blur->reply-composer#save" } } do |f|
+      .composer-field
+        = f.label :subject
+        = f.text_field :subject
+      .composer-field
+        = f.label :body, "Message"
+        = f.text_area :body, data: { reply_composer_target: "body" }, rows: 14, placeholder: "Type your reply…"
+    - if draft.last_send_error.present?
+      .composer-error-banner
+        i.fa-solid.fa-triangle-exclamation
+        div
+          strong Last send failed:
+          '
+          = draft.last_send_error
+    .composer-actions
+      = button_to "Discard", draft_path(draft), method: :delete,
+                  data: { turbo_confirm: ("Discard draft?" if draft.body.present?) },
+                  class: "button-secondary"
+      .composer-spacer
+      = button_tag type: "button", class: "button-primary",
+                   data: { action: "click->reply-composer#openConfirm" } do
+        i.fa-solid.fa-paper-plane
+        |  Send…
+    = turbo_frame_tag "confirm-#{draft.id}"

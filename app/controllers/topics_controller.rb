@@ -86,6 +86,9 @@ class TopicsController < ApplicationController
     if user_signed_in?
       load_notes
       load_star_state
+      @drafts_by_parent = current_user.outgoing_drafts.where(topic_id: @topic.id).index_by(&:reply_to_message_id)
+    else
+      @drafts_by_parent = {}
     end
 
     @has_patches =

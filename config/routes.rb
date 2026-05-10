@@ -18,6 +18,7 @@ Rails.application.routes.draw do
       end
     end
     resources :page_load_stats, only: [ :index ]
+    resources :outgoing_messages, only: [ :index ]
     resources :mailing_lists, only: [ :index, :new, :create, :edit, :update ]
     resources :saved_searches
     mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
@@ -61,6 +62,7 @@ Rails.application.routes.draw do
     resources :emails, only: [ :create, :destroy ] do
       post :primary, on: :member
     end
+    delete "send_auth/:identity_id", to: "send_auth#destroy", as: :send_auth
   end
   resources :topics, only: [ :index, :show ] do
     collection do
@@ -87,6 +89,13 @@ Rails.application.routes.draw do
   end
   resources :notes, only: [ :create, :update, :destroy ]
   resources :note_mentions, only: [ :destroy ]
+
+  resources :drafts, only: [ :create, :update, :destroy, :edit ] do
+    member do
+      get  :confirm
+      post :send_now
+    end
+  end
   get "stats", to: "stats#show", as: :stats
   get "stats/data", to: "stats#data", as: :stats_data
 

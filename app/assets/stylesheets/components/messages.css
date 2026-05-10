@@ -133,6 +133,59 @@
   }
 }
 
+/* Inline icon actions in the message header (archive links + Reply). */
+.message-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  color: var(--color-text-muted);
+}
+
+.message-actions a,
+.message-actions .message-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-link);
+  background: none;
+  border: 0;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.message-actions a:hover,
+.message-actions .message-action:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-link-hover);
+}
+
+.message-actions .message-action.is-active {
+  color: var(--color-primary-700);
+}
+
+.message-actions .message-action.is-disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  pointer-events: none;
+}
+
+/* button_to wraps the button in a form; keep the form inline so it doesn't
+   break the row of icons. */
+.message-actions form {
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+}
+
+.message-actions form > button.message-action {
+  font: inherit;
+}
+
 .message-content {
   padding: var(--spacing-5);
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -449,4 +502,17 @@ summary.attachment-info {
 
 .message-card.is-collapsed .message-header {
   border-bottom: none;
+}
+
+/* Pending message badge — shown until the IMAP echo arrives */
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #fff7d6;
+  color: #7a5d00;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  margin-right: 0.5rem;
 }

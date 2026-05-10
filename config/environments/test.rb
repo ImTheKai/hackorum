@@ -55,4 +55,9 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Deterministic AR encryption keys for tests. Real values come from ENV in dev/prod.
+  config.active_record.encryption.primary_key            = ENV.fetch("RAILS_AR_ENCRYPTION_PRIMARY_KEY", "test-primary-key-1234567890123456")
+  config.active_record.encryption.deterministic_key      = ENV.fetch("RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY", "test-deterministic-key-12345678901")
+  config.active_record.encryption.key_derivation_salt    = ENV.fetch("RAILS_AR_ENCRYPTION_SALT", "test-salt-12345678901234567890123")
 end

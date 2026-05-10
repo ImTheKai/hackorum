@@ -84,7 +84,7 @@ class EmailIngestor
   end
 
   def update_existing_message(message, body:, sent_at:, reply_to_message_id:, update_existing:)
-    return if update_existing.empty?
+    return if update_existing.empty? && message.state != Message::STATE_PENDING
 
     updates = {}
     updates[:body] = body if update_existing.include?(:body)
@@ -103,7 +103,23 @@ class EmailIngestor
       updates[:reply_to_message_id] = reply_to_message_id
     end
 
+    # Echo of an outgoing pending message has arrived from the list.
+    # Counters fired at draft-send time, so just flip the state.
+    flipped_to_sent = false
+    if message.state == Message::STATE_PENDING
+      updates[:state]   = Message::STATE_SENT
+      updates[:sent_at] = message.sent_at
+      flipped_to_sent = true
+    end
+
     message.update_columns(updates) if updates.any?
+
+    if flipped_to_sent
+      pending_age = message.sent_at ? (Time.current - message.sent_at).to_i : nil
+      ActiveSupport::Notifications.instrument("outgoing.echo.matched",
+        message_id: message.message_id,
+        pending_age_seconds: pending_age)
+    end
   end
 
   def build_from_aliases(m, sent_at)

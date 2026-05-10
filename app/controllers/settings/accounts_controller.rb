@@ -8,6 +8,7 @@ module Settings
         :email
       ) || []
       @identities = current_user.identities.order(:provider, :email, :uid)
+      @send_identity = current_user.identities.send_authorized.first
       @default_alias_id = current_user.person&.default_alias_id
 
       # Preload mention counts (CC/TO) for all aliases

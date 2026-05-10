@@ -1,0 +1,163 @@
+/* Inline reply composer rendered below a message via Turbo Frame. */
+
+.composer-card {
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-left: var(--border-width-reply) solid var(--color-primary-500);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-5) var(--spacing-6);
+  margin: var(--spacing-4) 0 var(--spacing-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.composer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.composer-from {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.composer-from::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--border-radius-full);
+  background: var(--color-success);
+}
+
+.composer-status {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.composer-card .composer-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.composer-card .composer-field label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.composer-card .composer-field input[type=text],
+.composer-card .composer-field input[type=email] {
+  margin: 0;
+  width: 100%;
+  font-size: var(--font-size-md);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+}
+
+.composer-card .composer-field textarea {
+  width: 100%;
+  margin: 0;
+  min-height: 18rem;
+  padding: var(--spacing-4);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  resize: vertical;
+}
+
+.composer-card .composer-field textarea:focus,
+.composer-card .composer-field input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.composer-error-banner {
+  margin: 0 0 var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-danger-soft);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--border-radius-md);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2);
+}
+
+.composer-error-banner strong {
+  color: var(--color-danger);
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-2);
+}
+
+.composer-actions form {
+  margin: 0;
+}
+
+.composer-actions .composer-spacer {
+  flex: 1;
+}
+
+.composer-actions .button-primary,
+.composer-actions .button-secondary {
+  padding: var(--spacing-3) var(--spacing-5);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--border-radius-md);
+  border: 0;
+  cursor: pointer;
+}
+
+.composer-actions .button-secondary {
+  border: var(--border-width) solid var(--color-border);
+}
+
+/* "Sending…" placeholder rendered while a transient retry is in flight. */
+
+.composer-card.composer-sending {
+  border-left-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  padding: var(--spacing-4) var(--spacing-6);
+}
+
+.composer-sending-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  color: var(--color-warning-text);
+  font-size: var(--font-size-base);
+}
+
+.composer-sending-row .fa-paper-plane {
+  font-size: 1.1rem;
+  animation: composer-sending-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes composer-sending-pulse {
+  0%, 100% { transform: translateX(0); opacity: 0.7; }
+  50%      { transform: translateX(3px); opacity: 1; }
+}

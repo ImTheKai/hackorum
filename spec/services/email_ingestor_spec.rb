@@ -214,6 +214,57 @@ RSpec.describe EmailIngestor do
     end
   end
 
+  describe "pending message echo" do
+    let(:user)   { create(:user) }
+    let(:sender) { create(:alias, user: user, email: "sender@example.com", name: "Sender") }
+    let(:list)   { create(:mailing_list) }
+    let(:topic)  { create(:topic, creator: sender) }
+    let!(:pending) {
+      Message.create!(
+        topic: topic, sender: sender, sender_person_id: sender.person_id,
+        subject: "Re: hi", body: "sent body",
+        message_id: "echo-test-1@hackorum.local",
+        state: Message::STATE_PENDING,
+        sent_at: 1.minute.ago,
+        created_at: 1.minute.ago
+      )
+    }
+
+    let(:raw_echo) {
+      <<~EML
+        From: Sender <sender@example.com>
+        To: pgsql-test@example.com
+        Subject: Re: hi
+        Message-ID: <echo-test-1@hackorum.local>
+        Date: #{Time.current.rfc2822}
+
+        sent body
+      EML
+    }
+
+    it "flips pending to sent" do
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      expect(pending.reload.state).to eq(Message::STATE_SENT)
+    end
+
+    it "attaches the list via the existing association path" do
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      expect(pending.message_mailing_lists.where(mailing_list: list)).to exist
+    end
+
+    it "does not double-count topic.message_count" do
+      initial = topic.reload.message_count
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      expect(topic.reload.message_count).to eq(initial)
+    end
+
+    it "does not change state for already-sent rows" do
+      pending.update_columns(state: Message::STATE_SENT)
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      expect(pending.reload.state).to eq(Message::STATE_SENT)
+    end
+  end
+
   describe "#fallback_thread_lookup scoped to list" do
     let(:ingestor) { described_class.new }
     let(:hackers_list) { create(:mailing_list, identifier: "pgsql-hackers", display_name: "hackers") }

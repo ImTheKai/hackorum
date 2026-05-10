@@ -57,5 +57,43 @@ The imap worker will connect to the specified imap, fetch all messages with the 
 It should point to a label subscribed to the pg-hackers list.
 It can't be INBOX, it has to be a specific label.
 
+### Email sending (dev)
+
+Hackorum can send mailing-list replies via the Gmail API on behalf of users
+who have opted in from `/settings/account` ("Authorize sending"). The send
+pipeline uses the narrowly-scoped `gmail.send` OAuth scope and stores the
+refresh token encrypted on the `identities` table.
+
+Required environment variables in `.env.development`:
+
+```
+GOOGLE_CLIENT_ID=          # OAuth client id (any test project works)
+GOOGLE_CLIENT_SECRET=      # OAuth client secret
+HACKORUM_DEV_REPLY_TO=     # required: where outgoing replies actually go in dev
+HACKORUM_OUTGOING_DOMAIN=  # optional, defaults to hackorum.local; used in Message-Id
+
+# Active Record encryption keys (32+ char strings)
+RAILS_AR_ENCRYPTION_PRIMARY_KEY=
+RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY=
+RAILS_AR_ENCRYPTION_SALT=
+```
+
+Generate AR encryption values with `bin/rails runner 'puts SecureRandom.alphanumeric(32)'`.
+
+**Safety guard**: in non-production, the recipient resolver refuses to send
+when `HACKORUM_DEV_REPLY_TO` is unset, and refuses (raises) when its value
+matches any real list's `post_address`. Always point it at a personal
+mailbox you control during dev. Production uses `mailing_lists.post_address`
+directly.
+
+Drafts that get stuck in `status="sending"` for more than 10 minutes are
+auto-reset to `idle` by `ResetStaleSendingDraftsJob` (recurring every 5
+minutes via `solid_queue`).
+
+Pending messages (Gmail accepted, awaiting list echo) appear with a yellow
+"Pending" badge until the IMAP worker ingests the echo and `EmailIngestor`
+flips them to `state="sent"`. Admins can inspect the pipeline at
+`/admin/outgoing_messages`.
+
 ## Production
 See `deploy/README.md` for the single-host Docker Compose deployment (Puma + Caddy + Postgres + backups).

@@ -13,6 +13,15 @@ class Message < ApplicationRecord
   has_many :message_mailing_lists, dependent: :destroy
   has_many :mailing_lists, through: :message_mailing_lists
 
+  STATE_PENDING = "pending"
+  STATE_SENT    = "sent"
+
+  scope :pending, -> { where(state: STATE_PENDING) }
+  scope :sent,    -> { where(state: STATE_SENT) }
+
+  def pending? = state == STATE_PENDING
+  def sent?    = state == STATE_SENT
+
   validates :subject, presence: true
   # Body may be blank for some historical imports; allow blank but keep presence on subject.
   validates :body, presence: true, allow_blank: true

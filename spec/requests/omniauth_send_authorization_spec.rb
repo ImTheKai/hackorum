@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe 'Send authorization callback', type: :request do
-  let(:user) { create(:user, admin: true) }
+  let(:user) { create(:user) }
+  let!(:enrollment) { create(:user_feature, user: user, feature: "email_sending") }
 
   before do
     OmniAuth.config.test_mode = true
@@ -60,12 +61,19 @@ RSpec.describe 'Send authorization callback', type: :request do
     expect(response).to redirect_to(new_session_path)
   end
 
-  it 'rejects non-admin users' do
-    non_admin = create(:user)
-    sign_in_as(non_admin)
+  it "rejects users without the email_sending feature" do
+    unenrolled = create(:user)
+    sign_in_as(unenrolled)
     trigger_callback
     expect(response).to redirect_to(settings_account_path)
-    expect(non_admin.reload.identities).to be_empty
+    expect(unenrolled.reload.identities).to be_empty
+  end
+
+  it "allows admin users without explicit enrollment" do
+    admin = create(:user, admin: true)
+    sign_in_as(admin)
+    trigger_callback
+    expect(admin.reload.identities.find_by(uid: "g-uid-1")).to be_present
   end
 
   it 'records the granted scope on the identity' do

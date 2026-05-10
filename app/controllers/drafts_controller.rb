@@ -43,8 +43,12 @@ class DraftsController < ApplicationController
   end
 
   def destroy
+    @reply_to_message_id = @draft.reply_to_message_id
     @draft.destroy!
-    head :no_content
+    respond_to do |format|
+      format.turbo_stream
+      format.html { head :no_content }
+    end
   end
 
   def confirm

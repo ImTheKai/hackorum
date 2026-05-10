@@ -108,4 +108,28 @@ RSpec.describe User, type: :model do
       expect(user.can_send_email?).to be false
     end
   end
+
+  describe "#has_feature?" do
+    it "returns true for admin regardless of enrollment" do
+      admin = create(:user, admin: true)
+      expect(admin.has_feature?(:email_sending)).to be true
+    end
+
+    it "returns true for non-admin enrolled in the feature" do
+      user = create(:user)
+      create(:user_feature, user: user, feature: "email_sending")
+      expect(user.has_feature?(:email_sending)).to be true
+    end
+
+    it "returns false for non-admin without enrollment" do
+      user = create(:user)
+      expect(user.has_feature?(:email_sending)).to be false
+    end
+
+    it "accepts strings as well as symbols" do
+      user = create(:user)
+      create(:user_feature, user: user, feature: "email_sending")
+      expect(user.has_feature?("email_sending")).to be true
+    end
+  end
 end

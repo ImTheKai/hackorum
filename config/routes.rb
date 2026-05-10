@@ -8,6 +8,8 @@ Rails.application.routes.draw do
         post :confirm_email
         post :add_email
       end
+      resources :features, only: [ :index, :create, :destroy ],
+        controller: "user_features", param: :name
     end
     resources :email_changes, only: [ :index ]
     resources :imap_sync_states, only: [ :index ]
@@ -21,6 +23,9 @@ Rails.application.routes.draw do
     resources :outgoing_messages, only: [ :index ]
     resources :mailing_lists, only: [ :index, :new, :create, :edit, :update ]
     resources :saved_searches
+    resources :features, only: [ :index, :show ], param: :name do
+      resources :enrollments, only: [ :create, :destroy ], param: :user_id, controller: "feature_enrollments"
+    end
     mount PgHero::Engine, at: "/pghero" if defined?(PgHero)
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html

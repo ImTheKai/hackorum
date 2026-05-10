@@ -1,0 +1,36 @@
+- content_for :title, "Admin — Features for #{@user.username || @user.id}"
+
+.settings-page
+  h1
+    | Features for #{@user.username || "user ##{@user.id}"}
+    - if @user.admin?
+      span.role-badge Admin
+
+  p
+    = link_to "Back to users", admin_users_path, class: "button-secondary"
+
+  - if @user.admin?
+    p.send-auth-hint Admins automatically have access to every feature. Explicit enrollment below is optional.
+
+  table.email-table
+    thead
+      tr
+        th Feature
+        th Status
+        th Action
+    tbody
+      - @features.each do |name, label|
+        tr
+          td = label
+          td
+            - if @enrolled.include?(name.to_s)
+              span.role-badge Enabled
+            - elsif @user.admin?
+              span.role-badge Inherited (admin)
+            - else
+              | —
+          td
+            - if @enrolled.include?(name.to_s)
+              = button_to "Disable", admin_user_feature_path(@user, name), method: :delete, class: "button-secondary button-small"
+            - else
+              = button_to "Enable", admin_user_features_path(@user, feature: name), method: :post, class: "button-primary button-small"

@@ -3,7 +3,8 @@
 require "rails_helper"
 
 RSpec.describe "Settings::SendAuth", type: :request do
-  let(:user) { create(:user, admin: true) }
+  let(:user) { create(:user) }
+  let!(:enrollment) { create(:user_feature, user: user, feature: "email_sending") }
   let!(:identity) {
     create(:identity, user: user, refresh_token: "r", access_token: "a",
            access_token_expires_at: 1.hour.from_now,
@@ -46,13 +47,13 @@ RSpec.describe "Settings::SendAuth", type: :request do
       expect(other_identity.reload.refresh_token).to eq("x")
     end
 
-    it "forbids non-admin users from revoking" do
-      non_admin = create(:user)
-      sign_in_as(non_admin)
-      non_admin_identity = create(:identity, user: non_admin, refresh_token: "y",
-                                  send_authorized_at: 1.hour.ago)
-      delete settings_send_auth_path(identity_id: non_admin_identity.id)
-      expect(non_admin_identity.reload.refresh_token).to eq("y")
+    it "forbids users without email_sending feature from revoking" do
+      unenrolled = create(:user)
+      sign_in_as(unenrolled)
+      unenrolled_identity = create(:identity, user: unenrolled, refresh_token: "y",
+                                   send_authorized_at: 1.hour.ago)
+      delete settings_send_auth_path(identity_id: unenrolled_identity.id)
+      expect(unenrolled_identity.reload.refresh_token).to eq("y")
       expect(response).to redirect_to(settings_account_path)
     end
   end

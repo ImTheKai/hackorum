@@ -89,6 +89,13 @@ RSpec.describe DraftsController, type: :request do
       expect { delete draft_path(draft) }.to change(OutgoingDraft, :count).by(-1)
       expect(response).to have_http_status(:no_content)
     end
+
+    it 'returns a turbo_stream that empties the draft frame' do
+      delete draft_path(draft), headers: { 'Accept' => 'text/vnd.turbo-stream.html' }
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq(Mime[:turbo_stream].to_s)
+      expect(response.body).to include(%(turbo-stream action="replace" target="draft-#{parent.id}"))
+    end
   end
 
   describe 'GET /drafts/:id/confirm' do

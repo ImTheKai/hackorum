@@ -16,6 +16,7 @@ class User < ApplicationRecord
   has_many :saved_searches
   has_many :saved_search_preferences
   has_many :outgoing_drafts, dependent: :destroy
+  has_many :user_features, dependent: :destroy
 
   enum :mention_restriction, { anyone: "anyone", teammates_only: "teammates_only" }, default: :anyone
 
@@ -27,6 +28,10 @@ class User < ApplicationRecord
 
   def can_send_email?
     identities.send_authorized.exists?
+  end
+
+  def has_feature?(name)
+    admin? || user_features.exists?(feature: name.to_s)
   end
 
   def mentionable_by?(mentioner)

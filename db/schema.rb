@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_10_103205) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_12_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -738,6 +738,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_10_103205) do
     t.index ["title_tsv"], name: "index_topics_on_title_tsv", using: :gin
   end
 
+  create_table "user_features", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "feature", null: false
+    t.datetime "created_at", null: false
+    t.index ["user_id", "feature"], name: "index_user_features_on_user_id_and_feature", unique: true
+    t.index ["user_id"], name: "index_user_features_on_user_id"
+  end
+
   create_table "user_tokens", force: :cascade do |t|
     t.bigint "user_id"
     t.string "email"
@@ -832,6 +840,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_10_103205) do
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "topics", "topics", column: "merged_into_topic_id"
+  add_foreign_key "user_features", "users"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

@@ -30,5 +30,8 @@
       = link_to admin_saved_searches_path, class: admin_nav_link_class(:saved_searches) do
         i.fas.fa-search
         span Saved Searches
+      = link_to admin_features_path, class: admin_nav_link_class(:features) do
+        i.fas.fa-flag
+        span Features
 
 = render template: 'layouts/application'

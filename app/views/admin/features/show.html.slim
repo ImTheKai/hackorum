@@ -1,0 +1,33 @@
+- content_for :title, "Admin — #{@label}"
+
+.settings-page
+  h1 = @label
+
+  p = link_to "Back to features", admin_features_path, class: "button-secondary"
+
+  .settings-section
+    h2 Add user
+    = form_with url: admin_feature_enrollments_path(@feature), method: :post, local: true, class: "email-form", data: { turbo: false } do |f|
+      .form-group
+        = f.label :identifier, "Username or email"
+        = f.text_field :identifier, required: true, placeholder: "alice or alice@example.com"
+      = f.submit "Enroll", class: "button-primary"
+
+  .settings-section
+    h2 Enrolled users
+    - if @enrolled_users.any?
+      table.email-table
+        thead
+          tr
+            th Username
+            th Email
+            th
+        tbody
+          - @enrolled_users.each do |u|
+            tr
+              td = u.username || "—"
+              td = u.person&.default_alias&.email || "—"
+              td
+                = button_to "Remove", admin_feature_enrollment_path(@feature, u), method: :delete, data: { turbo_confirm: "Remove enrollment?" }, class: "button-danger button-small"
+    - else
+      p No users enrolled yet.

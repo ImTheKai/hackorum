@@ -28,27 +28,52 @@
     - else
       p No connected accounts yet.
 
-  - if current_admin?
+  - if current_user&.has_feature?(:email_sending)
     .settings-section
       h2 Email sending
       - if @send_identity
-        p Status: Authorized as #{@send_identity.email}
-        - if @send_identity.send_authorized_at
-          p
-            | Authorized:
-            |
-            time datetime=@send_identity.send_authorized_at.iso8601
-              = l(@send_identity.send_authorized_at, format: :short)
-        - if @send_identity.last_send_error.present?
-          p
-            strong Last error:
-            |
-            = @send_identity.last_send_error
-        = button_to "Revoke authorization",
-                    settings_send_auth_path(identity_id: @send_identity.id),
-                    method: :delete,
-                    data: { turbo_confirm: "Revoke sending authorization?" },
-                    class: "button-danger"
+        .send-auth-card
+          .send-auth-header
+            .send-auth-title
+              i.fa-solid.fa-paper-plane.send-auth-icon aria-hidden="true"
+              span Sending authorized
+            span.status-badge.status-badge--active
+              span.status-badge-dot aria-hidden="true"
+              | Active
+          dl.send-auth-details
+            div.send-auth-row
+              dt Account
+              dd= @send_identity.email
+            - if @send_identity.send_authorized_at
+              div.send-auth-row
+                dt Authorized
+                dd
+                  time datetime=@send_identity.send_authorized_at.iso8601
+                    = l(@send_identity.send_authorized_at, format: :short)
+            - if @send_identity.access_token_expires_at
+              div.send-auth-row
+                dt Access token refreshes
+                dd
+                  time datetime=@send_identity.access_token_expires_at.iso8601
+                    = l(@send_identity.access_token_expires_at, format: :short)
+                  span.send-auth-hint Auto-renewed before expiry
+          p.send-auth-policy
+            i.fa-solid.fa-circle-info aria-hidden="true"
+            | Authorization stays active until you revoke it, or until the underlying
+            |  Google refresh token is invalidated (typically after 6 months of inactivity,
+            |  on password change for some scopes, or by Google security policy).
+          - if @send_identity.last_send_error.present?
+            .send-auth-error
+              i.fa-solid.fa-triangle-exclamation aria-hidden="true"
+              div
+                strong Last error
+                p= @send_identity.last_send_error
+          .send-auth-actions
+            = button_to "Revoke authorization",
+                        settings_send_auth_path(identity_id: @send_identity.id),
+                        method: :delete,
+                        data: { turbo_confirm: "Revoke sending authorization?" },
+                        class: "button-danger"
       - else
         p
           | Authorize Hackorum to send replies via your Google account. Uses the

@@ -48,3 +48,4 @@
             td = user.last_login_at ? smart_time_display(user.last_login_at) : "—"
             td
               = link_to "Add email", new_email_admin_user_path(user), class: "button-secondary button-small"
+              = link_to "Features", admin_user_features_path(user), class: "button-secondary button-small"

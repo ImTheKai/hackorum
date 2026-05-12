@@ -1,23 +1,39 @@
 class OutgoingDraft < ApplicationRecord
   STATUS_IDLE    = "idle"
   STATUS_SENDING = "sending"
+  STATUS_SENT    = "sent"
+
+  STATUSES = [STATUS_IDLE, STATUS_SENDING, STATUS_SENT].freeze
 
   belongs_to :user
   belongs_to :topic
   belongs_to :reply_to_message, class_name: "Message"
   belongs_to :sender_alias, class_name: "Alias"
   belongs_to :identity
+  belongs_to :sent_message, class_name: "Message", optional: true
 
   validates :subject, presence: true
-  validates :status, inclusion: { in: [STATUS_IDLE, STATUS_SENDING] }
-  validates :user_id, uniqueness: { scope: :reply_to_message_id }
+  validates :status, inclusion: { in: STATUSES }
+  validates :user_id,
+            uniqueness: {
+              scope: :reply_to_message_id,
+              conditions: -> { where(status: [STATUS_IDLE, STATUS_SENDING]) }
+            },
+            if: :active?
 
   scope :idle,    -> { where(status: STATUS_IDLE) }
   scope :sending, -> { where(status: STATUS_SENDING) }
+  scope :sent,    -> { where(status: STATUS_SENT) }
   scope :stale_sending, ->(threshold = 10.minutes.ago) {
     sending.where("sending_started_at < ?", threshold)
   }
 
   def idle?    = status == STATUS_IDLE
   def sending? = status == STATUS_SENDING
+  def sent?    = status == STATUS_SENT
+  def active?  = idle? || sending?
+
+  def failed? = idle? && last_send_error.present?
+
+  def readonly? = persisted? && status_was == STATUS_SENT
 end

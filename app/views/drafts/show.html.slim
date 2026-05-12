@@ -13,16 +13,16 @@
         '
         strong = @draft.sender_alias.name
         '
-        | &lt;
+        | <
         = @draft.sender_alias.email
-        | &gt;
+        | >
         - if @draft.sent_message&.sent_to_address.present?
           |  to
           '
           = @draft.sent_message.sent_to_address
 
-    .sent-body
-      pre = @draft.body
+    .message-body
+      = render_message_body(@draft.body)
 
     .sent-footer
       - if @draft.sent_message

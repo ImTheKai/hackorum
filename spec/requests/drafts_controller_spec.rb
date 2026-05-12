@@ -140,4 +140,84 @@ RSpec.describe DraftsController, type: :request do
       expect(response).to have_http_status(:conflict)
     end
   end
+
+  describe 'GET /drafts (index)' do
+    let!(:idle_draft)    { create(:outgoing_draft, user: user, topic: topic,
+                                  reply_to_message: parent, identity: identity, sender_alias: sender) }
+    let!(:other_parent)  { create(:message, topic: topic, subject: 'Other') }
+    let!(:sent_draft)    {
+      msg = create(:message, topic: topic, sender: sender, sender_person_id: sender.person_id,
+                   reply_to: other_parent, subject: 'Re: Other', body: 'b')
+      create(:outgoing_draft,
+             user: user, topic: topic, reply_to_message: other_parent,
+             identity: identity, sender_alias: sender,
+             status: 'sent', sent_message_id: msg.id, sent_at: 1.minute.ago)
+    }
+    let!(:other_user_draft) { create(:outgoing_draft) }
+
+    it 'lists only current user drafts across all states' do
+      get drafts_path
+      expect(response).to be_successful
+      expect(response.body).to include(idle_draft.subject)
+      expect(response.body).to include(sent_draft.subject)
+      expect(response.body).not_to include(other_user_draft.subject)
+    end
+
+    it 'filters to sent only with ?state=sent' do
+      get drafts_path(state: 'sent')
+      expect(response.body).to include(sent_draft.subject)
+      expect(response.body).not_to include(idle_draft.subject)
+    end
+  end
+
+  describe 'GET /drafts/:id (show)' do
+    let(:msg) {
+      create(:message, topic: topic, sender: sender, sender_person_id: sender.person_id,
+             reply_to: parent, subject: 'Re: Hi', body: 'b')
+    }
+    let(:sent_draft) {
+      create(:outgoing_draft,
+             user: user, topic: topic, reply_to_message: parent,
+             identity: identity, sender_alias: sender,
+             status: 'sent', sent_message_id: msg.id, sent_at: 1.minute.ago,
+             subject: 'Re: Hi', body: 'hello there')
+    }
+
+    it 'renders read-only view of a sent draft' do
+      get draft_path(sent_draft)
+      expect(response).to be_successful
+      expect(response.body).to include('Re: Hi')
+      expect(response.body).to include('hello there')
+    end
+
+    it 'returns 404 for another user' do
+      other = create(:outgoing_draft, status: 'sent', sent_at: 1.minute.ago)
+      get draft_path(other)
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe 'mutating actions on a sent draft' do
+    let(:sent_draft) {
+      create(:outgoing_draft,
+             user: user, topic: topic, reply_to_message: parent,
+             identity: identity, sender_alias: sender,
+             status: 'sent', sent_at: 1.minute.ago)
+    }
+
+    it 'rejects PATCH with 422' do
+      patch draft_path(sent_draft), params: { outgoing_draft: { body: 'x' } }
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'rejects DELETE with 422' do
+      delete draft_path(sent_draft)
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'rejects POST send_now with 422' do
+      post send_now_draft_path(sent_draft)
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
 end

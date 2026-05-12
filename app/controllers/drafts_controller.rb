@@ -1,6 +1,25 @@
 class DraftsController < ApplicationController
   before_action :require_authentication
-  before_action :set_draft, only: [ :update, :destroy, :confirm, :send_now, :edit ]
+  before_action :set_draft, only: [ :show, :update, :destroy, :confirm, :send_now, :edit ]
+  before_action :reject_sent_drafts, only: [ :update, :destroy, :edit, :confirm, :send_now ]
+
+  def index
+    @state = (params[:state].presence_in(%w[all in_progress sent failed]) || "all")
+    scope  = current_user.outgoing_drafts
+    @drafts = case @state
+              when "in_progress" then scope.where(status: %w[idle sending]).where(last_send_error: nil)
+              when "sent"        then scope.sent
+              when "failed"      then scope.idle.where.not(last_send_error: nil)
+              else                    scope
+              end
+    @drafts = @drafts
+                .includes(:topic, :reply_to_message, :sender_alias, :sent_message)
+                .order(Arel.sql("COALESCE(sent_at, updated_at) DESC"))
+                .page(params[:page]).per(50)
+  end
+
+  def show
+  end
 
   def create
     parent = Message.find(params[:reply_to_message_id])
@@ -94,6 +113,14 @@ class DraftsController < ApplicationController
 
   def set_draft
     @draft = current_user.outgoing_drafts.find(params[:id])
+  end
+
+  def reject_sent_drafts
+    if @draft&.sent?
+      redirect_to draft_path(@draft),
+                  status: :unprocessable_entity,
+                  alert: "This message has already been sent."
+    end
   end
 
   def draft_params

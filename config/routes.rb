@@ -95,8 +95,9 @@ Rails.application.routes.draw do
   resources :notes, only: [ :create, :update, :destroy ]
   resources :note_mentions, only: [ :destroy ]
 
-  resources :drafts, only: [ :create, :update, :destroy, :edit ] do
+  resources :drafts, only: [ :index, :show, :create, :update, :destroy ] do
     member do
+      get  :edit
       get  :confirm
       post :send_now
     end

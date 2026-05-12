@@ -39,6 +39,7 @@ RSpec.describe OutgoingDraft, type: :model do
     draft = create(:outgoing_draft, status: 'sent', sent_at: Time.current)
     expect(draft.readonly?).to be true
     expect { draft.update!(body: 'change') }.to raise_error(ActiveRecord::ReadOnlyRecord)
+    expect { draft.destroy! }.to raise_error(ActiveRecord::ReadOnlyRecord)
   end
 
   it 'flags sent?' do

@@ -14,6 +14,7 @@ class OutgoingDraft < ApplicationRecord
 
   validates :subject, presence: true
   validates :status, inclusion: { in: STATUSES }
+  # `if:` gates whether the validation runs on this record; `conditions:` scopes the existence query against other rows. Both are needed to mirror the DB partial unique index.
   validates :user_id,
             uniqueness: {
               scope: :reply_to_message_id,
@@ -35,5 +36,7 @@ class OutgoingDraft < ApplicationRecord
 
   def failed? = idle? && last_send_error.present?
 
+  # Use status_was, not sent?: the sending->sent transition save needs readonly? to
+  # return false at the moment of write, and factory inserts of status: 'sent' must succeed.
   def readonly? = persisted? && status_was == STATUS_SENT
 end

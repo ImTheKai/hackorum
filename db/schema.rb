@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_12_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -377,11 +377,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120000) do
     t.datetime "sending_started_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "sent_message_id"
+    t.datetime "sent_at"
     t.index ["identity_id"], name: "index_outgoing_drafts_on_identity_id"
     t.index ["reply_to_message_id"], name: "index_outgoing_drafts_on_reply_to_message_id"
     t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"
+    t.index ["sent_message_id"], name: "index_outgoing_drafts_on_sent_message_id"
     t.index ["topic_id"], name: "index_outgoing_drafts_on_topic_id"
-    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_unique", unique: true
+    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_active_unique", unique: true, where: "((status)::text = ANY ((ARRAY['idle'::character varying, 'sending'::character varying])::text[]))"
     t.index ["user_id"], name: "index_outgoing_drafts_on_user_id"
   end
 
@@ -819,6 +822,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120000) do
   add_foreign_key "outgoing_drafts", "aliases", column: "sender_alias_id"
   add_foreign_key "outgoing_drafts", "identities"
   add_foreign_key "outgoing_drafts", "messages", column: "reply_to_message_id"
+  add_foreign_key "outgoing_drafts", "messages", column: "sent_message_id"
   add_foreign_key "outgoing_drafts", "topics"
   add_foreign_key "outgoing_drafts", "users"
   add_foreign_key "patch_files", "attachments"

@@ -51,6 +51,30 @@ RSpec.describe DraftsController, type: :request do
     end
   end
 
+  describe 'POST /drafts after a sent draft to the same parent' do
+    let!(:sent_msg) {
+      create(:message, topic: topic, sender: sender, sender_person_id: sender.person_id,
+             reply_to: parent, subject: 'Re: Hi', body: 'b')
+    }
+    let!(:sent_draft) {
+      create(:outgoing_draft,
+             user: user, topic: topic, reply_to_message: parent,
+             identity: identity, sender_alias: sender,
+             status: 'sent', sent_message_id: sent_msg.id, sent_at: 1.minute.ago)
+    }
+
+    it 'creates a new active draft (does not return the sent one)' do
+      expect {
+        post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      }.to change(OutgoingDraft, :count).by(1)
+      expect(response).to have_http_status(:ok)
+      json = JSON.parse(response.body)
+      expect(json['id']).not_to eq(sent_draft.id)
+      new_draft = OutgoingDraft.find(json['id'])
+      expect(new_draft).to be_idle
+    end
+  end
+
   describe 'PATCH /drafts/:id' do
     let(:draft) {
       create(:outgoing_draft, user: user, topic: topic,

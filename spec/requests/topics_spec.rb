@@ -152,6 +152,43 @@ RSpec.describe "Topics", type: :request do
         expect(response).to have_http_status(:not_found)
       end
     end
+
+    context "with a signed-in user who has a sent draft for a message" do
+      let!(:user) { create(:user, password: "secret", password_confirmation: "secret") }
+      let!(:user_alias) { attach_verified_alias(user, email: "composer@example.com") }
+      let!(:identity) {
+        create(:identity, user: user, email: "composer@example.com",
+               refresh_token: "r", send_authorized_at: 1.hour.ago)
+      }
+      let!(:sent_msg) {
+        create(:message, topic: topic, sender: user_alias, sender_person_id: user_alias.person_id,
+               reply_to: root_message, subject: "Re: parent", body: "reply body")
+      }
+      let!(:sent_draft) {
+        create(:outgoing_draft,
+               user: user, topic: topic, reply_to_message: root_message,
+               identity: identity, sender_alias: user_alias,
+               status: "sent", sent_message_id: sent_msg.id, sent_at: 1.minute.ago)
+      }
+
+      before { sign_in(email: "composer@example.com") }
+
+      it "does not render the reply-composer for a sent draft" do
+        get topic_path(topic)
+        expect(response).to have_http_status(:success)
+        expect(response.body).not_to include(%(data-reply-composer-draft-id-value="#{sent_draft.id}"))
+      end
+
+      it "still renders the composer for an active draft on a different parent" do
+        active_draft = create(:outgoing_draft,
+                              user: user, topic: topic, reply_to_message: reply_message,
+                              identity: identity, sender_alias: user_alias)
+        get topic_path(topic)
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(%(data-reply-composer-draft-id-value="#{active_draft.id}"))
+        expect(response.body).not_to include(%(data-reply-composer-draft-id-value="#{sent_draft.id}"))
+      end
+    end
   end
 
   describe "GET /attachments/:id" do

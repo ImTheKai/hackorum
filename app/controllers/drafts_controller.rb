@@ -29,7 +29,9 @@ class DraftsController < ApplicationController
     sender = current_user.aliases.find_by(email: identity.email)
     return head :unprocessable_entity if sender.nil?
 
-    draft = current_user.outgoing_drafts.find_by(reply_to_message_id: parent.id)
+    draft = current_user.outgoing_drafts
+                        .where.not(status: OutgoingDraft::STATUS_SENT)
+                        .find_by(reply_to_message_id: parent.id)
     draft ||= begin
       current_user.outgoing_drafts.create!(
         topic: parent.topic,
@@ -40,7 +42,9 @@ class DraftsController < ApplicationController
         body: ""
       )
     rescue ActiveRecord::RecordNotUnique
-      current_user.outgoing_drafts.find_by!(reply_to_message_id: parent.id)
+      current_user.outgoing_drafts
+                  .where.not(status: OutgoingDraft::STATUS_SENT)
+                  .find_by!(reply_to_message_id: parent.id)
     end
 
     @draft = draft

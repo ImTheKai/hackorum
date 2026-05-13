@@ -265,6 +265,108 @@ RSpec.describe EmailIngestor do
     end
   end
 
+  describe "pending echo with Gmail-rewritten Message-ID" do
+    let(:user)   { create(:user) }
+    let(:sender) { create(:alias, user: user, email: "sender@example.com", name: "Sender") }
+    let(:list)   { create(:mailing_list) }
+    let(:parent_id) { "parent-thread@example.com" }
+    let(:topic)  { create(:topic, creator: sender) }
+    let!(:parent_msg) {
+      Message.create!(
+        topic: topic, sender: sender, sender_person_id: sender.person_id,
+        subject: "Topic", body: "parent body",
+        message_id: parent_id, state: Message::STATE_SENT,
+        created_at: 1.hour.ago
+      )
+    }
+    let(:pending_body) { "Hello, this is my reply body with enough length to match." }
+    let!(:pending) {
+      Message.create!(
+        topic: topic, sender: sender, sender_person_id: sender.person_id,
+        reply_to: parent_msg, reply_to_message_id: parent_id,
+        subject: "Re: Topic", body: pending_body,
+        message_id: "<placeholder-uuid@hackorum.dev>",
+        state: Message::STATE_PENDING,
+        sent_at: 30.seconds.ago,
+        created_at: 30.seconds.ago
+      )
+    }
+
+    let(:gmail_echo_id) { "CABx_real_gmail_id@mail.gmail.com" }
+    let(:echo_body) { "#{pending_body}\n\n-- \nList footer goes here" }
+    let(:raw_echo) {
+      <<~EML
+        From: Sender <sender@example.com>
+        To: pgsql-test@example.com
+        Subject: [PGSQL] Re: Topic
+        Message-ID: <#{gmail_echo_id}>
+        In-Reply-To: <#{parent_id}>
+        References: <#{parent_id}>
+        Date: #{Time.current.rfc2822}
+
+        #{echo_body}
+      EML
+    }
+
+    it "flips pending to sent and rewrites message_id" do
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      pending.reload
+      expect(pending.state).to eq(Message::STATE_SENT)
+      expect(pending.message_id).to eq(gmail_echo_id)
+    end
+
+    it "does not create a duplicate message" do
+      expect {
+        described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      }.not_to change { Message.count }
+    end
+
+    it "associates the mailing list with the pending row" do
+      described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      expect(pending.message_mailing_lists.where(mailing_list: list)).to exist
+    end
+
+    it "leaves pending intact when echo body does not contain pending body" do
+      raw = raw_echo.sub(echo_body, "completely unrelated content here that is long enough")
+      expect {
+        described_class.new.ingest_raw(raw, mailing_list: list)
+      }.to change { Message.count }.by(1)
+      expect(pending.reload.state).to eq(Message::STATE_PENDING)
+    end
+
+    it "skips heuristic when sender email differs" do
+      raw = raw_echo.sub("sender@example.com", "someone-else@example.com")
+      expect {
+        described_class.new.ingest_raw(raw, mailing_list: list)
+      }.to change { Message.count }.by(1)
+      expect(pending.reload.state).to eq(Message::STATE_PENDING)
+    end
+
+    it "skips heuristic outside the time window" do
+      pending.update_columns(sent_at: 3.days.ago, created_at: 3.days.ago)
+      expect {
+        described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      }.to change { Message.count }.by(1)
+      expect(pending.reload.state).to eq(Message::STATE_PENDING)
+    end
+
+    it "skips heuristic when two pending rows match ambiguously" do
+      Message.create!(
+        topic: topic, sender: sender, sender_person_id: sender.person_id,
+        reply_to: parent_msg, reply_to_message_id: parent_id,
+        subject: "Re: Topic", body: pending_body,
+        message_id: "<another-placeholder@hackorum.dev>",
+        state: Message::STATE_PENDING,
+        sent_at: 20.seconds.ago,
+        created_at: 20.seconds.ago
+      )
+      expect {
+        described_class.new.ingest_raw(raw_echo, mailing_list: list)
+      }.to change { Message.count }.by(1)
+      expect(pending.reload.state).to eq(Message::STATE_PENDING)
+    end
+  end
+
   describe "#fallback_thread_lookup scoped to list" do
     let(:ingestor) { described_class.new }
     let(:hackers_list) { create(:mailing_list, identifier: "pgsql-hackers", display_name: "hackers") }

@@ -20,6 +20,20 @@ class EmailIngestor
       return existing_message
     end
 
+    pending_echo = find_pending_echo(
+      reply_to_message_id: reply_to_message_id,
+      from_addresses: extract_from_emails(m),
+      echo_body: body,
+      echo_sent_at: sent_at
+    )
+    if pending_echo
+      pending_echo.update_columns(message_id: message_id) if pending_echo.message_id != message_id
+      update_existing_message(pending_echo, body: body, sent_at: sent_at,
+                              reply_to_message_id: reply_to_message_id, update_existing: update_existing)
+      associate_mailing_list(pending_echo, mailing_list)
+      return pending_echo
+    end
+
     import_log = ""
 
     from = build_from_aliases(m, sent_at)
@@ -261,6 +275,53 @@ class EmailIngestor
 
   def clean_reference(ref)
     MessageIdNormalizer.normalize(ref)
+  end
+
+  # Gmail rewrites Message-IDs on send, so the echo from the list has a different
+  # id than the pending row we created. Match heuristically on parent reference,
+  # sender, body fragment, and time window.
+  PENDING_ECHO_WINDOW = 24.hours
+  PENDING_ECHO_MIN_BODY = 20
+
+  def find_pending_echo(reply_to_message_id:, from_addresses:, echo_body:, echo_sent_at:)
+    return nil if from_addresses.empty?
+
+    scope = Message.pending
+    scope = scope.where(reply_to_message_id: reply_to_message_id) if reply_to_message_id.present?
+
+    reference_time = echo_sent_at || Time.current
+    scope = scope.where(sent_at: (reference_time - PENDING_ECHO_WINDOW)..(reference_time + PENDING_ECHO_WINDOW))
+
+    sender_alias_ids = Alias.where("LOWER(email) IN (?)", from_addresses).pluck(:id)
+    return nil if sender_alias_ids.empty?
+    scope = scope.where(sender_id: sender_alias_ids)
+
+    candidates = scope.to_a
+    return nil if candidates.empty?
+
+    echo_normalized = normalize_for_body_match(echo_body)
+    return nil if echo_normalized.blank?
+
+    matches = candidates.select do |c|
+      pending_normalized = normalize_for_body_match(c.body)
+      next false if pending_normalized.length < PENDING_ECHO_MIN_BODY
+      echo_normalized.include?(pending_normalized)
+    end
+
+    matches.size == 1 ? matches.first : nil
+  end
+
+  def normalize_for_body_match(text)
+    text.to_s.gsub(/\s+/, " ").strip
+  end
+
+  def extract_from_emails(mail)
+    addrs = mail.from
+    return [] unless addrs
+    addrs = [ addrs ] if addrs.is_a?(String)
+    addrs.compact.map { |a| a.to_s.downcase.strip }.reject(&:blank?)
+  rescue NoMethodError
+    []
   end
 
   def update_default_alias_for_person(alias_record)

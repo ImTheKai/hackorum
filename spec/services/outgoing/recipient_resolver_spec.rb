@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe Outgoing::RecipientResolver do
   let(:list)  { create(:mailing_list, post_address: "real@list.example") }
-  let(:topic) { create(:topic, mailing_lists: [list]) }
+  let(:topic) { create(:topic, mailing_lists: [ list ]) }
 
   context 'in production' do
     before { allow(Rails.env).to receive(:production?).and_return(true) }

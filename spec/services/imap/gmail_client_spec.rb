@@ -55,7 +55,7 @@ RSpec.describe Imap::GmailClient, type: :service do
     end
     yielded = []
     expect(imap_double).to receive(:idle) do |timeout, &blk|
-      blk.call(double('Resp', name: 'EXISTS', data: 1))
+      blk.call(Net::IMAP::UntaggedResponse.new('EXISTS', 1, nil))
     end
     result = client.idle_once(timeout: 1) { |resp| yielded << resp }
     expect(result).to eq(:activity)

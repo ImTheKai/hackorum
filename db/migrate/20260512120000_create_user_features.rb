@@ -5,6 +5,6 @@ class CreateUserFeatures < ActiveRecord::Migration[8.0]
       t.string :feature, null: false
       t.datetime :created_at, null: false
     end
-    add_index :user_features, [:user_id, :feature], unique: true
+    add_index :user_features, [ :user_id, :feature ], unique: true
   end
 end

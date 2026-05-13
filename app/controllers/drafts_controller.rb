@@ -10,11 +10,11 @@ class DraftsController < ApplicationController
     @state = (params[:state].presence_in(%w[all in_progress sent failed]) || "all")
     scope  = current_user.outgoing_drafts
     @drafts = case @state
-              when "in_progress" then scope.where(status: %w[idle sending]).where(last_send_error: nil)
-              when "sent"        then scope.sent
-              when "failed"      then scope.idle.where.not(last_send_error: nil)
-              else                    scope
-              end
+    when "in_progress" then scope.where(status: %w[idle sending]).where(last_send_error: nil)
+    when "sent"        then scope.sent
+    when "failed"      then scope.idle.where.not(last_send_error: nil)
+    else                    scope
+    end
     @drafts = @drafts
                 .includes(:topic, :reply_to_message, :sender_alias, :sent_message)
                 .order(Arel.sql("COALESCE(sent_at, updated_at) DESC"))

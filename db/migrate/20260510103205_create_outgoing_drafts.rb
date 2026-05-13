@@ -13,7 +13,7 @@ class CreateOutgoingDrafts < ActiveRecord::Migration[8.0]
       t.datetime :sending_started_at
       t.timestamps
     end
-    add_index :outgoing_drafts, [:user_id, :reply_to_message_id], unique: true,
+    add_index :outgoing_drafts, [ :user_id, :reply_to_message_id ], unique: true,
               name: "idx_drafts_user_parent_unique"
   end
 end

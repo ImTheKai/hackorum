@@ -3,7 +3,7 @@ class OutgoingDraft < ApplicationRecord
   STATUS_SENDING = "sending"
   STATUS_SENT    = "sent"
 
-  STATUSES = [STATUS_IDLE, STATUS_SENDING, STATUS_SENT].freeze
+  STATUSES = [ STATUS_IDLE, STATUS_SENDING, STATUS_SENT ].freeze
 
   belongs_to :user
   belongs_to :topic
@@ -18,7 +18,7 @@ class OutgoingDraft < ApplicationRecord
   validates :user_id,
             uniqueness: {
               scope: :reply_to_message_id,
-              conditions: -> { where(status: [STATUS_IDLE, STATUS_SENDING]) }
+              conditions: -> { where(status: [ STATUS_IDLE, STATUS_SENDING ]) }
             },
             if: :active?
 

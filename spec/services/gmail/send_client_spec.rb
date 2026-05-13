@@ -14,7 +14,7 @@ RSpec.describe Gmail::SendClient do
 
   it 'returns parsed JSON on 200' do
     stub_response(code: 200, body: '{"id":"abc"}')
-    expect(described_class.send_raw(identity, rfc822)).to eq({"id" => "abc"})
+    expect(described_class.send_raw(identity, rfc822)).to eq({ "id" => "abc" })
   end
 
   it 'raises AuthRevokedError on 401' do

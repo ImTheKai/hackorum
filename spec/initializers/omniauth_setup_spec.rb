@@ -15,7 +15,7 @@ RSpec.describe 'OmniAuth setup proc' do
       OMNIAUTH_SETUP_PROC.call(env_with_query)
       expect(options[:scope]).to       include('gmail.send')
       expect(options[:access_type]).to eq('offline')
-      expect(options[:prompt]).to       eq('consent')
+      expect(options[:prompt]).to eq('consent')
     end
   end
 
@@ -25,7 +25,7 @@ RSpec.describe 'OmniAuth setup proc' do
       OMNIAUTH_SETUP_PROC.call(env_with_query)
       expect(options[:scope]).to       eq('email,profile')
       expect(options[:access_type]).to eq('online')
-      expect(options[:prompt]).to       eq('select_account')
+      expect(options[:prompt]).to eq('select_account')
     end
   end
 end

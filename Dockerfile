@@ -15,7 +15,9 @@ RUN apt-get update -qq && \
 WORKDIR /app
 
 COPY Gemfile Gemfile.lock ./
-RUN bundle install --jobs=4 --retry=3
+RUN BUNDLER_VERSION="$(awk '/^BUNDLED WITH/{getline; gsub(/^ +/, ""); print}' Gemfile.lock)" && \
+    gem install bundler -v "$BUNDLER_VERSION" && \
+    bundle install --jobs=4 --retry=3
 
 COPY . .
 

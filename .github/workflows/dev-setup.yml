@@ -20,7 +20,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Prepare dev env file
-        run: cp .env.development.example .env.development
+        run: |
+          cp .env.development.example .env.development
+          # Dev env requires Active Record encryption keys for OAuth token storage.
+          for key in RAILS_AR_ENCRYPTION_PRIMARY_KEY RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY RAILS_AR_ENCRYPTION_SALT; do
+            value=$(ruby -rsecurerandom -e 'puts SecureRandom.alphanumeric(32)')
+            sed -i "s|^${key}=.*|${key}=${value}|" .env.development
+          done
 
       - name: Start dev stack
         run: make dev-detach

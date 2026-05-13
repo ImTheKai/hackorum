@@ -1,6 +1,6 @@
 module EnvHelper
   def with_env(values)
-    saved = values.keys.to_h { |k| [k, ENV[k]] }
+    saved = values.keys.to_h { |k| [ k, ENV[k] ] }
     values.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
     yield
   ensure

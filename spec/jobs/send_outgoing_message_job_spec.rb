@@ -7,7 +7,7 @@ RSpec.describe SendOutgoingMessageJob do
                           access_token_expires_at: 1.hour.from_now) }
   let(:sender)   { create(:alias, user: user, name: 'Alice', email: 'a@b') }
   let(:list)     { create(:mailing_list, post_address: 'list@example.com') }
-  let(:topic)    { create(:topic, mailing_lists: [list]) }
+  let(:topic)    { create(:topic, mailing_lists: [ list ]) }
   let(:parent)   { create(:message, topic: topic, message_id: '<parent@x>') }
   let(:draft) {
     create(:outgoing_draft,
@@ -29,7 +29,7 @@ RSpec.describe SendOutgoingMessageJob do
   end
 
   it 'creates a pending message and marks the draft sent on success' do
-    allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+    allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
 
     expect {
       described_class.new.perform(draft.id)
@@ -59,7 +59,7 @@ RSpec.describe SendOutgoingMessageJob do
     noname = create(:alias, user: user, email: 'a@b', name: 'Noname', sender_count: 0)
     draft.update_columns(sender_alias_id: noname.id)
     allow(Outgoing::MessageBuilder).to receive(:build).and_return(builder_result)
-    allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+    allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
 
     described_class.new.perform(draft.id)
 

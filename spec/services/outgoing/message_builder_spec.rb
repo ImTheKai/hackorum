@@ -5,10 +5,10 @@ RSpec.describe Outgoing::MessageBuilder do
   let(:identity) { create(:identity, user: user, email: 'a@b', refresh_token: 'r') }
   let(:sender)   { create(:alias, user: user, name: 'Alice', email: 'a@b') }
   let(:list)     { create(:mailing_list, post_address: 'list@example.com') }
-  let(:topic)    { create(:topic, mailing_lists: [list]) }
+  let(:topic)    { create(:topic, mailing_lists: [ list ]) }
   let(:parent) {
     create(:message, topic: topic, message_id: '<parent-id@x>',
-           mailing_lists: [list])
+           mailing_lists: [ list ])
   }
 
   before do
@@ -18,9 +18,9 @@ RSpec.describe Outgoing::MessageBuilder do
 
   def build_draft(overrides = {})
     create(:outgoing_draft,
-           {user: user, topic: topic, reply_to_message: parent,
+           { user: user, topic: topic, reply_to_message: parent,
             sender_alias: sender, identity: identity,
-            subject: 'Re: hello', body: 'hi'}.merge(overrides))
+            subject: 'Re: hello', body: 'hi' }.merge(overrides))
   end
 
   it 'builds RFC822 with proper From, To, Subject, Body' do
@@ -28,7 +28,7 @@ RSpec.describe Outgoing::MessageBuilder do
       result = described_class.build(build_draft)
       mail = Mail.new(result.encoded)
       expect(mail.from).to include('a@b')
-      expect(mail.to).to eq(['test@example.com'])
+      expect(mail.to).to eq([ 'test@example.com' ])
       expect(mail.subject).to eq('Re: hello')
       expect(mail.body.to_s.strip).to eq('hi')
     end
@@ -45,7 +45,7 @@ RSpec.describe Outgoing::MessageBuilder do
   it 'falls back to default outgoing domain when env unset' do
     with_env('HACKORUM_OUTGOING_DOMAIN' => nil) do
       result = described_class.build(build_draft)
-      expect(result.message_id).to end_with('@hackorum.local>')
+      expect(result.message_id).to end_with("@#{Outgoing::MessageBuilder::DEFAULT_DOMAIN}>")
     end
   end
 
@@ -64,7 +64,7 @@ RSpec.describe Outgoing::MessageBuilder do
       result = described_class.build(build_draft)
       mail = Mail.new(result.encoded)
       refs = mail.references
-      refs = [refs] unless refs.is_a?(Array)
+      refs = [ refs ] unless refs.is_a?(Array)
       expect(refs).to include('grand@x', 'parent-id@x')
     end
   end
@@ -75,7 +75,7 @@ RSpec.describe Outgoing::MessageBuilder do
     with_env('HACKORUM_OUTGOING_DOMAIN' => 'hackorum.local') do
       result = described_class.build(build_draft)
       refs = Mail.new(result.encoded).references
-      refs = [refs] unless refs.is_a?(Array)
+      refs = [ refs ] unless refs.is_a?(Array)
       expect(refs).to contain_exactly('parent-id@x')
     end
   end

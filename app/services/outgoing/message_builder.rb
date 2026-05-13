@@ -21,8 +21,8 @@ module Outgoing
         message_id msg_id
         body       draft.body
       end
-      mail.content_type 'text/plain; charset=UTF-8'
-      mail.in_reply_to = draft.reply_to_message.message_id.to_s.gsub(/[<>]/, '')
+      mail.content_type "text/plain; charset=UTF-8"
+      mail.in_reply_to = draft.reply_to_message.message_id.to_s.gsub(/[<>]/, "")
       mail.references  = build_references(draft.reply_to_message)
 
       Result.new(encoded: mail.encoded, message_id: msg_id,
@@ -35,7 +35,7 @@ module Outgoing
       cur   = parent
       while cur && seen.add?(cur.id)
         if cur.message_id.present?
-          chain.unshift(cur.message_id.to_s.gsub(/[<>]/, ''))
+          chain.unshift(cur.message_id.to_s.gsub(/[<>]/, ""))
         end
         cur = cur.reply_to
       end

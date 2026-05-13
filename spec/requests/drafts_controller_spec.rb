@@ -8,7 +8,7 @@ RSpec.describe DraftsController, type: :request do
   }
   let!(:sender) { create(:alias, user: user, email: 'a@b', name: 'Alice') }
   let(:list)    { create(:mailing_list, post_address: 'real@list.example') }
-  let(:topic)   { create(:topic, mailing_lists: [list]) }
+  let(:topic)   { create(:topic, mailing_lists: [ list ]) }
   let(:parent)  { create(:message, topic: topic, subject: 'Hi') }
 
   before { sign_in_as(user) }
@@ -270,7 +270,7 @@ RSpec.describe DraftsController, type: :request do
         subject: "Re: hi", recipient: "to@x")
       allow(OAuth::TokenRefresher).to receive(:call)
       allow(Outgoing::MessageBuilder).to receive(:build).and_return(builder)
-      allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+      allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
 
       post send_now_draft_path(draft)
       draft.reload

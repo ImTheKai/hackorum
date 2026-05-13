@@ -18,6 +18,12 @@ jobs:
           cp deploy/.env.example deploy/.env
           # Override secrets/SSL for CI boot
           ruby -e "require 'securerandom'; puts \"SECRET_KEY_BASE=#{SecureRandom.hex(64)}\"" >> deploy/.env
+          # AR encryption keys — production.rb normally loads these from
+          # credentials, but CI has no RAILS_MASTER_KEY. Inject random values
+          # via env so db:prepare can boot.
+          ruby -e "require 'securerandom'; puts \"RAILS_AR_ENCRYPTION_PRIMARY_KEY=#{SecureRandom.alphanumeric(32)}\"" >> deploy/.env
+          ruby -e "require 'securerandom'; puts \"RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY=#{SecureRandom.alphanumeric(32)}\"" >> deploy/.env
+          ruby -e "require 'securerandom'; puts \"RAILS_AR_ENCRYPTION_SALT=#{SecureRandom.alphanumeric(32)}\"" >> deploy/.env
           echo "FORCE_SSL=false" >> deploy/.env
           echo "APP_HOST=localhost" >> deploy/.env
           # Copy Postgres config template and shrink memory settings

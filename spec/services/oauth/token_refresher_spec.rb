@@ -1,6 +1,11 @@
 require 'rails_helper'
 
 RSpec.describe OAuth::TokenRefresher do
+  before do
+    ENV['GOOGLE_CLIENT_ID']     ||= 'test-client-id'
+    ENV['GOOGLE_CLIENT_SECRET'] ||= 'test-client-secret'
+  end
+
   let(:identity) {
     create(:identity, refresh_token: 'r1', access_token: nil,
                       access_token_expires_at: nil)

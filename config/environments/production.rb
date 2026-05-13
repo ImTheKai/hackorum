@@ -98,6 +98,20 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
+  # Active Record encryption keys. Default to credentials (decrypted with
+  # RAILS_MASTER_KEY); allow RAILS_AR_ENCRYPTION_* env overrides so a smoke-test
+  # boot (e.g. prod-boot CI) can run without baking a master key into the image.
+  ar_enc_env = {
+    primary_key:         ENV["RAILS_AR_ENCRYPTION_PRIMARY_KEY"],
+    deterministic_key:   ENV["RAILS_AR_ENCRYPTION_DETERMINISTIC_KEY"],
+    key_derivation_salt: ENV["RAILS_AR_ENCRYPTION_SALT"]
+  }
+  if ar_enc_env.values.all?(&:present?)
+    config.active_record.encryption.primary_key            = ar_enc_env[:primary_key]
+    config.active_record.encryption.deterministic_key      = ar_enc_env[:deterministic_key]
+    config.active_record.encryption.key_derivation_salt    = ar_enc_env[:key_derivation_salt]
+  end
+
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [
   #   "example.com",     # Allow requests from example.com

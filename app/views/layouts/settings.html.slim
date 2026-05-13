@@ -21,6 +21,9 @@
       = link_to settings_import_path, class: settings_nav_link_class(:import) do
         i.fas.fa-download
         span Import
+      = link_to drafts_path, class: settings_nav_link_class(:my_emails) do
+        i.fas.fa-paper-plane
+        span My emails
       .settings-nav-divider
       = link_to settings_deletion_path, class: settings_nav_link_class(:deletion, danger: true) do
         i.fas.fa-exclamation-triangle

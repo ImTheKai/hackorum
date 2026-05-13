@@ -189,6 +189,35 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).not_to include(%(data-reply-composer-draft-id-value="#{sent_draft.id}"))
       end
     end
+
+    context "with a signed-in user whose send is unauthorized but who has an active draft" do
+      let!(:user) { create(:user, password: "secret", password_confirmation: "secret") }
+      let!(:user_alias) { attach_verified_alias(user, email: "composer@example.com") }
+      # refresh_token nil + send_revoked_at set => NOT send_authorized => can_send_email? false
+      let!(:identity) {
+        create(:identity, user: user, email: "composer@example.com",
+               refresh_token: nil, send_revoked_at: 1.minute.ago)
+      }
+      let!(:active_draft) {
+        create(:outgoing_draft,
+               user: user, topic: topic, reply_to_message: root_message,
+               identity: identity, sender_alias: user_alias,
+               status: "idle", last_send_error: "Authorization revoked: prior failure")
+      }
+
+      before { sign_in(email: "composer@example.com") }
+
+      it "still renders the composer for the active draft" do
+        get topic_path(topic)
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(%(data-reply-composer-draft-id-value="#{active_draft.id}"))
+      end
+
+      it "does not render a new-reply button on a message that has no draft" do
+        get topic_path(topic)
+        expect(response.body).not_to include(%(name="reply_to_message_id" value="#{reply_message.id}"))
+      end
+    end
   end
 
   describe "GET /attachments/:id" do

@@ -25,7 +25,8 @@ module Gmail
 
       case res.code.to_i
       when 200      then JSON.parse(res.body)
-      when 401, 403 then raise AuthRevokedError, res.body
+      when 401      then raise AuthRevokedError, res.body
+      when 403      then raise ScopeError,       res.body
       when 400..499 then raise PermanentError,   res.body
       else               raise TransientError,   res.body
       end

@@ -2,6 +2,9 @@ class DraftsController < ApplicationController
   before_action :require_authentication
   before_action :set_draft, only: [ :show, :update, :destroy, :confirm, :send_now, :edit ]
   before_action :reject_sent_drafts, only: [ :update, :destroy, :edit, :confirm, :send_now ]
+  layout :resolve_layout
+
+  helper_method :active_settings_section
 
   def index
     @state = (params[:state].presence_in(%w[all in_progress sent failed]) || "all")
@@ -134,5 +137,13 @@ class DraftsController < ApplicationController
   def build_default_subject(parent)
     base = parent.subject.to_s.sub(/\A(re|aw|fwd):\s*/i, "")
     "Re: #{base}"
+  end
+
+  def active_settings_section
+    :my_emails
+  end
+
+  def resolve_layout
+    %w[index show].include?(action_name) ? "settings" : "application"
   end
 end

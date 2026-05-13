@@ -23,10 +23,15 @@ RSpec.describe Gmail::SendClient do
       .to raise_error(Gmail::AuthRevokedError)
   end
 
-  it 'raises AuthRevokedError on 403' do
-    stub_response(code: 403, body: 'forbidden')
+  it 'raises ScopeError on 403 (insufficient scope, not auth revocation)' do
+    stub_response(code: 403, body: 'Request had insufficient authentication scopes.')
     expect { described_class.send_raw(identity, rfc822) }
-      .to raise_error(Gmail::AuthRevokedError)
+      .to raise_error(Gmail::ScopeError)
+  end
+
+  it 'ScopeError is a PermanentError but not an AuthRevokedError' do
+    expect(Gmail::ScopeError.ancestors).to include(Gmail::PermanentError)
+    expect(Gmail::ScopeError.ancestors).not_to include(Gmail::AuthRevokedError)
   end
 
   it 'raises PermanentError on other 4xx' do

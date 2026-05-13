@@ -84,6 +84,19 @@ RSpec.describe SendOutgoingMessageJob do
     expect(draft.last_send_error).to include('unauthorized')
   end
 
+  it 'does NOT revoke identity tokens on ScopeError (insufficient scope)' do
+    allow(Gmail::SendClient).to receive(:send_raw)
+      .and_raise(Gmail::ScopeError, 'insufficient authentication scopes')
+    described_class.new.perform(draft.id)
+    identity.reload
+    expect(identity.send_revoked_at).to be_nil
+    expect(identity.refresh_token).to eq('r')
+    expect(identity.access_token).to eq('at')
+    draft.reload
+    expect(draft).to be_idle
+    expect(draft.last_send_error).to include('insufficient authentication scopes')
+  end
+
   it 'lets TransientError propagate so ActiveJob can retry' do
     allow(Gmail::SendClient).to receive(:send_raw).and_raise(Gmail::TransientError, 'down')
     expect {

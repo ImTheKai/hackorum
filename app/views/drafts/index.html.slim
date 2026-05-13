@@ -1,8 +1,7 @@
 - content_for :title, "My emails"
 
-.drafts-page
-  .drafts-header
-    h2 My emails
+.settings-page
+  h1 My emails
 
   nav.tabs.draft-state-tabs
     - %w[all in_progress sent failed].each do |state|
@@ -11,9 +10,9 @@
                 class: ("tab is-active" if @state == state) || "tab"
 
   - if @drafts.empty?
-    p No emails yet.
+    p.settings-hint No emails yet.
   - else
-    table.drafts-list
+    table.email-table
       thead
         tr
           th State
@@ -46,12 +45,12 @@
             td
               - ts = draft.sent_at || draft.updated_at
               time datetime=ts.iso8601 title=absolute_time_display(ts) = smart_time_display(ts)
-            td.actions
+            td
               - if draft.sent?
-                = link_to "View", draft_path(draft), class: "button-link"
+                = link_to "View", draft_path(draft), class: "button-secondary"
               - elsif draft.failed?
                 = link_to "Retry", topic_path(draft.topic, anchor: "message-#{draft.reply_to_message_id}"),
-                          class: "button-link"
+                          class: "button-secondary"
               - elsif draft.idle?
                 = link_to "Resume", topic_path(draft.topic, anchor: "message-#{draft.reply_to_message_id}"),
-                          class: "button-link"
+                          class: "button-secondary"

@@ -52,26 +52,26 @@
             = mailing_list_badges_html(msg_lists)
       - existing_draft = (@drafts_by_parent && @drafts_by_parent[message.id])
       - can_reply = user_signed_in? && current_user.can_send_email?
+      - show_composer = user_signed_in? && (existing_draft.present? || can_reply)
       .message-actions
         - if message.message_id.present?
           = link_to "https://postgr.es/m/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "View on postgr.es", "aria-label": "View on postgr.es" do
             i.fa-solid.fa-building-columns
           = link_to "https://www.postgresql.org/message-id/resend/#{ERB::Util.url_encode(message.message_id)}", target: "_blank", rel: "noopener", data: { turbo: false }, title: "Resend from postgresql.org archive", "aria-label": "Resend from postgresql.org archive" do
             i.fa-solid.fa-share-from-square
-        - if can_reply
-          - if existing_draft&.sending?
-            span.message-action.is-disabled title="Sending…" aria-label="Sending"
-              i.fa-solid.fa-spinner.fa-spin
-          - elsif existing_draft
-            = link_to "##{message_dom_id(message)}-composer", class: "message-action is-active", title: "Continue draft", "aria-label": "Continue draft" do
-              i.fa-solid.fa-pen-to-square
-          - else
-            = button_to drafts_path, params: { reply_to_message_id: message.id },
-                        method: :post,
-                        form: { data: { turbo_frame: "draft-#{message.id}" } },
-                        class: "message-action message-action-form",
-                        title: "Reply", "aria-label": "Reply" do
-              i.fa-solid.fa-reply
+        - if existing_draft&.sending?
+          span.message-action.is-disabled title="Sending…" aria-label="Sending"
+            i.fa-solid.fa-spinner.fa-spin
+        - elsif existing_draft
+          = link_to "##{message_dom_id(message)}-composer", class: "message-action is-active", title: "Continue draft", "aria-label": "Continue draft" do
+            i.fa-solid.fa-pen-to-square
+        - elsif can_reply
+          = button_to drafts_path, params: { reply_to_message_id: message.id },
+                      method: :post,
+                      form: { data: { turbo_frame: "draft-#{message.id}" } },
+                      class: "message-action message-action-form",
+                      title: "Reply", "aria-label": "Reply" do
+            i.fa-solid.fa-reply
       button.message-collapse-toggle type="button" data-action="click->message-collapse#toggle" aria-label="Toggle message"
         i.fa-solid class=(is_collapsed ? "fa-chevron-down" : "fa-chevron-up")
   .message-body-wrapper
@@ -90,7 +90,7 @@
       - notes_for_message = @notes_by_message&.[](message.id) || []
       = render "notes/note_stack", topic: @topic, message: message, notes: notes_for_message
 
-  - if can_reply
+  - if show_composer
     a name="#{message_dom_id(message)}-composer"
     - if existing_draft&.sending?
       .composer-card.composer-sending data-controller="composer-poll"

@@ -1,6 +1,6 @@
 - content_for :title, "Sent: #{@draft.subject}"
 
-.drafts-page
+.settings-page
   - if @draft.sent?
     .sent-header
       h2 = @draft.subject

@@ -6,7 +6,7 @@ module Outgoing
   class MessageBuilder
     Result = Struct.new(:encoded, :message_id, :subject, :recipient,
                         keyword_init: true)
-    DEFAULT_DOMAIN = "hackorum.local"
+    DEFAULT_DOMAIN = "hackorum.dev"
 
     def self.build(draft)
       recipient = RecipientResolver.for(draft.topic)

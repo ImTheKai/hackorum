@@ -75,8 +75,11 @@ Access:
 
 ## Environment variables (deploy/.env)
 - `SECRET_KEY_BASE` (required)
+- `RAILS_MASTER_KEY` (required — see [Credentials & encryption](#credentials--encryption))
+- `APP_HOST` (required — host used by Caddy and mailer URLs)
 - `DATABASE_URL` (defaults to local Postgres via env interpolation)
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (for the db container)
+- `HACKORUM_DATABASE_PASSWORD` (app DB password)
 - Umami:
   - `UMAMI_DB` (database name for init script; default `umami`)
   - `UMAMI_DB_USER` (dedicated Umami database user)
@@ -89,11 +92,68 @@ Access:
 - IMAP:
   - `IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_MAILBOX_LABEL`
   - Optional: `IMAP_HOST`, `IMAP_PORT`, `IMAP_SSL`
-- Gmail OAuth (if enabled in the app):
+- Gmail OAuth (Google sign-in + per-user "send email"):
   - `GOOGLE_CLIENT_ID`
   - `GOOGLE_CLIENT_SECRET`
   - `GOOGLE_REDIRECT_URI` (e.g., https://your-domain/auth/google_oauth2/callback)
+  - See [Gmail send authorization](#gmail-send-authorization) for required scope and
+    Google Cloud Console publishing status.
+- Transactional mail (Mailgun SMTP — used for password reset, email verification, etc.;
+  user-to-thread replies go out via Gmail API, not SMTP):
+  - `MAIL_DOMAIN`, `MAIL_FROM`
+  - `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_DOMAIN`, `SMTP_USERNAME`, `SMTP_PASSWORD`
+- Puma / job runner:
+  - `WEB_CONCURRENCY` (default `3`), `RAILS_MAX_THREADS` (default `5`)
+  - `SOLID_QUEUE_IN_PUMA=1` is set in `docker-compose.yml` and is required —
+    `SendOutgoingMessageJob` and the every-5-min `ResetStaleSendingDraftsJob`
+    run inside the `web` container's Puma process. Do not disable.
 - Rails runtime: `RAILS_ENV=production`, `RAILS_LOG_TO_STDOUT=1`, `RAILS_SERVE_STATIC_FILES=1`
+
+## Credentials & encryption
+The app stores per-user Gmail OAuth tokens (`Identity#refresh_token`,
+`Identity#access_token`) using Active Record Encryption. The encryption keys
+live in `config/credentials.yml.enc` and are decrypted at boot using
+`RAILS_MASTER_KEY`.
+
+The master key MUST NOT live inside the Docker image:
+- `config/master.key` is in `.gitignore` (so it isn't committed) and in
+  `.dockerignore` (so a local build cannot bake it into the image).
+- On the deploy host, set `RAILS_MASTER_KEY` in `deploy/.env` instead. The
+  `web` and `imap_worker` services read it from `.env`.
+
+First-time setup (run once, from a checkout with the existing master key):
+```bash
+bin/rails db:encryption:init
+# prints three keys under "active_record_encryption:" — copy them
+EDITOR=vi bin/rails credentials:edit
+# paste the three keys, save, and commit the resulting credentials.yml.enc
+```
+
+Then on each deploy host, put the master key in `deploy/.env`:
+```
+RAILS_MASTER_KEY=<contents of config/master.key>
+```
+
+Losing `RAILS_MASTER_KEY` makes all stored OAuth tokens permanently
+unreadable — the send job will mark the affected drafts as failed with
+"Stored token could not be decrypted" and revoke the identity's send
+authorization, forcing each user to re-consent. Back up the master key
+out-of-band (password manager / secrets vault), not in this repo.
+
+## Gmail send authorization
+Reply-sending uses the Gmail API per signed-in user, not SMTP. Each user goes
+through a second OAuth consent (offline access, `gmail.send` scope) before they
+can send. In the Google Cloud Console for the OAuth client referenced by
+`GOOGLE_CLIENT_ID`:
+- Add `https://www.googleapis.com/auth/gmail.send` to the configured scopes
+  (in addition to the default `email`/`profile` used for sign-in).
+- Ensure the OAuth consent screen is set to **In production** (verified).
+  While the app is still in **Testing**, refresh tokens for the `gmail.send`
+  scope expire after 7 days, after which queued sends fail with
+  `Gmail::AuthRevokedError` and the user must re-authorize.
+- The send feature is gated by a DB-backed feature flag managed under
+  `/admin/features` — no env var is required to enable it, but it is off by
+  default for new users.
 
 ## Backups (monthly SQL dumps)
 The database dumps are split into public and private data, written to a Docker volume mounted at `/dumps` inside the Postgres container. Each month overwrites the same two files:

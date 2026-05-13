@@ -47,6 +47,9 @@ services:
       # Run Solid Queue supervisor inside Puma so background jobs (emails, etc.) get processed.
       SOLID_QUEUE_IN_PUMA: "1"
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      # Required: decrypts credentials.yml.enc, which holds the Active Record
+      # encryption keys used for Identity OAuth tokens (Gmail send feature).
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
       # Mail configuration
       APP_HOST: ${APP_HOST}
       MAIL_DOMAIN: ${MAIL_DOMAIN}
@@ -97,6 +100,9 @@ services:
       PGUSER: ${POSTGRES_USER:-postgres}
       PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
       PGDATABASE: ${POSTGRES_DB:-hackorum}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      # IMAP ingest reads Identity rows whose tokens are AR-encrypted.
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
     depends_on:
       db:
         condition: service_healthy

@@ -22,3 +22,7 @@ tmp/sockets
 tmp/storage
 *.swp
 *.swo
+
+# Secrets must never land in the image; provided via RAILS_MASTER_KEY at runtime.
+config/master.key
+config/credentials/*.key

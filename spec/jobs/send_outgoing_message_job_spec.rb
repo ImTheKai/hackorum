@@ -55,6 +55,20 @@ RSpec.describe SendOutgoingMessageJob do
     expect(draft.last_send_error).to be_nil
   end
 
+  it 'corrects a Noname sender_alias to the named one before send' do
+    noname = create(:alias, user: user, email: 'a@b', name: 'Noname', sender_count: 0)
+    draft.update_columns(sender_alias_id: noname.id)
+    allow(Outgoing::MessageBuilder).to receive(:build).and_return(builder_result)
+    allow(Gmail::SendClient).to receive(:send_raw).and_return({"id" => "g"})
+
+    described_class.new.perform(draft.id)
+
+    draft.reload
+    expect(draft.sender_alias_id).to eq(sender.id)
+    msg = Message.where(message_id: '<m@x>').first
+    expect(msg.sender_id).to eq(sender.id)
+  end
+
   it 'no-ops if the draft is already sent' do
     draft.update_columns(status: 'sent', sent_at: 1.minute.ago)
     expect(Gmail::SendClient).not_to receive(:send_raw)

@@ -49,6 +49,17 @@ RSpec.describe DraftsController, type: :request do
       post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    it 'picks the named alias over a Noname alias for the same identity email' do
+      create(:alias, user: user, email: 'a@b', name: 'Noname', sender_count: 50)
+
+      post drafts_path, params: { reply_to_message_id: parent.id }, as: :json
+      expect(response).to have_http_status(:ok)
+
+      draft = OutgoingDraft.find(JSON.parse(response.body)['id'])
+      expect(draft.sender_alias).to eq(sender)
+      expect(draft.sender_alias.name).to eq('Alice')
+    end
   end
 
   describe 'POST /drafts after a sent draft to the same parent' do

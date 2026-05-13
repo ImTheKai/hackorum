@@ -29,7 +29,7 @@ class DraftsController < ApplicationController
     identity = current_user.identities.send_authorized.first
     return head :forbidden if identity.nil?
 
-    sender = current_user.aliases.find_by(email: identity.email)
+    sender = current_user.sender_alias_for(identity.email)
     return head :unprocessable_entity if sender.nil?
 
     draft = current_user.outgoing_drafts

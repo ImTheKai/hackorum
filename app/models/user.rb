@@ -26,6 +26,20 @@ class User < ApplicationRecord
     person&.default_alias
   end
 
+  def sender_alias_for(email)
+    normalized = email.to_s.downcase.strip
+    primary    = primary_alias
+    if primary && primary.user_id == id && primary.email.to_s.downcase.strip == normalized
+      return primary
+    end
+
+    aliases.by_email(email)
+           .order(Arel.sql("CASE WHEN name = 'Noname' THEN 1 ELSE 0 END"))
+           .order(sender_count: :desc)
+           .order(:created_at)
+           .first
+  end
+
   def can_send_email?
     identities.send_authorized.exists?
   end

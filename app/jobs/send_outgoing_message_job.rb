@@ -10,6 +10,13 @@ class SendOutgoingMessageJob < ApplicationJob
     ActiveSupport::Notifications.instrument("outgoing.send.attempt", draft_id: draft.id)
 
     OAuth::TokenRefresher.call(draft.identity)
+
+    correct_sender = draft.user.sender_alias_for(draft.sender_alias.email)
+    if correct_sender && correct_sender.id != draft.sender_alias_id
+      draft.update_columns(sender_alias_id: correct_sender.id, updated_at: Time.current)
+      draft.sender_alias = correct_sender
+    end
+
     rfc = Outgoing::MessageBuilder.build(draft)
     Gmail::SendClient.send_raw(draft.identity, rfc.encoded)
 

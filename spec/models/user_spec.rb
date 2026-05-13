@@ -109,6 +109,80 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#sender_alias_for" do
+    let(:user) { create(:user) }
+
+    it "prefers a named alias over a Noname alias for the same email" do
+      noname = create(:alias, user: user, email: "a@b", name: "Noname", sender_count: 10)
+      named  = create(:alias, user: user, email: "a@b", name: "Alice", sender_count: 1)
+      user.person.recalculate_default_alias!
+      user.person.reload
+
+      expect(user.sender_alias_for("a@b")).to eq(named)
+      expect(user.sender_alias_for("a@b")).not_to eq(noname)
+    end
+
+    it "uses the user's primary alias when its email matches, even over a higher sender_count alias" do
+      _other = create(:alias, user: user, email: "a@b", name: "Aliased", sender_count: 999)
+      primary = create(:alias, user: user, email: "a@b", name: "Alice")
+      user.person.update!(default_alias: primary)
+
+      expect(user.sender_alias_for("a@b")).to eq(primary)
+    end
+
+    it "ignores the primary alias when its email does not match" do
+      primary = create(:alias, user: user, email: "primary@x", name: "Alice")
+      user.person.update!(default_alias: primary)
+      other = create(:alias, user: user, email: "other@x", name: "Other")
+
+      expect(user.sender_alias_for("other@x")).to eq(other)
+    end
+
+    it "ignores the primary alias when it does not belong to this user" do
+      foreign_user = create(:user)
+      foreign_primary = create(:alias, user: foreign_user, email: "a@b", name: "Foreign", person: user.person)
+      user.person.update!(default_alias: foreign_primary)
+      mine = create(:alias, user: user, email: "a@b", name: "Mine")
+
+      expect(user.sender_alias_for("a@b")).to eq(mine)
+    end
+
+    it "prefers higher sender_count when no primary alias matches the email" do
+      elsewhere = create(:alias, user: user, email: "primary@x", name: "Primary")
+      user.person.update!(default_alias: elsewhere)
+      _low  = create(:alias, user: user, email: "a@b", name: "Alice",  sender_count: 1)
+      high  = create(:alias, user: user, email: "a@b", name: "Alicia", sender_count: 99)
+      user.person.reload
+
+      expect(user.sender_alias_for("a@b")).to eq(high)
+    end
+
+    it "matches case- and whitespace-insensitively on email" do
+      named = create(:alias, user: user, email: "alice@example.com", name: "Alice")
+
+      expect(user.sender_alias_for("  Alice@Example.COM  ")).to eq(named)
+    end
+
+    it "returns the Noname alias when no other alias exists for the email" do
+      noname = create(:alias, user: user, email: "a@b", name: "Noname")
+
+      expect(user.sender_alias_for("a@b")).to eq(noname)
+    end
+
+    it "returns nil when no alias matches the email" do
+      create(:alias, user: user, email: "a@b", name: "Alice")
+
+      expect(user.sender_alias_for("missing@x")).to be_nil
+    end
+
+    it "ignores aliases belonging to other users" do
+      other = create(:user)
+      create(:alias, user: other, email: "a@b", name: "OtherAlice")
+
+      expect(user.sender_alias_for("a@b")).to be_nil
+    end
+  end
+
   describe "#has_feature?" do
     it "returns true for admin regardless of enrollment" do
       admin = create(:user, admin: true)

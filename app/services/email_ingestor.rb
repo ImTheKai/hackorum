@@ -163,20 +163,12 @@ class EmailIngestor
       next if a[:content_type].decoded.match(/^application\/x-pkcs7-signature/)
       next if a[:content_type].decoded.match(/^text\/x-vcard/)
 
-      attachment = Attachment.create!(
+      Attachment.create!(
         message: msg,
         file_name: a.filename,
         content_type: a[:content_type].decoded,
         body: Base64.encode64(a.decoded)
       )
-
-      if attachment.patch?
-        begin
-          PatchParsingService.new(attachment).parse!
-        rescue => e
-          Rails.logger.warn("Patch parsing error for #{attachment.id}: #{e.message}") if defined?(Rails)
-        end
-      end
     end
   end
 

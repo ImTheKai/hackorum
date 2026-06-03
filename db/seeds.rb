@@ -17,7 +17,6 @@ ApplicationRecord.transaction do
   MessageMailingList.delete_all
   MailingList.delete_all
   Mention.delete_all
-  PatchFile.delete_all
   Attachment.delete_all
   MessageReadRange.delete_all
   ThreadAwareness.delete_all
@@ -236,12 +235,6 @@ patch_attachment = Attachment.create!(
   body: Base64.encode64(patch_content),
   created_at: base_time,
   updated_at: base_time
-)
-
-PatchFile.create!(
-  attachment: patch_attachment,
-  filename: "src/backend/commands/vacuum.c",
-  status: "modified"
 )
 
 msg2 = create_message(
@@ -661,7 +654,7 @@ long_messages.each_with_index do |msg, idx|
      }
   PATCH
 
-  att = Attachment.create!(
+  Attachment.create!(
     message: msg,
     file_name: "v#{version}-0001-replication-backpressure.patch",
     content_type: "text/x-patch",
@@ -669,7 +662,6 @@ long_messages.each_with_index do |msg, idx|
     created_at: msg.created_at,
     updated_at: msg.created_at
   )
-  PatchFile.create!(attachment: att, filename: "src/backend/replication/walsender.c", status: "modified")
 
   next unless version > 3
   config_patch = <<~PATCH
@@ -694,7 +686,7 @@ long_messages.each_with_index do |msg, idx|
      };
   PATCH
 
-  att2 = Attachment.create!(
+  Attachment.create!(
     message: msg,
     file_name: "v#{version}-0002-wal-sender-timeout-guc.patch",
     content_type: "text/x-patch",
@@ -702,7 +694,6 @@ long_messages.each_with_index do |msg, idx|
     created_at: msg.created_at,
     updated_at: msg.created_at
   )
-  PatchFile.create!(attachment: att2, filename: "src/backend/utils/misc/guc.c", status: "modified")
 end
 
 # add explicit branching replies to a single message

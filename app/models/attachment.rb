@@ -1,6 +1,5 @@
 class Attachment < ApplicationRecord
   belongs_to :message
-  has_many :patch_files, dependent: :destroy
 
   after_create :mark_topic_has_attachments
   after_destroy :update_topic_has_attachments

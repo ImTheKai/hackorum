@@ -63,7 +63,6 @@ class ImapIdleRunner
           last_ingested_count: metrics[:ingested_count],
           last_duplicate_count: metrics[:duplicate_count],
           last_attachment_count: metrics[:attachments_count],
-          last_patch_files_count: metrics[:patch_files_count],
           last_backlog_count: metrics[:backlog_count],
           consecutive_error_count: 0,
           backoff_seconds: 0
@@ -119,25 +118,23 @@ class ImapIdleRunner
       @client.uids_after(state.last_uid.to_i)
     end
     fetched = uids&.size || 0
-    return { fetched_count: 0, ingested_count: 0, duplicate_count: 0, attachments_count: 0, patch_files_count: 0, backlog_count: 0 } if fetched == 0
+    return { fetched_count: 0, ingested_count: 0, duplicate_count: 0, attachments_count: 0, backlog_count: 0 } if fetched == 0
 
     ingested = 0
     duplicates = 0
     attachments = 0
-    patch_files = 0
 
     uids.sort.each do |uid|
       result = process_uid(uid)
       if result[:ingested]
         ingested += 1
         attachments += result[:attachments]
-        patch_files += result[:patch_files]
       else
         duplicates += 1
       end
     end
 
-    { fetched_count: fetched, ingested_count: ingested, duplicate_count: duplicates, attachments_count: attachments, patch_files_count: patch_files, backlog_count: fetched }
+    { fetched_count: fetched, ingested_count: ingested, duplicate_count: duplicates, attachments_count: attachments, backlog_count: fetched }
   end
 
   def process_uid(uid)
@@ -153,7 +150,7 @@ class ImapIdleRunner
                to: Array(mail.to).join(", "), cc: Array(mail.cc).join(", "),
                subject: mail.subject, message: "Could not resolve mailing list from To/CC headers")
       state.update!(last_uid: uid, last_checked_at: Time.now)
-      return { ingested: false, attachments: 0, patch_files: 0 }
+      return { ingested: false, attachments: 0 }
     end
 
     msg = nil
@@ -168,12 +165,12 @@ class ImapIdleRunner
 
     @client.mark_seen(uid)
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: nil)
-    log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: msg.nil?, attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0))
-    { ingested: !msg.nil?, attachments: (msg ? msg.attachments.count : 0), patch_files: (msg ? msg.attachments.joins(:patch_files).count : 0) }
+    log_info(event: "ingest", uid: uid, message_id: msg&.message_id, duplicate: msg.nil?, attachments: (msg ? msg.attachments.count : 0))
+    { ingested: !msg.nil?, attachments: (msg ? msg.attachments.count : 0) }
   rescue => e
     log_error(event: "ingest_error", uid: uid, error_class: e.class.to_s, message: e.message)
     state.update!(last_uid: uid, last_checked_at: Time.now, last_error: short_error(e))
-    { ingested: false, attachments: 0, patch_files: 0 }
+    { ingested: false, attachments: 0 }
   end
 
   def resolve_mailing_lists_from_mail(mail)

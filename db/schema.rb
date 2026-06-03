@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_03_174419) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -210,7 +210,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
     t.integer "last_ingested_count"
     t.integer "last_duplicate_count"
     t.integer "last_attachment_count"
-    t.integer "last_patch_files_count"
     t.integer "last_backlog_count"
     t.integer "consecutive_error_count", default: 0, null: false
     t.string "last_error_class"
@@ -397,19 +396,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
     t.datetime "created_at", null: false
     t.index ["controller", "action"], name: "index_page_load_stats_on_controller_and_action"
     t.index ["created_at"], name: "index_page_load_stats_on_created_at"
-  end
-
-  create_table "patch_files", force: :cascade do |t|
-    t.bigint "attachment_id", null: false
-    t.string "filename", null: false
-    t.string "status"
-    t.integer "line_changes"
-    t.string "old_filename"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["attachment_id", "filename"], name: "index_patch_files_on_attachment_id_and_filename", unique: true
-    t.index ["attachment_id"], name: "index_patch_files_on_attachment_id"
-    t.index ["filename"], name: "index_patch_files_on_filename"
   end
 
   create_table "people", force: :cascade do |t|
@@ -825,7 +811,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
   add_foreign_key "outgoing_drafts", "messages", column: "sent_message_id"
   add_foreign_key "outgoing_drafts", "topics"
   add_foreign_key "outgoing_drafts", "users"
-  add_foreign_key "patch_files", "attachments"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "saved_search_preferences", "saved_searches"
   add_foreign_key "team_members", "teams"

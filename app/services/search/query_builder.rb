@@ -708,12 +708,8 @@ module Search
       # Start with attachments joined to messages
       base = Attachment.joins(:message)
 
-      # For patches, restrict attachments to patch-submission candidates: extension
-      # is .patch/.diff/.diffs, optionally followed by .gz/.bz2/.txt; filename
-      # must not contain nocfbot/no_cfbot.
       if has_type == "patch"
-        base = base.where("attachments.file_name ~* ?", '\.(patch|diff|diffs)(\.gz|\.bz2|\.txt)?$')
-                   .where.not("attachments.file_name ~* ?", 'no_?cfbot')
+        base = base.where(messages: { is_patch_submission: true })
       end
 
       # Extract conditions

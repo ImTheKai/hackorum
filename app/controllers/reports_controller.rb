@@ -201,31 +201,31 @@ class ReportsController < ApplicationController
 
   def ranking_sent_first_patch
     scope = Message.where(created_at: @period_range)
-      .joins(:attachments)
-      .joins("INNER JOIN (SELECT m.topic_id, MIN(m.id) as first_patch_id FROM messages m INNER JOIN attachments a ON a.message_id = m.id GROUP BY m.topic_id) first_patches ON messages.id = first_patches.first_patch_id")
+      .where(is_patch_submission: true)
+      .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_patch_id FROM messages WHERE is_patch_submission = true GROUP BY topic_id) first_patches ON messages.id = first_patches.first_patch_id")
     scope = apply_contributor_filter(scope, :sender_person_id)
 
     person_ids_with_counts = scope
       .group(:sender_person_id)
-      .order(Arel.sql("COUNT(DISTINCT messages.id) DESC"))
+      .order(Arel.sql("COUNT(*) DESC"))
       .limit(RANKING_LIMIT)
-      .pluck(:sender_person_id, Arel.sql("COUNT(DISTINCT messages.id)"))
+      .pluck(:sender_person_id, Arel.sql("COUNT(*)"))
 
     build_ranking_entries(person_ids_with_counts)
   end
 
   def ranking_sent_followup_patch
     scope = Message.where(created_at: @period_range)
-      .joins(:attachments)
-      .joins("INNER JOIN (SELECT m.topic_id, MIN(m.id) as first_patch_id FROM messages m INNER JOIN attachments a ON a.message_id = m.id GROUP BY m.topic_id) first_patches ON messages.topic_id = first_patches.topic_id")
+      .where(is_patch_submission: true)
+      .joins("INNER JOIN (SELECT topic_id, MIN(id) as first_patch_id FROM messages WHERE is_patch_submission = true GROUP BY topic_id) first_patches ON messages.topic_id = first_patches.topic_id")
       .where("messages.id != first_patches.first_patch_id")
     scope = apply_contributor_filter(scope, :sender_person_id)
 
     person_ids_with_counts = scope
       .group(:sender_person_id)
-      .order(Arel.sql("COUNT(DISTINCT messages.id) DESC"))
+      .order(Arel.sql("COUNT(*) DESC"))
       .limit(RANKING_LIMIT)
-      .pluck(:sender_person_id, Arel.sql("COUNT(DISTINCT messages.id)"))
+      .pluck(:sender_person_id, Arel.sql("COUNT(*)"))
 
     build_ranking_entries(person_ids_with_counts)
   end

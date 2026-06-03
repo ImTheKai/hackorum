@@ -44,14 +44,14 @@ module ProfileActivity
     return [] if ids.blank?
 
     scope ||= Message.where(sender_person_id: ids)
-    messages = scope.includes(:topic, :attachments, :sender, sender_person: :default_alias)
+    messages = scope.includes(:topic, :sender, sender_person: :default_alias)
                     .order(created_at: :desc)
 
     return [] if messages.empty?
 
     topic_ids = messages.map(&:topic_id).uniq
     first_message_per_topic = Message.where(topic_id: topic_ids).group(:topic_id).minimum(:id)
-    first_patch_per_topic = Message.joins(:attachments).where(topic_id: topic_ids).group(:topic_id).minimum(:id)
+    first_patch_per_topic = Message.where(topic_id: topic_ids, is_patch_submission: true).group(:topic_id).minimum(:id)
     own_topic_ids = Topic.where(id: topic_ids, creator_person_id: ids).pluck(:id).to_set
 
     filter_symbols = filters&.map(&:to_sym)&.to_set
@@ -88,13 +88,13 @@ module ProfileActivity
     return empty_activity_summary if ids.blank?
 
     scope ||= Message.where(sender_person_id: ids)
-    messages = scope.includes(:topic, :attachments)
+    messages = scope.includes(:topic)
 
     return empty_activity_summary if messages.empty?
 
     topic_ids = messages.map(&:topic_id).uniq
     first_message_per_topic = Message.where(topic_id: topic_ids).group(:topic_id).minimum(:id)
-    first_patch_per_topic = Message.joins(:attachments).where(topic_id: topic_ids).group(:topic_id).minimum(:id)
+    first_patch_per_topic = Message.where(topic_id: topic_ids, is_patch_submission: true).group(:topic_id).minimum(:id)
     own_topic_ids = Topic.where(id: topic_ids, creator_person_id: ids).pluck(:id).to_set
 
     filter_symbols = filters&.map(&:to_sym)&.to_set
@@ -151,7 +151,7 @@ module ProfileActivity
   def compute_activity_types(message:, topic:, first_message_per_topic:, first_patch_per_topic:, own_topic_ids:)
     is_first_message = first_message_per_topic[topic.id] == message.id
     is_own_thread = own_topic_ids.include?(topic.id)
-    has_patch = message.attachments.any?
+    has_patch = message.is_patch_submission?
 
     activity_types = []
 
@@ -245,13 +245,13 @@ module ProfileActivity
     end
 
     messages = Message.where(sender_person_id: ids, created_at: start_date.beginning_of_day..end_date.end_of_day)
-                      .includes(:topic, :attachments)
+                      .includes(:topic)
 
     return {} if messages.empty?
 
     topic_ids = messages.map(&:topic_id).uniq
     first_message_per_topic = Message.where(topic_id: topic_ids).group(:topic_id).minimum(:id)
-    first_patch_per_topic = Message.joins(:attachments).where(topic_id: topic_ids).group(:topic_id).minimum(:id)
+    first_patch_per_topic = Message.where(topic_id: topic_ids, is_patch_submission: true).group(:topic_id).minimum(:id)
     own_topic_ids = Topic.where(id: topic_ids, creator_person_id: ids).pluck(:id).to_set
 
     counts = Hash.new(0)

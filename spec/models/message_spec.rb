@@ -124,6 +124,36 @@ RSpec.describe Message, type: :model do
       create(:attachment, :content_based_patch, message: message)
       expect(message.reload.is_patch_submission).to eq(false)
     end
+
+    it 'recognizes text/x-diff content type even when filename has no patch extension' do
+      create(:attachment, message: message, file_name: "0001-f.txt", content_type: "text/x-diff; charset=us-ascii")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes bare "diff" basename with path prefix' do
+      create(:attachment, message: message, file_name: "/bjm/diff", content_type: "text/plain")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes bare "patch" basename' do
+      create(:attachment, message: message, file_name: "patch", content_type: "text/plain; charset=us-ascii")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes numeric-suffixed patch like .patch.3' do
+      create(:attachment, message: message, file_name: "pgsql-6.2.1.alpha.patch.3", content_type: "text/plain")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'still excludes nocfbot names even with text/x-diff content type' do
+      create(:attachment, message: message, file_name: "nocfbot.diff", content_type: "text/x-diff")
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
+
+    it 'does not flag arbitrary filenames ending in "patch" without a separator' do
+      create(:attachment, message: message, file_name: "mypatch", content_type: "text/plain")
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
   end
 
   describe 'state' do

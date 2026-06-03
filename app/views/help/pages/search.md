@@ -146,7 +146,7 @@ The `has:` selector checks for the presence of specific attributes:
 | Value | Description |
 |-------|-------------|
 | `has:attachment` | Topics with any attachments |
-| `has:patch` | Topics with `.patch` or `.diff` files |
+| `has:patch` | Topics with patch attachments (`.patch`, `.diff`, `.diffs`, optionally `.gz`/`.bz2`/`.txt`; ignoring `nocfbot`) |
 | `has:contributor` | Topics with PostgreSQL contributor activity |
 | `has:committer` | Topics with committer activity |
 | `has:core_team` | Topics with core team activity |

@@ -99,13 +99,11 @@ class TopicsController < ApplicationController
       @sidebar_drafts = []
     end
 
-    @has_patches =
-      Attachment.joins(:message).where(messages: { topic_id: @topic.id })
-               .where("attachments.file_name LIKE '%.patch' OR attachments.file_name LIKE '%.diff'").exists?
+    @has_patches = @topic.messages.where(is_patch_submission: true).exists?
     if @has_patches
       latest_message = latest_patchset_message
       if latest_message
-        patch_attachments = latest_message.attachments.select(&:patch?)
+        patch_attachments = latest_message.attachments.select(&:patch_submission_candidate?)
         totals = patch_attachments.reduce({ added: 0, removed: 0 }) do |acc, attachment|
           stats = attachment.diff_line_stats
           acc[:added] += stats[:added]
@@ -227,7 +225,7 @@ class TopicsController < ApplicationController
 
     return head :not_found unless latest_message
 
-    patches = latest_message.attachments.select(&:patch?).sort_by(&:file_name)
+    patches = latest_message.attachments.select(&:patch_submission_candidate?).sort_by(&:file_name)
     return head :not_found if patches.empty?
 
     # Calculate attachment number (1-based index among all messages with attachments)
@@ -259,7 +257,7 @@ class TopicsController < ApplicationController
         end
 
         patches.each do |patch|
-          content = patch.decoded_body_utf8
+          content = patch.decoded_body
           tar.add_file_simple(patch.file_name, 0644, content.bytesize) do |io|
             io.write(content)
           end
@@ -403,10 +401,7 @@ class TopicsController < ApplicationController
 
   def latest_patchset_message
     @latest_patchset_message ||= @topic.messages
-      .where(id: Attachment.joins(:message)
-                           .where(messages: { topic_id: @topic.id })
-                           .where("attachments.file_name LIKE '%.patch' OR attachments.file_name LIKE '%.diff'")
-                           .select(:message_id))
+      .where(is_patch_submission: true)
       .order(created_at: :desc)
       .preload(:attachments)
       .first

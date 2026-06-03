@@ -1,8 +1,17 @@
 class Attachment < ApplicationRecord
   belongs_to :message
 
+  PATCH_SUBMISSION_BASE_EXTS    = %w[patch diff diffs].freeze
+  PATCH_SUBMISSION_WRAPPER_EXTS = ["", ".gz", ".bz2", ".txt"].freeze
+  PATCH_SUBMISSION_EXTENSIONS   = PATCH_SUBMISSION_BASE_EXTS.flat_map { |b|
+    PATCH_SUBMISSION_WRAPPER_EXTS.map { |w| ".#{b}#{w}" }
+  }.freeze
+  PATCH_SUBMISSION_EXCLUDE_PATTERNS = %w[nocfbot no_cfbot].freeze
+
   after_create :mark_topic_has_attachments
   after_destroy :update_topic_has_attachments
+  after_save :recompute_message_patch_submission
+  after_destroy :recompute_message_patch_submission
 
   # This list is in no way comprehensive. It can be extended as needed.
   TEXT_APPLICATION_TYPES = %w[
@@ -29,6 +38,13 @@ class Attachment < ApplicationRecord
 
   def patch_extension?
     file_name&.ends_with?(".patch", ".diff")
+  end
+
+  def patch_submission_candidate?
+    return false if file_name.blank?
+    name_lower = file_name.downcase
+    return false if PATCH_SUBMISSION_EXCLUDE_PATTERNS.any? { |p| name_lower.include?(p) }
+    PATCH_SUBMISSION_EXTENSIONS.any? { |ext| name_lower.end_with?(ext) }
   end
 
   def decoded_body
@@ -90,6 +106,10 @@ class Attachment < ApplicationRecord
     return unless topic
 
     topic.update_column(:has_attachments, true) unless topic.has_attachments?
+  end
+
+  def recompute_message_patch_submission
+    message&.recompute_patch_submission!
   end
 
   def update_topic_has_attachments

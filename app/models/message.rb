@@ -34,6 +34,11 @@ class Message < ApplicationRecord
     sender_person&.default_alias || sender
   end
 
+  def recompute_patch_submission!
+    new_value = attachments.reload.any?(&:patch_submission_candidate?)
+    update_column(:is_patch_submission, new_value) if is_patch_submission != new_value
+  end
+
   private
 
   def update_topic_participant_on_create

@@ -681,9 +681,7 @@ module Search
         topic_ids_subquery = Attachment.joins(:message).select("messages.topic_id").distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
       when "patch"
-        topic_ids_subquery = Attachment.joins(:message)
-          .where("attachments.file_name ILIKE ? OR attachments.file_name ILIKE ?", "%.patch", "%.diff")
-          .select("messages.topic_id").distinct
+        topic_ids_subquery = Message.where(is_patch_submission: true).select(:topic_id).distinct
         negated ? relation.where.not(id: topic_ids_subquery) : relation.where(id: topic_ids_subquery)
       when "contributor"
         # Use denormalized count
@@ -710,9 +708,12 @@ module Search
       # Start with attachments joined to messages
       base = Attachment.joins(:message)
 
-      # For patches, filter by file extension
+      # For patches, restrict attachments to patch-submission candidates: extension
+      # is .patch/.diff/.diffs, optionally followed by .gz/.bz2/.txt; filename
+      # must not contain nocfbot/no_cfbot.
       if has_type == "patch"
-        base = base.where("attachments.file_name ILIKE ? OR attachments.file_name ILIKE ?", "%.patch", "%.diff")
+        base = base.where("attachments.file_name ~* ?", '\.(patch|diff|diffs)(\.gz|\.bz2|\.txt)?$')
+                   .where.not("attachments.file_name ~* ?", 'no_?cfbot')
       end
 
       # Extract conditions

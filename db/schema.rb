@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_06_03_174419) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -293,11 +293,13 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_174419) do
     t.datetime "sent_at"
     t.bigint "sent_via_identity_id"
     t.string "sent_to_address"
+    t.boolean "is_patch_submission", default: false, null: false
     t.index ["body"], name: "index_messages_on_body_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["body_tsv"], name: "index_messages_on_body_tsv", using: :gin
     t.index ["created_at", "sender_id"], name: "index_messages_on_created_at_and_sender_id"
     t.index ["created_at", "topic_id"], name: "index_messages_on_created_at_and_topic_id"
     t.index ["created_at"], name: "index_messages_on_created_at"
+    t.index ["is_patch_submission"], name: "index_messages_on_is_patch_submission", where: "(is_patch_submission = true)"
     t.index ["message_id"], name: "index_messages_on_message_id", unique: true
     t.index ["reply_to_id"], name: "index_messages_on_reply_to_id"
     t.index ["sender_id"], name: "index_messages_on_sender_id"
@@ -383,7 +385,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_174419) do
     t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"
     t.index ["sent_message_id"], name: "index_outgoing_drafts_on_sent_message_id"
     t.index ["topic_id"], name: "index_outgoing_drafts_on_topic_id"
-    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_active_unique", unique: true, where: "((status)::text = ANY ((ARRAY['idle'::character varying, 'sending'::character varying])::text[]))"
+    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_active_unique", unique: true, where: "((status)::text = ANY (ARRAY[('idle'::character varying)::text, ('sending'::character varying)::text]))"
     t.index ["user_id"], name: "index_outgoing_drafts_on_user_id"
   end
 

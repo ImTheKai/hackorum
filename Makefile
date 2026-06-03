@@ -1,7 +1,7 @@
 ENGINE  ?= $(shell command -v podman >/dev/null 2>&1 && echo podman || echo docker)
 COMPOSE ?= $(ENGINE) compose --env-file .env.development -f compose.dev.yml
 
-.PHONY: dev dev-detach down shell console test imap logs db-migrate db-reset db-import mbox-import stats psql sim-email-once sim-email-stream
+.PHONY: dev dev-detach down shell console test imap logs db-migrate db-reset db-import mbox-import stats psql sim-email-once sim-email-stream backfill-patch-submissions
 
 dev: ## Start dev stack (foreground)
 	$(COMPOSE) up --build
@@ -82,6 +82,9 @@ sim-email-once: ## Send a single simulated email (env: SENT_OFFSET_SECONDS, EXIS
 
 sim-email-stream: ## Start a continuous simulated email stream (env: MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS, EXISTING_ALIAS_PROB, EXISTING_TOPIC_PROB)
 	$(COMPOSE) exec web ruby script/simulate_email_stream.rb
+
+backfill-patch-submissions: ## Recompute messages.is_patch_submission (dry run by default; pass ARGS=--fix to apply)
+	$(COMPOSE) exec web ruby script/backfill_patch_submissions.rb $(ARGS)
 
 rubocop: ## Run rubocop
 	$(COMPOSE) exec web bundle exec rubocop

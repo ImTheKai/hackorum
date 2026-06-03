@@ -65,6 +65,67 @@ RSpec.describe Message, type: :model do
     end
   end
 
+  describe 'is_patch_submission' do
+    let(:message) { create(:message) }
+
+    it 'defaults to false' do
+      expect(message.is_patch_submission).to eq(false)
+    end
+
+    it 'flips to true when a patch attachment is added' do
+      create(:attachment, :patch_file, message: message, file_name: "0001-feature.patch")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes .patch.gz as a patch submission' do
+      create(:attachment, message: message, file_name: "0001-feature.patch.gz", content_type: "application/gzip")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes .diffs as a patch submission' do
+      create(:attachment, message: message, file_name: "regression.diffs")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes .patch.txt as a patch submission' do
+      create(:attachment, message: message, file_name: "fix.patch.txt")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'recognizes .diff.bz2 as a patch submission' do
+      create(:attachment, message: message, file_name: "0001.diff.bz2", content_type: "application/x-bzip2")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'ignores attachments with nocfbot in the name' do
+      create(:attachment, message: message, file_name: "0001-nocfbot.patch")
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
+
+    it 'ignores attachments with no_cfbot in the name' do
+      create(:attachment, message: message, file_name: "0001-no_cfbot.patch")
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
+
+    it 'is true if at least one attachment qualifies even when others are excluded' do
+      create(:attachment, message: message, file_name: "0001-nocfbot.patch")
+      create(:attachment, message: message, file_name: "0002-real.patch")
+      expect(message.reload.is_patch_submission).to eq(true)
+    end
+
+    it 'flips back to false when the last patch is destroyed' do
+      attachment = create(:attachment, :patch_file, message: message, file_name: "0001-feature.patch")
+      expect(message.reload.is_patch_submission).to eq(true)
+      attachment.destroy!
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
+
+    it 'ignores content-based patches without a patch extension' do
+      create(:attachment, :content_based_patch, message: message)
+      expect(message.reload.is_patch_submission).to eq(false)
+    end
+  end
+
   describe 'state' do
     it 'defaults to sent' do
       expect(create(:message).state).to eq('sent')

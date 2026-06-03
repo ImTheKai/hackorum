@@ -55,6 +55,17 @@ RSpec.describe SendOutgoingMessageJob do
     expect(draft.last_send_error).to be_nil
   end
 
+  it 'auto-stars the topic and marks the pending message read for the sender' do
+    allow(Gmail::SendClient).to receive(:send_raw).and_return({ "id" => "g" })
+
+    described_class.new.perform(draft.id)
+    msg = Message.where(message_id: '<m@x>').first
+
+    expect(TopicStar.exists?(user: user, topic: topic)).to be true
+    expect(MessageReadRange.covering?(user: user, topic: topic, message_id: msg.id)).to be true
+    expect(ThreadAwareness.covering?(user: user, topic: topic, message_id: msg.id)).to be true
+  end
+
   it 'corrects a Noname sender_alias to the named one before send' do
     noname = create(:alias, user: user, email: 'a@b', name: 'Noname', sender_count: 0)
     draft.update_columns(sender_alias_id: noname.id)

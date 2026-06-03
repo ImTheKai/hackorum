@@ -44,6 +44,7 @@ class SendOutgoingMessageJob < ApplicationJob
         sending_started_at: nil,
         updated_at:         Time.current
       )
+      MessageActivityBuilder.new(msg).process!
     end
 
     ActiveSupport::Notifications.instrument("outgoing.send.success",

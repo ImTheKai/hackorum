@@ -1,7 +1,7 @@
 class TopicsController < ApplicationController
   include DraftSidebarLoader
 
-  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
+  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset, :summary, :messages ]
   before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
 
   def index
@@ -252,6 +252,86 @@ class TopicsController < ApplicationController
               disposition: "attachment"
   end
 
+  def summary
+    messages = @topic.messages.order(created_at: :asc)
+    message_numbers = messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+
+    patchset_messages = @topic.messages
+      .where(is_patch_submission: true)
+      .preload(:attachments, sender_person: :default_alias, sender: {})
+      .order(created_at: :asc)
+
+    creator_alias = @topic.creator_display_alias
+
+    mailing_lists = @topic.mailing_lists.order(:display_name).map do |ml|
+      { id: ml.id, identifier: ml.identifier, display_name: ml.display_name }
+    end
+
+    patchsets = patchset_messages.map do |msg|
+      sender_alias = msg.sender_display_alias
+      patch_count = msg.attachments.count(&:patch_submission_candidate?)
+      {
+        message_id: msg.id,
+        message_number: message_numbers[msg.id],
+        external_message_id: msg.message_id,
+        subject: msg.subject,
+        submitted_at: msg.created_at&.iso8601,
+        submitted_by: alias_payload(sender_alias),
+        patch_count: patch_count,
+        download_url: message_patchset_url(msg)
+      }
+    end
+
+    render json: {
+      id: @topic.id,
+      title: @topic.title,
+      url: topic_url(@topic),
+      created_at: @topic.created_at&.iso8601,
+      last_message_at: @topic.last_message_at&.iso8601,
+      message_count: @topic.message_count,
+      participant_count: @topic.participant_count,
+      creator: alias_payload(creator_alias),
+      mailing_lists: mailing_lists,
+      patchsets: patchsets
+    }
+  end
+
+  def messages
+    msgs = @topic.messages
+      .preload(:attachments, sender_person: :default_alias, sender: {})
+      .order(created_at: :asc)
+
+    payload = msgs.map do |msg|
+      sender_alias = msg.sender_display_alias
+      attachments = msg.attachments.map do |att|
+        {
+          id: att.id,
+          file_name: att.file_name,
+          content_type: att.content_type,
+          url: attachment_url(att)
+        }
+      end
+
+      {
+        id: msg.id,
+        external_message_id: msg.message_id,
+        subject: msg.subject,
+        created_at: msg.created_at&.iso8601,
+        reply_to_id: msg.reply_to_id,
+        sender: alias_payload(sender_alias),
+        is_patch_submission: msg.is_patch_submission,
+        body: msg.body,
+        attachments: attachments
+      }
+    end
+
+    render json: {
+      topic_id: @topic.id,
+      title: @topic.title,
+      messages: payload
+    }
+  end
+
   def search
     if params[:saved_search_id].present?
       base_scope = SavedSearch.visible_to(user_signed_in? ? current_user : nil)
@@ -378,6 +458,11 @@ class TopicsController < ApplicationController
   end
 
   private
+
+  def alias_payload(alias_record)
+    return nil unless alias_record
+    { name: alias_record.name, email: alias_record.email }
+  end
 
   def latest_patchset_message
     @latest_patchset_message ||= @topic.messages

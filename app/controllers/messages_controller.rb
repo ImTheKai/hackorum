@@ -75,5 +75,4 @@ class MessagesController < ApplicationController
       format.html { head :ok }
     end
   end
-
 end

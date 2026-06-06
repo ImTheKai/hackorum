@@ -2,7 +2,7 @@ class Attachment < ApplicationRecord
   belongs_to :message
 
   PATCH_SUBMISSION_BASE_EXTS    = %w[patch diff diffs].freeze
-  PATCH_SUBMISSION_WRAPPER_EXTS = ["", ".gz", ".bz2", ".txt"].freeze
+  PATCH_SUBMISSION_WRAPPER_EXTS = [ "", ".gz", ".bz2", ".txt" ].freeze
   PATCH_SUBMISSION_EXTENSIONS   = PATCH_SUBMISSION_BASE_EXTS.flat_map { |b|
     PATCH_SUBMISSION_WRAPPER_EXTS.map { |w| ".#{b}#{w}" }
   }.freeze

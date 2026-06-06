@@ -88,6 +88,8 @@ Rails.application.routes.draw do
       get :message_batch
       get :attachments_sidebar
       get :patchsets_sidebar
+      get :summary, defaults: { format: :json }
+      get :messages, defaults: { format: :json }
     end
   end
   resources :activities, only: [ :index ] do

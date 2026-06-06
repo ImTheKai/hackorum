@@ -492,6 +492,80 @@ RSpec.describe "Topics", type: :request do
     end
   end
 
+  describe "GET /topics/:id/summary" do
+    let!(:creator) { create(:alias, name: "Alice", email: "alice@example.com") }
+    let!(:topic) { create(:topic, creator: creator, title: "Patch topic") }
+    let!(:plain_message) { create(:message, topic: topic, sender: creator, created_at: 2.hours.ago) }
+    let!(:patch_message) { create(:message, topic: topic, sender: creator, created_at: 1.hour.ago, subject: "v1 patch") }
+    let!(:patch1) { create(:attachment, :patch_file, message: patch_message, file_name: "v1.patch") }
+    let!(:noise_attachment) { create(:attachment, message: patch_message, file_name: "notes.txt", content_type: "text/plain") }
+
+    it "returns topic summary with patchset list" do
+      get summary_topic_path(topic)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.content_type).to include("application/json")
+      json = JSON.parse(response.body)
+
+      expect(json["id"]).to eq(topic.id)
+      expect(json["title"]).to eq("Patch topic")
+      expect(json["creator"]).to eq("name" => "Alice", "email" => "alice@example.com")
+      expect(json["url"]).to include("/topics/#{topic.id}")
+
+      expect(json["patchsets"].size).to eq(1)
+      patchset = json["patchsets"].first
+      expect(patchset["message_id"]).to eq(patch_message.id)
+      expect(patchset["subject"]).to eq("v1 patch")
+      expect(patchset["patch_count"]).to eq(1)
+      expect(patchset["download_url"]).to include("/messages/#{patch_message.id}/patchset")
+    end
+
+    it "returns 404 for unknown topic" do
+      bogus_id = Topic.maximum(:id).to_i + 1_000_000
+      get summary_topic_path(id: bogus_id)
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "GET /topics/:id/messages" do
+    let!(:creator) { create(:alias, name: "Bob", email: "bob@example.com") }
+    let!(:topic) { create(:topic, creator: creator) }
+    let!(:root_msg) { create(:message, topic: topic, sender: creator, reply_to: nil, created_at: 2.hours.ago, body: "root body") }
+    let!(:reply_msg) { create(:message, topic: topic, sender: creator, reply_to: root_msg, created_at: 1.hour.ago, body: "reply body") }
+    let!(:attachment) { create(:attachment, :patch_file, message: reply_msg, file_name: "fix.patch") }
+
+    it "returns all messages with bodies and attachment links" do
+      get messages_topic_path(topic)
+
+      expect(response).to have_http_status(:ok)
+      json = JSON.parse(response.body)
+
+      expect(json["topic_id"]).to eq(topic.id)
+      expect(json["messages"].size).to eq(2)
+
+      first, second = json["messages"]
+      expect(first["id"]).to eq(root_msg.id)
+      expect(first["body"]).to eq("root body")
+      expect(first["reply_to_id"]).to be_nil
+      expect(first["attachments"]).to eq([])
+
+      expect(second["id"]).to eq(reply_msg.id)
+      expect(second["body"]).to eq("reply body")
+      expect(second["reply_to_id"]).to eq(root_msg.id)
+      expect(second["is_patch_submission"]).to eq(true)
+      expect(second["attachments"].size).to eq(1)
+      att = second["attachments"].first
+      expect(att["file_name"]).to eq("fix.patch")
+      expect(att["url"]).to include("/attachments/#{attachment.id}")
+    end
+
+    it "returns 404 for unknown topic" do
+      bogus_id = Topic.maximum(:id).to_i + 1_000_000
+      get messages_topic_path(id: bogus_id)
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
   describe "GET /messages/:id/content" do
     let!(:creator) { create(:alias) }
     let!(:topic) { create(:topic, creator: creator) }

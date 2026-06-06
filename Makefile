@@ -42,19 +42,40 @@ db-reset: ## Drop and setup (create/migrate/seed) - stops web if running, restar
 		$(COMPOSE) start web; \
 	fi
 
-db-import: ## Drop dev DB and import a public dump (env: DUMP=/path/to/public-YYYY-MM.sql.gz)
+db-import: ## Drop dev DB and import dumps (env: DUMP=/path/public-YYYY-MM.sql.gz PDUMP=/path/private-schema-YYYY-MM.sql.gz) - stops web if running, restarts after
 	@if [ -z "$(DUMP)" ]; then echo "Set DUMP=/path/to/public-YYYY-MM.sql.gz"; exit 1; fi
 	@if [ -z "$(PDUMP)" ]; then echo "Set PDUMP=/path/to/private-schema-YYYY-MM.sql.gz"; exit 1; fi
-	$(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d postgres -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-hackorum_development};" -c "CREATE DATABASE $${POSTGRES_DB:-hackorum_development};"'
-	@if echo "$(DUMP)" | grep -qE '\.gz$$'; then \
-	  gzip -cd "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
+	@if [ ! -f "$(DUMP)" ]; then echo "DUMP file not found: $(DUMP)"; exit 1; fi
+	@if [ ! -f "$(PDUMP)" ]; then echo "PDUMP file not found: $(PDUMP)"; exit 1; fi
+	@WEB_WAS_RUNNING=$$($(COMPOSE) ps --status running --format '{{.Service}}' | grep -q '^web$$' && echo 1 || echo 0); \
+	if [ "$$WEB_WAS_RUNNING" = "1" ]; then \
+		echo "Stopping web container..."; \
+		$(COMPOSE) stop web; \
+	fi; \
+	echo "Ensuring db container is running..."; \
+	$(COMPOSE) up -d db; \
+	echo "Waiting for db to accept connections..."; \
+	for i in $$(seq 1 60); do \
+		if $(COMPOSE) exec -T db bash -lc 'pg_isready -U $${POSTGRES_USER:-hackorum} -d postgres' >/dev/null 2>&1; then break; fi; \
+		sleep 1; \
+	done; \
+	echo "Dropping and recreating database..."; \
+	$(COMPOSE) exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-hackorum} -d postgres -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-hackorum_development};" -c "CREATE DATABASE $${POSTGRES_DB:-hackorum_development};"' || { echo "drop/create failed"; exit 1; }; \
+	echo "Importing public dump $(DUMP)..."; \
+	if echo "$(DUMP)" | grep -qE '\.gz$$'; then \
+	  gzip -cd "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}' || { echo "public import failed"; exit 1; }; \
 	else \
-	  cat "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
-	fi
-	@if echo "$(PDUMP)" | grep -qE '\.gz$$'; then \
-	  gzip -cd "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
+	  cat "$(DUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}' || { echo "public import failed"; exit 1; }; \
+	fi; \
+	echo "Importing private dump $(PDUMP)..."; \
+	if echo "$(PDUMP)" | grep -qE '\.gz$$'; then \
+	  gzip -cd "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}' || { echo "private import failed"; exit 1; }; \
 	else \
-	  cat "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}'; \
+	  cat "$(PDUMP)" | $(COMPOSE) exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-hackorum} -d $${POSTGRES_DB:-hackorum_development}' || { echo "private import failed"; exit 1; }; \
+	fi; \
+	if [ "$$WEB_WAS_RUNNING" = "1" ]; then \
+		echo "Restarting web container..."; \
+		$(COMPOSE) start web; \
 	fi
 
 mbox-import: ## Import mbox files (env: LIST=id MBOX_DIR=/path MBOX_FILES="*.mbox" ARGS="--update-body")

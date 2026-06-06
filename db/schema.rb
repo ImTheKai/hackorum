@@ -773,7 +773,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
   end
 
   add_foreign_key "activities", "users"
+  add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
+  add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
+  add_foreign_key "aliases", "users", validate: false
   add_foreign_key "attachments", "messages"
   add_foreign_key "commitfest_patch_commitfests", "commitfest_patches"
   add_foreign_key "commitfest_patch_commitfests", "commitfests"
@@ -795,7 +798,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
-  add_foreign_key "messages", "identities", column: "sent_via_identity_id"
+  add_foreign_key "messages", "identities", column: "sent_via_identity_id", validate: false
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
@@ -815,6 +818,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
   add_foreign_key "outgoing_drafts", "users"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "saved_search_preferences", "saved_searches"
+  add_foreign_key "saved_search_preferences", "users"
+  add_foreign_key "saved_searches", "teams"
+  add_foreign_key "saved_searches", "users"
   add_foreign_key "team_members", "teams"
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
@@ -823,15 +829,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_03_180000) do
   add_foreign_key "topic_mailing_lists", "topics"
   add_foreign_key "topic_merges", "topics", column: "source_topic_id"
   add_foreign_key "topic_merges", "topics", column: "target_topic_id"
+  add_foreign_key "topic_merges", "users", column: "merged_by_id"
   add_foreign_key "topic_participants", "people"
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
+  add_foreign_key "topic_stars", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "topics", "topics", column: "merged_into_topic_id"
-  add_foreign_key "user_features", "users"
+  add_foreign_key "user_features", "users", validate: false
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end

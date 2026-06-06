@@ -1,7 +1,7 @@
 class TopicsController < ApplicationController
   include DraftSidebarLoader
 
-  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
+  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset ]
   before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
 
   def index
@@ -142,6 +142,21 @@ class TopicsController < ApplicationController
     render layout: false
   end
 
+  def patchsets_sidebar
+    message_columns = (Message.column_names - %w[body body_tsv]).map { |c| "messages.#{c}" }
+    messages = @topic.messages
+      .select(message_columns)
+      .order(created_at: :asc)
+
+    @message_numbers = messages.each_with_index.to_h { |msg, idx| [ msg.id, idx + 1 ] }
+    @patchset_messages = messages
+      .select(&:is_patch_submission)
+      .sort_by(&:created_at)
+      .reverse
+
+    render layout: false
+  end
+
   def aware
     last_id = params[:up_to_message_id].presence&.to_i || @topic.messages.maximum(:id)
     ThreadAwareness.mark_until(user: current_user, topic: @topic, until_message_id: last_id) if last_id
@@ -222,52 +237,17 @@ class TopicsController < ApplicationController
 
   def latest_patchset
     latest_message = latest_patchset_message
-
     return head :not_found unless latest_message
 
-    patches = latest_message.attachments.select(&:patch_submission_candidate?).sort_by(&:file_name)
-    return head :not_found if patches.empty?
+    archive = PatchsetArchive.build(
+      message: latest_message,
+      attachment_number: @topic.chronological_index_of(latest_message),
+      host: request.host_with_port
+    )
+    return head :not_found unless archive
 
-    # Calculate attachment number (1-based index among all messages with attachments)
-    messages_with_attachments = @topic.messages
-                                      .where(id: Attachment.where(message_id: @topic.messages.select(:id))
-                                                           .select(:message_id))
-                                      .order(created_at: :asc)
-    attachment_number = messages_with_attachments.index { |msg| msg.id == latest_message.id }.to_i + 1
-
-    require "zlib"
-    require "rubygems/package"
-
-    first_message = @topic.messages.order(:created_at).first
-    first_message_id = first_message&.message_id
-
-    tar_gz_data = StringIO.new
-    Zlib::GzipWriter.wrap(tar_gz_data) do |gz|
-      Gem::Package::TarWriter.new(gz) do |tar|
-        # Add metadata file first
-        metadata = {
-          attachment_number: attachment_number,
-          topic_id: @topic.id,
-          submission_date: latest_message.created_at.iso8601,
-          hackorum_url: topic_url(@topic),
-          upstream_url: first_message_id ? "https://www.postgresql.org/message-id/flat/#{ERB::Util.url_encode(first_message_id)}" : nil
-        }.compact.to_json
-        tar.add_file_simple("hackorum.json", 0644, metadata.bytesize) do |io|
-          io.write(metadata)
-        end
-
-        patches.each do |patch|
-          content = patch.decoded_body
-          tar.add_file_simple(patch.file_name, 0644, content.bytesize) do |io|
-            io.write(content)
-          end
-        end
-      end
-    end
-
-    filename = "topic-#{@topic.id}-patchset.tar.gz"
-    send_data tar_gz_data.string,
-              filename: filename,
+    send_data archive[:data],
+              filename: "topic-#{@topic.id}-patchset.tar.gz",
               type: "application/gzip",
               disposition: "attachment"
   end

@@ -466,3 +466,53 @@
 .drafts-recipient {
   font-weight: 500;
 }
+
+.sidebar .patchsets-list {
+  list-style: none;
+  padding-left: 0;
+  margin: var(--spacing-3) 0;
+}
+
+.sidebar .patchsets-list li + li {
+  margin-top: var(--spacing-2);
+}
+
+.sidebar .patchset-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+}
+
+.sidebar .patchset-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  color: var(--color-text-link);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar .patchset-link:hover {
+  text-decoration: underline;
+}
+
+.sidebar .patchset-target {
+  font-weight: var(--font-weight-bold);
+}
+
+.sidebar .patchset-date {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sidebar .patchset-download {
+  color: var(--color-text-secondary);
+  padding: var(--spacing-1) var(--spacing-2);
+}
+
+.sidebar .patchset-download:hover {
+  color: var(--color-text-link);
+}

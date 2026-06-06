@@ -104,6 +104,25 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).to include("attachment-content-#{attachment.id}")
         expect(response.body).not_to include("diff --git")
       end
+
+      it "renders the Show all patchsets details when patches exist" do
+        create(:attachment, :patch_file, message: root_message)
+
+        get topic_path(topic)
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include("Show all patchsets")
+        expect(response.body).to include("patchsets-sidebar-list")
+        expect(response.body).to include(patchsets_sidebar_topic_path(topic))
+      end
+
+      it "omits the Show all patchsets details when no patches exist" do
+        get topic_path(topic)
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).not_to include("Show all patchsets")
+        expect(response.body).not_to include("patchsets-sidebar-list")
+      end
     end
 
     context "with signed-in user and read/unread messages" do
@@ -512,5 +531,50 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
     items = list.css('li .drafts-link')
     expect(items.size).to eq(1)
     expect(items.first.css('.drafts-target').text.strip).to eq('#1')
+  end
+
+  describe "GET /topics/:id/patchsets_sidebar" do
+    let!(:creator) { create(:alias) }
+    let!(:topic)   { create(:topic, creator: creator) }
+
+    context "with multiple patch-submission messages" do
+      let!(:msg_v1) do
+        create(:message, topic: topic, sender: creator, created_at: 2.days.ago)
+      end
+      let!(:patch_v1) { create(:attachment, :patch_file, message: msg_v1) }
+      let!(:msg_v2) do
+        create(:message, topic: topic, sender: creator, created_at: 1.hour.ago)
+      end
+      let!(:patch_v2) { create(:attachment, :patch_file, message: msg_v2) }
+      let!(:non_patch_msg) do
+        create(:message, topic: topic, sender: creator, created_at: 1.day.ago)
+      end
+
+      it "lists patch-submission messages newest first" do
+        get patchsets_sidebar_topic_path(topic)
+        expect(response).to have_http_status(:ok)
+        body = response.body
+        v2_pos = body.index("message-#{msg_v2.id}")
+        v1_pos = body.index("message-#{msg_v1.id}")
+        expect(v2_pos).to be < v1_pos
+        expect(body).not_to include("message-#{non_patch_msg.id}")
+      end
+
+      it "renders a download link per patchset" do
+        get patchsets_sidebar_topic_path(topic)
+        expect(response.body).to include(message_patchset_path(msg_v1))
+        expect(response.body).to include(message_patchset_path(msg_v2))
+      end
+    end
+
+    context "with no patch-submission messages" do
+      let!(:msg) { create(:message, topic: topic, sender: creator) }
+
+      it "renders the empty-state copy" do
+        get patchsets_sidebar_topic_path(topic)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("No patchsets in this thread")
+      end
+    end
   end
 end

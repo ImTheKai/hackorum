@@ -90,6 +90,11 @@
           summary Show all attachments
           = turbo_frame_tag "attachments-sidebar-list", src: attachments_sidebar_topic_path(@topic), loading: :lazy
 
+        - if @has_patches
+          details.attachments-details
+            summary Show all patchsets
+            = turbo_frame_tag "patchsets-sidebar-list", src: patchsets_sidebar_topic_path(@topic), loading: :lazy
+
 
     details.sidebar-section open=true
       summary.sidebar-heading Thread Outline

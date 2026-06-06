@@ -87,6 +87,7 @@ Rails.application.routes.draw do
       get :latest_patchset
       get :message_batch
       get :attachments_sidebar
+      get :patchsets_sidebar
     end
   end
   resources :activities, only: [ :index ] do
@@ -139,6 +140,7 @@ Rails.application.routes.draw do
 
   post "messages/:id/read", to: "messages#read", as: :read_message
   get "messages/:id/content", to: "messages#content", as: :message_content
+  get "messages/:id/patchset", to: "messages#patchset", as: :message_patchset
   resources :attachments, only: [ :show ] do
     get :content, on: :member
   end

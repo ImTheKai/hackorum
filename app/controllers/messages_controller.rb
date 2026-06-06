@@ -48,6 +48,23 @@ class MessagesController < ApplicationController
     render layout: false
   end
 
+  def patchset
+    message = Message.includes(:attachments, :topic).find(params[:id])
+    return head :not_found unless message.is_patch_submission
+
+    archive = PatchsetArchive.build(
+      message: message,
+      attachment_number: message.topic.chronological_index_of(message),
+      host: request.host_with_port
+    )
+    return head :not_found unless archive
+
+    send_data archive[:data],
+              filename: archive[:filename],
+              type: "application/gzip",
+              disposition: "attachment"
+  end
+
   def read
     message = Message.find(params[:id])
     MessageReadRange.add_range(user: current_user, topic: message.topic, start_id: message.id, end_id: message.id)
@@ -58,4 +75,5 @@ class MessagesController < ApplicationController
       format.html { head :ok }
     end
   end
+
 end

@@ -41,6 +41,11 @@ class Topic < ApplicationRecord
     creator_person&.default_alias || creator
   end
 
+  def chronological_index_of(message)
+    ids = messages.order(:created_at).pluck(:id)
+    ids.index(message.id).to_i + 1
+  end
+
   def participant_aliases(limit: 10)
     # Get all unique senders from messages, with their message counts
     sender_counts = messages.group(:sender_id)

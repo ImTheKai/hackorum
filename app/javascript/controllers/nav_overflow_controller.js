@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-const MOBILE_BREAKPOINT = "(max-width: 900px)"
+const MOBILE_BREAKPOINT = "(max-width: 1024px)"
 
 export default class extends Controller {
   static targets = ["container", "menu", "overflow", "overflowMenu", "item"]

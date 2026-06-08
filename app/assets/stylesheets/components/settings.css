@@ -326,7 +326,7 @@
   padding: var(--spacing-2) var(--spacing-3);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .settings-page .email-table {
     table-layout: fixed;
   }

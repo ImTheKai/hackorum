@@ -87,7 +87,7 @@ body.sidebar-collapsed .page-layout.with-sidebar > main.container {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .container {
     padding: 0;
   }

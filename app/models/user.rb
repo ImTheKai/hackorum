@@ -13,6 +13,7 @@ class User < ApplicationRecord
   has_many :activities
   has_many :topic_stars, dependent: :destroy
   has_many :starred_topics, through: :topic_stars, source: :topic
+  has_many :topic_subscriptions, dependent: :destroy
   has_many :saved_searches
   has_many :saved_search_preferences
   has_many :outgoing_drafts, dependent: :destroy

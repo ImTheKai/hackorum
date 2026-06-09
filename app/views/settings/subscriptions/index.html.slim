@@ -1,0 +1,31 @@
+.settings-page
+  h1 Email Subscriptions
+
+  - if @subscriptions.empty?
+    .settings-section
+      p.text-muted You have no email subscriptions. Visit a thread and click the bell icon to subscribe.
+  - else
+    = form_with url: batch_destroy_settings_subscriptions_path, method: :post, data: { controller: "subscription-manager" } do |f|
+      .subscriptions-toolbar
+        button.subscriptions-select-all type="button" data-action="click->subscription-manager#toggleAll"
+          | Select all
+        .subscriptions-toolbar-actions
+          = f.submit "Unsubscribe selected", class: "button-danger", disabled: true, data: { "subscription-manager-target": "batchButton" }
+          = link_to "Unsubscribe all", destroy_all_settings_subscriptions_path, data: { turbo_method: :delete, turbo_confirm: "Unsubscribe from all #{@subscriptions.size} thread(s)? You will need to resubscribe to each thread manually." }, class: "button-danger-secondary"
+
+      table.email-table
+        thead
+          tr
+            th
+            th Thread
+            th Subscribed on
+            th
+        tbody
+          - @subscriptions.each do |subscription|
+            tr
+              td
+                input type="checkbox" name="subscription_ids[]" value=subscription.id data-subscription-manager-target="checkbox" data-action="change->subscription-manager#toggle"
+              td = link_to subscription.topic.title, topic_path(subscription.topic)
+              td = l(subscription.created_at, format: :short)
+              td
+                = link_to "Unsubscribe", settings_subscription_path(subscription), data: { turbo_method: :delete, turbo_confirm: "Unsubscribe from this thread?" }, class: "button-secondary"

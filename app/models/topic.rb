@@ -19,6 +19,7 @@ class Topic < ApplicationRecord
   has_many :commitfest_patches, through: :commitfest_patch_topics
   has_many :topic_stars, dependent: :destroy
   has_many :starring_users, through: :topic_stars, source: :user
+  has_many :topic_subscriptions, dependent: :destroy
   has_many :topic_participants, dependent: :delete_all
   has_many :top_topic_participants,
            -> { order(message_count: :desc).limit(5) },

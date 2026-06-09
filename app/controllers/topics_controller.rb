@@ -888,7 +888,8 @@ class TopicsController < ApplicationController
   end
 
   def load_star_state
-    @is_starred = TopicStar.exists?(user: current_user, topic: @topic)
+    @is_starred    = TopicStar.exists?(user: current_user, topic: @topic)
+    @is_subscribed = TopicSubscription.exists?(user: current_user, topic: @topic)
   end
 
   SEARCH_PAGE_SIZE = 1000

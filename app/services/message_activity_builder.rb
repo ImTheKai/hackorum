@@ -11,6 +11,7 @@ class MessageActivityBuilder
       mark_message_read_for_sender
       fan_out_to_starring_users
     end
+    fan_out_emails_to_subscribers
   end
 
   private
@@ -68,5 +69,14 @@ class MessageActivityBuilder
       topic_id: @message.topic_id,
       message_id: @message.id
     }
+  end
+
+  def fan_out_emails_to_subscribers
+    sender_user_id = @message.sender.user_id
+    @message.topic.topic_subscriptions.each do |subscription|
+      next if subscription.user_id == sender_user_id
+
+      TopicSubscriptionMailer.new_message(subscription, @message).deliver_later
+    end
   end
 end

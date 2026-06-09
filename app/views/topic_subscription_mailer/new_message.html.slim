@@ -1,0 +1,15 @@
+p A new message has arrived in a thread you're subscribed to.
+
+p
+  strong Thread:
+  =< link_to @topic.title, @thread_url
+
+p
+  = link_to "View thread", @thread_url
+
+hr
+
+p style="font-size: 12px; color: #666;"
+  | You're receiving this because you subscribed to email notifications for this thread.
+  br
+  = link_to "Unsubscribe from this thread", @unsubscribe_url

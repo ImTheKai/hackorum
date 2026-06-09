@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_09_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -384,7 +384,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
     t.index ["sender_alias_id"], name: "index_outgoing_drafts_on_sender_alias_id"
     t.index ["sent_message_id"], name: "index_outgoing_drafts_on_sent_message_id"
     t.index ["topic_id"], name: "index_outgoing_drafts_on_topic_id"
-    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_active_unique", unique: true, where: "((status)::text = ANY ((ARRAY['idle'::character varying, 'sending'::character varying])::text[]))"
+    t.index ["user_id", "reply_to_message_id"], name: "idx_drafts_user_parent_active_unique", unique: true, where: "((status)::text = ANY (ARRAY[('idle'::character varying)::text, ('sending'::character varying)::text]))"
     t.index ["user_id"], name: "index_outgoing_drafts_on_user_id"
   end
 
@@ -716,6 +716,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
     t.index ["user_id"], name: "index_topic_stars_on_user_id"
   end
 
+  create_table "topic_subscriptions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.string "unsubscribe_token", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_topic_subscriptions_on_topic_id"
+    t.index ["unsubscribe_token"], name: "index_topic_subscriptions_on_unsubscribe_token", unique: true
+    t.index ["user_id", "topic_id"], name: "index_topic_subscriptions_on_user_id_and_topic_id", unique: true
+    t.index ["user_id"], name: "index_topic_subscriptions_on_user_id"
+  end
+
   create_table "topics", force: :cascade do |t|
     t.string "title", null: false
     t.bigint "creator_id", null: false
@@ -839,6 +851,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_12_120001) do
   add_foreign_key "topic_participants", "people"
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
+  add_foreign_key "topic_subscriptions", "topics"
+  add_foreign_key "topic_subscriptions", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"

@@ -171,6 +171,7 @@
     .topic-title-with-star
       - if user_signed_in?
         = render "star_button", topic: @topic, starred: @is_starred
+        = render "subscribe_button", topic: @topic, subscribed: @is_subscribed
       h1 = @topic.title
     .topic-meta
       span.creator Started by #{@topic.creator_display_alias.name}

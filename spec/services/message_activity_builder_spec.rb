@@ -168,6 +168,33 @@ RSpec.describe MessageActivityBuilder do
       end
     end
 
+    context "subscription emails" do
+      include ActiveJob::TestHelper
+
+      it "enqueues an email for each subscriber who is not the sender" do
+        subscriber = create(:user)
+        create(:topic_subscription, user: subscriber, topic: topic)
+
+        expect {
+          described_class.new(message).process!
+        }.to have_enqueued_mail(TopicSubscriptionMailer, :new_message)
+      end
+
+      it "does not enqueue an email for the sender even if they are subscribed" do
+        create(:topic_subscription, user: sender_user, topic: topic)
+
+        expect {
+          described_class.new(message).process!
+        }.not_to have_enqueued_mail(TopicSubscriptionMailer, :new_message)
+      end
+
+      it "does not enqueue email when there are no subscribers" do
+        expect {
+          described_class.new(message).process!
+        }.not_to have_enqueued_mail(TopicSubscriptionMailer, :new_message)
+      end
+    end
+
     context "edge cases" do
       it "handles topic with no stars" do
         expect {

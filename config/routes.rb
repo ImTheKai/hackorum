@@ -67,6 +67,12 @@ Rails.application.routes.draw do
     resources :emails, only: [ :create, :destroy ] do
       post :primary, on: :member
     end
+    resources :subscriptions, only: [:index, :destroy] do
+      collection do
+        delete :destroy_all
+        post   :batch_destroy
+      end
+    end
     delete "send_auth/:identity_id", to: "send_auth#destroy", as: :send_auth
   end
   resources :topics, only: [ :index, :show ] do
@@ -88,7 +94,9 @@ Rails.application.routes.draw do
       get :message_batch
       get :attachments_sidebar
     end
+    resource :subscription, only: [:create, :destroy], module: :topics
   end
+  get "unsubscribe/:token", to: "topic_unsubscribes#show", as: :topic_unsubscribe
   resources :activities, only: [ :index ] do
     post :mark_all_read, on: :collection
   end

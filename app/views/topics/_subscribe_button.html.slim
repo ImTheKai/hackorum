@@ -1,0 +1,7 @@
+- subscribed = local_assigns.fetch(:subscribed, false)
+- sub_path   = topic_subscription_path(topic)
+- method     = subscribed ? :delete : :post
+- icon_class = subscribed ? "fa-solid fa-bell" : "fa-regular fa-bell"
+- tooltip    = subscribed ? "Unsubscribe from email notifications" : "Subscribe to email notifications"
+= link_to sub_path, method: method, data: { turbo_method: method, turbo_stream: true }, class: "topic-icon activity-subscribe#{' is-subscribed' if subscribed}", title: tooltip, id: dom_id(topic, "subscribe_button") do
+  i class="#{icon_class}" aria-hidden="true"

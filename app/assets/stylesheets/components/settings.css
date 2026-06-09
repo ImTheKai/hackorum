@@ -351,6 +351,39 @@
   }
 }
 
+.subscriptions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-3) 0;
+  margin-bottom: var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  gap: var(--spacing-3);
+}
+
+.subscriptions-select-all {
+  background: none;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 999px;
+  padding: var(--spacing-3) var(--spacing-6);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.subscriptions-select-all:hover {
+  background: var(--color-bg-hover);
+}
+
+.subscriptions-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .settings-page .team-list,
 .settings-page .member-list {
   list-style: none;

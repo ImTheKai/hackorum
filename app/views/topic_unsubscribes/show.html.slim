@@ -1,0 +1,11 @@
+.container
+  - if @topic
+    h1 Unsubscribed
+    p You will no longer receive email notifications for:
+    p.unsubscribe-topic-title
+      = link_to @topic.title, topic_path(@topic)
+    = link_to "View thread", topic_path(@topic), class: "button-primary"
+  - else
+    h1 Already unsubscribed
+    p This unsubscribe link has already been used or is invalid.
+    = link_to "Back to topics", root_path

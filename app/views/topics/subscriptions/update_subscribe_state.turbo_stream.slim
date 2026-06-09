@@ -1,0 +1,2 @@
+= turbo_stream.replace dom_id(@topic, "subscribe_button") do
+  = render "topics/subscribe_button", topic: @topic, subscribed: TopicSubscription.exists?(user: current_user, topic: @topic)

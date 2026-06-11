@@ -162,7 +162,7 @@ export default class extends Controller {
   }
 
   isMobile() {
-    return window.matchMedia("(max-width: 900px)").matches
+    return window.matchMedia("(max-width: 1024px)").matches
   }
 
   closeOnNavigate(event) {

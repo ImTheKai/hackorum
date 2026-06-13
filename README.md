@@ -6,7 +6,7 @@ Live application is available at https://hackorum.dev
 
 ## Development
 
-Both Docker and Podman (rootless) are supported. The Makefile auto-detects which runtime is available (preferring Podman). Override with `ENGINE=docker` or `ENGINE=podman`.
+Commands are run via [Task](https://taskfile.dev) (`task <name>`; run `task` with no arguments to list them). Both Docker and Podman (rootless) are supported. The Taskfile auto-detects which runtime is available (preferring Podman). Override with `ENGINE=docker` or `ENGINE=podman`.
 
 1) Copy the sample env and adjust as needed:
 ```bash
@@ -14,7 +14,7 @@ cp .env.development.example .env.development
 ```
 2) Build and start the stack (web + Postgres):
 ```bash
-make dev
+task dev
 ```
 * App: http://localhost:3000
 * Postgres: localhost:15432 (user/password: hackorum/hackorum by default)
@@ -22,14 +22,13 @@ make dev
 * If you run into a Postgres data-dir warning, clear the old volume: `docker volume rm hackorum_db-data` (or `podman volume rm hackorum_db-data`)
 
 Useful commands:
-* Shell: `make shell`
-* Rails console: `make console`
-* Migrations/seeds: `make db-migrate` (or run arbitrary commands via `make shell`)
-* Tests: `make test`
-* Import a public DB dump: `make db-import DUMP=/path/to/public-YYYY-MM.sql.gz`
-* If you need private table definitions too, apply `private-schema-YYYY-MM.sql.gz` after the import:
-  `gzip -cd /path/to/private-schema-YYYY-MM.sql.gz | make psql`
-* Other targets: `make dev-detach` / `make down` / `make logs` / `make db-reset` / `make psql`
+* Shell: `task shell`
+* Rails console: `task console`
+* Migrations/seeds: `task db-migrate` (or run arbitrary commands via `task shell`)
+* Tests: `task test` (pass args after `--`, e.g. `task test -- spec/models`)
+* Import a DB dump: `task db-import SCHEMA=/path/to/schema-YYYY-MM.sql.gz PUBLIC_DATA=/path/to/public-data-YYYY-MM.sql.gz`
+* If you need private data too, add `PRIVATE_DATA=/path/to/private-data-YYYY-MM.sql.gz` to the same command
+* Other targets: `task dev-detach` / `task down` / `task logs` / `task db-reset` / `task psql`
 
 Public database dumps (schema + public data) are published at https://dumps.hackorum.dev/
 
@@ -38,16 +37,16 @@ Public database dumps (schema + public data) are published at https://dumps.hack
 There are two helper scripts `script/simulate_email_once.rb` and `simulate_email_stream.rb` that simulate incoming emails.
 The scripts can be configured by a few environment variables, for details see the source of the scripts.
 
-Makefile shortcuts:
-* `make sim-email-once`
-* `make sim-email-stream`
+Task shortcuts:
+* `task sim-email-once`
+* `task sim-email-stream`
 
 ### IMAP worker
 
 The "production" IMAP worker which pulls actual mailing list messages from an IMAP label can be also run locally.
 
 ```bash
-make imap
+task imap
 ```
 Configure IMAP via `.env.development` (`IMAP_USERNAME`, `IMAP_PASSWORD`, `IMAP_MAILBOX_LABEL`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_SSL`).
 

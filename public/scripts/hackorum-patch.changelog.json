@@ -1,6 +1,13 @@
 {
-  "current_version": "1.2.1",
+  "current_version": "1.3.0",
   "versions": [
+    {
+      "version": "1.3.0",
+      "date": "2026-06-06",
+      "changes": [
+        "Added support for gzipped patch/diff files inside the archive (e.g. 0001-foo.patch.gz)"
+      ]
+    },
     {
       "version": "1.2.1",
       "date": "2026-02-16",

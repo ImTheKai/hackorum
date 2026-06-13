@@ -5,7 +5,10 @@
       "version": "1.3.0",
       "date": "2026-06-06",
       "changes": [
-        "Added support for gzipped patch/diff files inside the archive (e.g. 0001-foo.patch.gz)"
+        "Added support for gzipped patch/diff files inside the archive (e.g. 0001-foo.patch.gz)",
+        "Save the topic summary and messages JSON into .hackorum/ (summary.json, messages.json) when downloading by topic ID",
+        "Added --patchset=N to download a specific patchset by its message number instead of the latest",
+        "Added --list-patchsets to list a topic's available patchsets"
       ]
     },
     {

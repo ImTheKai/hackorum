@@ -169,6 +169,8 @@ Options:
   --worktree=MODE           Worktree mode: yes, no, auto (default: auto)
   --worktree-path=PATH      Specify worktree location
   --server=URL              Server URL (default: https://hackorum.dev)
+  --patchset=N              Download patchset by message number (default: latest)
+  --list-patchsets          List a topic's patchsets and exit
   -h, --help                Show help message
   -v, --version             Show version number
 ```
@@ -184,6 +186,31 @@ Options:
 | `--worktree=auto` | Auto-detect based on existing worktrees (default) |
 | `--worktree-path=PATH` | Override the default worktree location |
 | `--server=URL` | Use a different Hackorum server |
+| `--patchset=N` | Download a specific patchset by its message number (the `#N` shown in the topic's patchset list) instead of the latest |
+| `--list-patchsets` | List the topic's available patchsets (number, subject, count, date, submitter) and exit without applying anything |
+
+## Selecting a Patch Version
+
+By default `hackorum-patch` applies the **latest** patchset in a topic. To work with an
+earlier revision, first list what's available:
+
+```bash
+hackorum-patch <topic_id> --list-patchsets
+```
+
+This prints each patchset with its message number (the same `#N` shown in the topic's
+patchset sidebar on the website), subject, patch count, date, and submitter — without
+touching git, so you can run it from anywhere.
+
+Then apply a specific one by its number:
+
+```bash
+hackorum-patch <topic_id> --patchset=5
+```
+
+When downloading by topic ID, the script also saves the topic's `summary.json` and
+`messages.json` into the `.hackorum/` directory alongside the patches, so the full topic
+context is available offline.
 
 ## Troubleshooting
 

@@ -56,6 +56,12 @@ class HackorumPatch
     print_banner
     check_version
     validate_arguments!
+
+    if @options[:list_patchsets]
+      list_patchsets
+      return
+    end
+
     validate_git_repository!
 
     worktree_info = detect_worktree_usage
@@ -150,6 +156,14 @@ class HackorumPatch
         @options[:server] = url
       end
 
+      opts.on("--patchset=N", "Download patchset by message number (default: latest)") do |n|
+        @options[:patchset] = n
+      end
+
+      opts.on("--list-patchsets", "List available patchsets for a topic and exit") do
+        @options[:list_patchsets] = true
+      end
+
       opts.on("--verbose", "Print detailed base commit detection info") do
         @options[:verbose] = true
       end
@@ -178,6 +192,7 @@ class HackorumPatch
       puts "Topic: #{@topic_id}"
       puts "Branch: #{@branch_name}"
       puts "Server: #{@server_url}"
+      puts "Patchset: ##{@options[:patchset]}" if @options[:patchset]
     end
     puts ""
   end
@@ -229,6 +244,14 @@ class HackorumPatch
   end
 
   def validate_arguments!
+    if @using_local_file && (@options[:patchset] || @options[:list_patchsets])
+      raise "--patchset and --list-patchsets require a topic ID; they cannot be used with a local archive."
+    end
+
+    if @options[:patchset] && @options[:patchset] !~ /^\d+$/
+      raise "Invalid --patchset value. Must be a message number (integer)."
+    end
+
     if @using_local_file
       unless File.exist?(@local_archive)
         raise "Archive file not found: #{@local_archive}"
@@ -354,8 +377,90 @@ class HackorumPatch
     puts ""
   end
 
+  def fetch_topic_metadata
+    @summary_json = fetch_topic_json("summary")
+    @summary_data = nil
+    if @summary_json
+      begin
+        @summary_data = JSON.parse(@summary_json)
+      rescue JSON::ParserError
+        puts "  [WARN] Could not parse summary JSON from server"
+      end
+    end
+    @messages_json = fetch_topic_json("messages")
+  end
+
+  def fetch_topic_json(kind)
+    url = "#{@server_url}/topics/#{@topic_id}/#{kind}"
+    uri = URI(url)
+
+    response = Net::HTTP.get_response(uri)
+    unless response.is_a?(Net::HTTPSuccess)
+      puts "  [WARN] Could not fetch #{kind} JSON (HTTP #{response.code})"
+      return nil
+    end
+
+    response.body
+  rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, Net::OpenTimeout, Net::ReadTimeout, SocketError => e
+    puts "  [WARN] Could not fetch #{kind} JSON: #{e.message}"
+    nil
+  end
+
+  def resolve_patchset_url
+    return "#{@server_url}/topics/#{@topic_id}/latest_patchset" unless @options[:patchset]
+
+    target = @options[:patchset].to_i
+    unless @summary_data
+      raise "Cannot select patchset ##{target}: topic summary could not be fetched."
+    end
+
+    patchsets = @summary_data["patchsets"] || []
+    match = patchsets.find { |ps| ps["message_number"] == target }
+    unless match
+      available = patchsets.map { |ps| "##{ps['message_number']}" }.join(", ")
+      raise "No patchset with message number ##{target}. Available: #{available.empty? ? '(none)' : available}"
+    end
+
+    puts "Selected patchset ##{target} (message #{match['message_id']})"
+    "#{@server_url}/messages/#{match['message_id']}/patchset"
+  end
+
+  def list_patchsets
+    puts "Fetching patchsets for topic #{@topic_id}..."
+    summary_json = fetch_topic_json("summary")
+    raise "Could not fetch patchset list from server" unless summary_json
+
+    begin
+      data = JSON.parse(summary_json)
+    rescue JSON::ParserError
+      raise "Could not parse patchset list from server"
+    end
+
+    patchsets = data["patchsets"] || []
+    if patchsets.empty?
+      puts "No patchsets found for topic #{@topic_id}."
+      return
+    end
+
+    puts ""
+    puts "Available patchsets for: #{data['title']}"
+    puts "=" * 60
+    patchsets.each do |ps|
+      number = ps["message_number"]
+      count = ps["patch_count"]
+      submitter = ps.dig("submitted_by", "name") || "unknown"
+      puts ""
+      puts "  ##{number}  #{ps['subject']}"
+      puts "       #{count} patch#{count == 1 ? '' : 'es'} | #{ps['submitted_at']} | #{submitter}"
+    end
+    puts ""
+    puts "Apply one with: hackorum-patch #{@topic_id} --patchset=<number>"
+    puts ""
+  end
+
   def download_and_extract_patchset
-    url = "#{@server_url}/topics/#{@topic_id}/latest_patchset"
+    fetch_topic_metadata
+    url = resolve_patchset_url
     uri = URI(url)
 
     puts "Downloading patchset from #{url}..."
@@ -754,6 +859,14 @@ class HackorumPatch
     if @metadata
       metadata_file = File.join(hackorum_dir, "#{@topic_id}.json")
       File.write(metadata_file, JSON.pretty_generate(@metadata))
+    end
+
+    # Write topic JSON snapshots if available (topic-id mode only)
+    if @summary_json
+      File.write(File.join(hackorum_dir, "summary.json"), @summary_json)
+    end
+    if @messages_json
+      File.write(File.join(hackorum_dir, "messages.json"), @messages_json)
     end
 
     puts "[OK]"

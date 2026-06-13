@@ -8,8 +8,8 @@ RSpec.describe HackorumCommits::Confirmer do
   let(:commit) { { "sha" => "abc", "subject" => "Fix vacuum", "body" => "details" } }
   let(:candidates) do
     [
-      { "topic_id" => 100, "source" => "trailer", "metadata" => { "mailing_lists" => ["pgsql-hackers"] }.to_json },
-      { "topic_id" => 200, "source" => "search", "metadata" => { "title" => "vacuum perf", "mailing_lists" => ["pgsql-bugs"] }.to_json }
+      { "topic_id" => 100, "source" => "trailer", "metadata" => { "mailing_lists" => [ "pgsql-hackers" ] }.to_json },
+      { "topic_id" => 200, "source" => "search", "metadata" => { "title" => "vacuum perf", "mailing_lists" => [ "pgsql-bugs" ] }.to_json }
     ]
   end
 
@@ -18,7 +18,7 @@ RSpec.describe HackorumCommits::Confirmer do
       "links" => [
         { "topic_id" => 200, "verdict" => "related", "confidence" => 0.8, "evidence" => "same crash" }
       ],
-      "facts" => [{ "kind" => "cve", "value" => "CVE-2025-9999" }]
+      "facts" => [ { "kind" => "cve", "value" => "CVE-2025-9999" } ]
     )
 
     confirmer.confirm(commit, candidates: candidates)

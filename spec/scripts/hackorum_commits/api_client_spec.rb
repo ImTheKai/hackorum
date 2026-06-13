@@ -8,7 +8,7 @@ RSpec.describe HackorumCommits::ApiClient, :webmock do
   it "fetches and parses candidate search, caching the second call" do
     stub = stub_request(:get, "http://hk.test/topics/search_candidates.json")
            .with(query: hash_including("q" => "vacuum"))
-           .to_return(status: 200, body: { candidates: [{ topic_id: 7, title: "T" }] }.to_json,
+           .to_return(status: 200, body: { candidates: [ { topic_id: 7, title: "T" } ] }.to_json,
                       headers: { "Content-Type" => "application/json" })
 
     first = client.search_candidates(q: "vacuum", from: "2020-01-01T00:00:00Z",
@@ -25,7 +25,7 @@ RSpec.describe HackorumCommits::ApiClient, :webmock do
 
   it "resolves a message-id, returning nil on 404" do
     stub_request(:get, %r{http://hk\.test/messages/by-id/.*\.json})
-      .to_return(status: 200, body: { topic_id: 9, mailing_lists: ["pgsql-hackers"] }.to_json,
+      .to_return(status: 200, body: { topic_id: 9, mailing_lists: [ "pgsql-hackers" ] }.to_json,
                  headers: { "Content-Type" => "application/json" })
     expect(client.resolve_message_id("abc@x")["topic_id"]).to eq(9)
 

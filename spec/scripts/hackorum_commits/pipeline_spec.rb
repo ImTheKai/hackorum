@@ -12,9 +12,9 @@ RSpec.describe HackorumCommits::Pipeline do
                         authored_at: "2020-01-01T00:00:00Z", committed_at: "2020-01-02T00:00:00Z",
                         author_name: "Dan", author_email: "dan@x",
                         committer_name: "Andrew", committer_email: "a@x",
-                        branches: ["master"], versions: ["devel"], stage: "walked")
+                        branches: [ "master" ], versions: [ "devel" ], stage: "walked")
     allow(api).to receive(:resolve_message_id).with("d@x")
-      .and_return({ "topic_id" => 100, "mailing_lists" => ["pgsql-hackers"] })
+      .and_return({ "topic_id" => 100, "mailing_lists" => [ "pgsql-hackers" ] })
     allow(api).to receive(:search_candidates).and_return([])
     allow(llm).to receive(:complete).and_return({ "links" => [], "facts" => [] })
   end

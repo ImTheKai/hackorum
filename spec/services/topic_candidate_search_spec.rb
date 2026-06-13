@@ -44,10 +44,10 @@ RSpec.describe TopicCandidateSearch do
 
     results = described_class.new(
       q: "crash widget", from: 30.days.ago, to: Time.current,
-      mailing_lists: ["pgsql-bugs"], patches_only: false, limit: 10
+      mailing_lists: [ "pgsql-bugs" ], patches_only: false, limit: 10
     ).results
 
-    expect(results.map(&:id)).to eq([on_bugs.id])
+    expect(results.map(&:id)).to eq([ on_bugs.id ])
   end
 
   it "sets has_patches based on patch-submission messages, not attachments" do

@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   ENGINE:
-    sh: command -v podman >/dev/null 2>&1 && echo podman || echo docker
+    sh: echo "${ENGINE:-$(command -v podman >/dev/null 2>&1 && echo podman || echo docker)}"
   COMPOSE: '{{.ENGINE}} compose --env-file .env.development -f compose.dev.yml'
   PSQL_IMPORT: "{{.COMPOSE}} exec -T db bash -lc 'psql -v ON_ERROR_STOP=1 -U ${POSTGRES_USER:-hackorum} -d ${POSTGRES_DB:-hackorum_development}'"
 
@@ -54,10 +54,14 @@ tasks:
       - '{{.COMPOSE}} exec web bin/rails console'
 
   test:
-    desc: Run RSpec in the web container (uses test database). Pass args after --, e.g. task test -- spec/models
+    desc: Run RSpec in a one-off container (uses test database). Pass args after --, e.g. task test -- spec/models
     cmds:
-      - '{{.COMPOSE}} exec -e RAILS_ENV=test -e DATABASE_URL=postgresql://hackorum:hackorum@db:5432/hackorum_test web bin/rails db:prepare'
-      - '{{.COMPOSE}} exec -e RAILS_ENV=test -e DATABASE_URL=postgresql://hackorum:hackorum@db:5432/hackorum_test web bundle exec rspec {{.CLI_ARGS}}'
+      # Use `run --rm` (a dedicated throwaway container) rather than `exec` into the
+      # running dev server: that avoids loading rspec on top of the live bin/dev
+      # process tree, where a foreman/server crash or an OOM victim selection would
+      # take the exec'd rspec down with it (SIGKILL/exit 137 in CI).
+      - '{{.COMPOSE}} run --rm -e RAILS_ENV=test -e DATABASE_URL=postgresql://hackorum:hackorum@db:5432/hackorum_test web bin/rails db:prepare'
+      - '{{.COMPOSE}} run --rm -e RAILS_ENV=test -e DATABASE_URL=postgresql://hackorum:hackorum@db:5432/hackorum_test web bundle exec rspec {{.CLI_ARGS}}'
 
   db-migrate:
     desc: Run db:migrate

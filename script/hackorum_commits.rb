@@ -105,9 +105,9 @@ module HackorumCommits
     def upsert_commit(sha:, subject:, body:, authored_at:, committed_at:,
                       author_name:, author_email:, committer_name:, committer_email:,
                       branches:, versions:, stage: "walked")
-      params = [sha, subject, body, authored_at, committed_at,
+      params = [ sha, subject, body, authored_at, committed_at,
                 author_name, author_email, committer_name, committer_email,
-                JSON.generate(branches), JSON.generate(versions), stage, Time.now.utc.iso8601]
+                JSON.generate(branches), JSON.generate(versions), stage, Time.now.utc.iso8601 ]
       @db.execute(<<~SQL, params)
         INSERT INTO commits (sha, subject, body, authored_at, committed_at,
           author_name, author_email, committer_name, committer_email,
@@ -119,58 +119,58 @@ module HackorumCommits
     end
 
     def commit(sha)
-      @db.execute("SELECT * FROM commits WHERE sha = ?", [sha]).first
+      @db.execute("SELECT * FROM commits WHERE sha = ?", [ sha ]).first
     end
 
     def set_stage(sha, stage)
       @db.execute("UPDATE commits SET stage = ?, updated_at = ? WHERE sha = ?",
-                  [stage, Time.now.utc.iso8601, sha])
+                  [ stage, Time.now.utc.iso8601, sha ])
     end
 
     def add_relation(from_sha:, to_sha:, kind:, confidence:, method:)
-      @db.execute(<<~SQL, [from_sha, to_sha, kind, confidence, method])
+      @db.execute(<<~SQL, [ from_sha, to_sha, kind, confidence, method ])
         INSERT OR IGNORE INTO commit_relations (from_sha, to_sha, kind, confidence, method)
         VALUES (?,?,?,?,?)
       SQL
     end
 
     def relations_for(sha)
-      @db.execute("SELECT * FROM commit_relations WHERE from_sha = ?", [sha])
+      @db.execute("SELECT * FROM commit_relations WHERE from_sha = ?", [ sha ])
     end
 
     def api_cache_get(key)
-      row = @db.execute("SELECT response FROM api_cache WHERE request_key = ?", [key]).first
+      row = @db.execute("SELECT response FROM api_cache WHERE request_key = ?", [ key ]).first
       row && row["response"]
     end
 
     def api_cache_put(key, response)
       @db.execute("INSERT OR REPLACE INTO api_cache (request_key, response, fetched_at) VALUES (?,?,?)",
-                  [key, response, Time.now.utc.iso8601])
+                  [ key, response, Time.now.utc.iso8601 ])
     end
 
     def add_candidate(sha:, topic_id:, source:, prefilter_score:, metadata:)
-      @db.execute(<<~SQL, [sha, topic_id, source, prefilter_score, JSON.generate(metadata)])
+      @db.execute(<<~SQL, [ sha, topic_id, source, prefilter_score, JSON.generate(metadata) ])
         INSERT OR REPLACE INTO thread_candidates (sha, topic_id, source, prefilter_score, metadata)
         VALUES (?,?,?,?,?)
       SQL
     end
 
     def candidates_for(sha)
-      @db.execute("SELECT * FROM thread_candidates WHERE sha = ?", [sha])
+      @db.execute("SELECT * FROM thread_candidates WHERE sha = ?", [ sha ])
     end
 
     def llm_cache_get(key)
-      row = @db.execute("SELECT response FROM llm_cache WHERE prompt_hash = ?", [key]).first
+      row = @db.execute("SELECT response FROM llm_cache WHERE prompt_hash = ?", [ key ]).first
       row && row["response"]
     end
 
     def llm_cache_put(key, response, model)
       @db.execute("INSERT OR REPLACE INTO llm_cache (prompt_hash, response, model, created_at) VALUES (?,?,?,?)",
-                  [key, response, model, Time.now.utc.iso8601])
+                  [ key, response, model, Time.now.utc.iso8601 ])
     end
 
     def add_link(sha:, topic_id:, mailing_list:, method:, confidence:, verdict:, evidence:, external_message_id:)
-      @db.execute(<<~SQL, [sha, topic_id, mailing_list, method, confidence, verdict, evidence, external_message_id])
+      @db.execute(<<~SQL, [ sha, topic_id, mailing_list, method, confidence, verdict, evidence, external_message_id ])
         INSERT OR REPLACE INTO thread_links
           (sha, topic_id, mailing_list, method, confidence, verdict, evidence, external_message_id)
         VALUES (?,?,?,?,?,?,?,?)
@@ -178,18 +178,18 @@ module HackorumCommits
     end
 
     def links_for(sha)
-      @db.execute("SELECT * FROM thread_links WHERE sha = ?", [sha])
+      @db.execute("SELECT * FROM thread_links WHERE sha = ?", [ sha ])
     end
 
     def add_fact(sha:, kind:, value:, method:, confidence:, evidence:)
-      @db.execute(<<~SQL, [sha, kind, value, method, confidence, evidence])
+      @db.execute(<<~SQL, [ sha, kind, value, method, confidence, evidence ])
         INSERT OR IGNORE INTO commit_facts (sha, kind, value, method, confidence, evidence)
         VALUES (?,?,?,?,?,?)
       SQL
     end
 
     def facts_for(sha)
-      @db.execute("SELECT * FROM commit_facts WHERE sha = ?", [sha])
+      @db.execute("SELECT * FROM commit_facts WHERE sha = ?", [ sha ])
     end
 
     def each_commit
@@ -197,18 +197,18 @@ module HackorumCommits
     end
 
     def each_commit_at_stage(stage)
-      @db.execute("SELECT * FROM commits WHERE stage = ? ORDER BY committed_at", [stage]).each { |r| yield r }
+      @db.execute("SELECT * FROM commits WHERE stage = ? ORDER BY committed_at", [ stage ]).each { |r| yield r }
     end
 
     def set_message_ids(sha, ids)
       ids.each do |id|
         @db.execute("INSERT OR IGNORE INTO commit_facts (sha, kind, value, method, confidence, evidence) VALUES (?,?,?,?,?,?)",
-                    [sha, "discussion_message_id", id, "trailer", 1.0, "Discussion: #{id}"])
+                    [ sha, "discussion_message_id", id, "trailer", 1.0, "Discussion: #{id}" ])
       end
     end
 
     def message_ids_for(sha)
-      @db.execute("SELECT value FROM commit_facts WHERE sha = ? AND kind = 'discussion_message_id'", [sha])
+      @db.execute("SELECT value FROM commit_facts WHERE sha = ? AND kind = 'discussion_message_id'", [ sha ])
          .map { |r| r["value"] }
     end
   end
@@ -314,7 +314,7 @@ module HackorumCommits
       out = git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
       rel = out.lines.map(&:strip).map { |r| r.sub(%r{\Aorigin/}, "") }
                .select { |r| r == "master" || r.start_with?("REL") }
-      (["master"] + rel).uniq
+      ([ "master" ] + rel).uniq
     end
 
     def version_for_ref(ref)
@@ -357,7 +357,7 @@ module HackorumCommits
         row = @store.commit(sha)
         next unless row
         next if row["subject"].to_s.strip.length < 10 # too generic to match safely
-        key = [row["subject"], row["author_email"]]
+        key = [ row["subject"], row["author_email"] ]
         by_key[key] << row
       end
 
@@ -376,10 +376,10 @@ module HackorumCommits
 
     def list_shas(ref)
       args = if ref_exists?("origin/#{ref}")
-               ["rev-list", "origin/#{ref}"]
-             else
-               ["rev-list", ref]
-             end
+               [ "rev-list", "origin/#{ref}" ]
+      else
+               [ "rev-list", ref ]
+      end
       args << "--max-count=#{@limit}" if @limit
       args << "--since=#{@since}" if @since
       git(*args).lines.map(&:strip).reject(&:empty?)
@@ -509,7 +509,7 @@ module HackorumCommits
       from, to = date_window(commit["committed_at"])
 
       search_added = 0
-      [true, false].each do |patches_only|
+      [ true, false ].each do |patches_only|
         hits = @api.search_candidates(q: terms.join(" "), from: from, to: to,
                                       mailing_lists: [], patches_only: patches_only,
                                       limit: @config.candidate_limit)
@@ -626,7 +626,7 @@ module HackorumCommits
     end
 
     def build_user_prompt(commit, candidates)
-      lines = ["COMMIT subject: #{commit['subject']}", "COMMIT body:", commit["body"].to_s, "", "CANDIDATE THREADS:"]
+      lines = [ "COMMIT subject: #{commit['subject']}", "COMMIT body:", commit["body"].to_s, "", "CANDIDATE THREADS:" ]
       candidates.each do |c|
         meta = parse_meta(c)
         lines << "- topic_id=#{c['topic_id']} lists=#{Array(meta['mailing_lists']).join(',')} " \

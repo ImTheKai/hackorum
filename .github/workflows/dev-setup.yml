@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      # The runner has podman installed, but only the Docker daemon is running.
+      # Force the Taskfile's compose engine to docker so it doesn't pick podman.
       ENGINE: docker
 
     steps:
@@ -18,6 +20,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare dev env file
         run: |
@@ -29,7 +37,7 @@ jobs:
           done
 
       - name: Start dev stack
-        run: make dev-detach
+        run: task dev-detach
 
       - name: Wait for Rails to be healthy
         run: |
@@ -47,7 +55,7 @@ jobs:
           exit 1
 
       - name: Run db-reset while stack is running
-        run: make db-reset
+        run: task db-reset
 
       - name: Wait for web to restart
         run: |
@@ -65,8 +73,8 @@ jobs:
           exit 1
 
       - name: Run RSpec tests
-        run: make test
+        run: task test
 
       - name: Teardown
         if: always()
-        run: make down
+        run: task down

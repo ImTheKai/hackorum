@@ -51,7 +51,7 @@ class TopicCandidateSearch
 
   def rank_select
     return "0 AS relevance_score" if @q.blank?
-    Topic.sanitize_sql_array(["ts_rank(topics.title_tsv, websearch_to_tsquery('english', ?)) AS relevance_score", @q])
+    Topic.sanitize_sql_array([ "ts_rank(topics.title_tsv, websearch_to_tsquery('english', ?)) AS relevance_score", @q ])
   end
 
   def apply_text(relation)

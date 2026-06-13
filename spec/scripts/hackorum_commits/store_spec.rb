@@ -15,9 +15,9 @@ RSpec.describe HackorumCommits::Store do
     store.upsert_commit(sha: "abc", subject: "hi", body: "b",
                         authored_at: "2020-01-01", committed_at: "2020-01-02",
                         author_name: "A", author_email: "a@x", committer_name: "C",
-                        committer_email: "c@x", branches: ["master"], versions: ["devel"])
+                        committer_email: "c@x", branches: [ "master" ], versions: [ "devel" ])
     row = store.commit("abc")
     expect(row["subject"]).to eq("hi")
-    expect(JSON.parse(row["branches"])).to eq(["master"])
+    expect(JSON.parse(row["branches"])).to eq([ "master" ])
   end
 end

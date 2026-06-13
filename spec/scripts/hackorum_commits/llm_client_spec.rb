@@ -7,7 +7,7 @@ RSpec.describe HackorumCommits::LlmClient, :webmock do
   let(:schema) { { name: "verdicts", schema: { type: "object", properties: { ok: { type: "boolean" } } } } }
 
   it "posts a chat completion with json_schema and parses the content, caching" do
-    payload = { choices: [{ message: { content: { ok: true }.to_json } }] }
+    payload = { choices: [ { message: { content: { ok: true }.to_json } } ] }
     stub = stub_request(:post, "http://llm.test/v1/chat/completions")
            .to_return(status: 200, body: payload.to_json,
                       headers: { "Content-Type" => "application/json" })
@@ -28,7 +28,7 @@ RSpec.describe HackorumCommits::LlmClient, :webmock do
           body["response_format"]["type"] == "json_schema" &&
           body["messages"].first["role"] == "system"
       }
-      .to_return(status: 200, body: { choices: [{ message: { content: "{}" } }] }.to_json)
+      .to_return(status: 200, body: { choices: [ { message: { content: "{}" } } ] }.to_json)
 
     expect(client.complete(system: "s", user: "u", schema: schema)).to eq({})
   end

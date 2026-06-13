@@ -41,3 +41,6 @@ CLAUDE.md
 !/app/assets/builds/.keep
 
 /node_modules
+
+# Local PostgreSQL clone used by the commit-history-parsing tool/specs
+/postgres/

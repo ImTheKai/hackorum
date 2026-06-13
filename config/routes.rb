@@ -37,7 +37,8 @@ Rails.application.routes.draw do
       PendingMigrationCatcher.new(nil).send(:render_maintenance_page)
     }
   end
-  get "messages/by-id/*message_id", to: "messages#by_message_id", as: :message_by_id, format: false
+  get "messages/by-id/*message_id", to: "messages#by_message_id", as: :message_by_id,
+      constraints: { format: /html|json/ }, defaults: { format: "html" }
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
@@ -72,6 +73,7 @@ Rails.application.routes.draw do
   resources :topics, only: [ :index, :show ] do
     collection do
       get :search
+      get :search_candidates, defaults: { format: :json }
       get :user_state_frame
       post :user_state
       get :new_topics_count

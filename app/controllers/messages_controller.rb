@@ -6,13 +6,29 @@ class MessagesController < ApplicationController
   def by_message_id
     raw = params[:message_id].to_s
     decoded = CGI.unescape(raw.gsub("+", "%2B"))
-    message = Message.find_by(message_id: decoded)
+    message = Message.includes(topic: :mailing_lists).find_by(message_id: decoded)
 
-    if message
-      anchor = view_context.message_id_anchor(message) || view_context.message_dom_id(message)
-      redirect_to topic_path(message.topic, anchor: anchor)
-    else
-      render plain: "Message not found", status: :not_found
+    respond_to do |format|
+      format.html do
+        if message
+          anchor = view_context.message_id_anchor(message) || view_context.message_dom_id(message)
+          redirect_to topic_path(message.topic, anchor: anchor)
+        else
+          render plain: "Message not found", status: :not_found
+        end
+      end
+      format.json do
+        if message
+          render json: {
+            message_id: message.message_id,
+            topic_id: message.topic_id,
+            topic_title: message.topic.title,
+            mailing_lists: message.topic.mailing_lists.map(&:identifier)
+          }
+        else
+          render json: { error: "Message not found" }, status: :not_found
+        end
+      end
     end
   end
 

@@ -332,6 +332,33 @@ class TopicsController < ApplicationController
     }
   end
 
+  def search_candidates
+    search = TopicCandidateSearch.new(
+      q: params[:q],
+      from: parse_time_param(params[:from]),
+      to: parse_time_param(params[:to]),
+      mailing_lists: Array(params[:mailing_list] || params[:mailing_lists]),
+      patches_only: ActiveModel::Type::Boolean.new.cast(params[:patches_only]),
+      limit: params[:limit].presence || TopicCandidateSearch::DEFAULT_LIMIT
+    )
+
+    candidates = search.results.map do |r|
+      {
+        topic_id: r.id,
+        title: r.title,
+        mailing_lists: r.mailing_lists,
+        created_at: r.created_at&.iso8601,
+        last_message_at: r.last_message_at&.iso8601,
+        message_count: r.message_count,
+        has_patches: r.has_patches,
+        first_message_snippet: r.first_message_snippet,
+        score: r.score
+      }
+    end
+
+    render json: { candidates: candidates }
+  end
+
   def search
     if params[:saved_search_id].present?
       base_scope = SavedSearch.visible_to(user_signed_in? ? current_user : nil)
@@ -458,6 +485,13 @@ class TopicsController < ApplicationController
   end
 
   private
+
+  def parse_time_param(value)
+    return nil if value.blank?
+    Time.zone.parse(value.to_s)
+  rescue ArgumentError
+    nil
+  end
 
   def alias_payload(alias_record)
     return nil unless alias_record

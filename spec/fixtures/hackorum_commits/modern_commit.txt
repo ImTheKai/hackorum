@@ -1,0 +1,11 @@
+Adjust cross-version upgrade tests for seg_out() fix
+
+Commit 0e1f1ed157e taught seg_out() to print the certainty indicator.
+Back-patch to all supported branches.
+
+Reviewed-by: Jane Reviewer <jane@example.com>
+Reported-by: Bob Reporter <bob@example.com>
+Co-authored-by: Carol Coder <carol@example.com>
+Author: Dan Dev <dan@example.com>
+Tested-by: Tina Tester <tina@example.com>
+Discussion: https://postgr.es/m/5ccbdbde-6467-4a10-bf4d-0be73a05ce8d@dunslane.net

@@ -1,0 +1,7 @@
+Fix privilege escalation in function execution
+
+This addresses CVE-2025-1234. The fix for commit deadbeefcafe1234
+restores the prior permission check.
+
+Discussion: https://postgr.es/m/abc-123@example.com
+Discussion: https://postgr.es/message-id/def-456@example.com

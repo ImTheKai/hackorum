@@ -21,5 +21,6 @@ teams
 thread_awarenesses
 topic_merges
 topic_stars
+user_features
 user_tokens
 users

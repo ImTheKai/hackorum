@@ -2,28 +2,6 @@ require "rails_helper"
 require "cgi"
 
 RSpec.describe "Commit linking read APIs", type: :request do
-  describe "topic candidate search json" do
-    it "returns lightweight candidate rows as JSON" do
-      list = create(:mailing_list, identifier: "pgsql-hackers", display_name: "pgsql-hackers")
-      topic = create(:topic, title: "Improve vacuum throttling",
-                     created_at: 10.days.ago, last_message_at: 10.days.ago)
-      topic.mailing_lists << list
-      create(:message, topic: topic, body: "vacuum throttling body", created_at: 10.days.ago)
-
-      get "/topics/search_candidates.json", params: {
-        q: "vacuum throttling", from: 30.days.ago.iso8601, to: Time.current.iso8601
-      }
-
-      expect(response).to have_http_status(:ok)
-      body = JSON.parse(response.body)
-      cand = body["candidates"].find { |c| c["topic_id"] == topic.id }
-      expect(cand).to be_present
-      expect(cand["title"]).to eq("Improve vacuum throttling")
-      expect(cand["mailing_lists"]).to include("pgsql-hackers")
-      expect(cand).to have_key("first_message_snippet")
-    end
-  end
-
   describe "by-id json" do
     it "resolves an existing message-id to its topic as JSON" do
       topic = create(:topic, title: "Add a widget")

@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe HackorumCommits::Exporter do
   let(:store) { HackorumCommits::Store.new(":memory:") }
-  let(:config) { HackorumCommits::Config.parse(%w[--llm-model qwen]) }
+  let(:config) { HackorumCommits::Config.parse([]) }
 
   before do
     store.upsert_commit(sha: "abc", subject: "Fix vacuum", body: "b",
@@ -13,7 +13,7 @@ RSpec.describe HackorumCommits::Exporter do
     store.add_fact(sha: "abc", kind: "reviewer", value: "Jane", method: "trailer", confidence: 1.0, evidence: "Reviewed-by: Jane")
     store.add_link(sha: "abc", topic_id: 100, mailing_list: "pgsql-hackers", method: "trailer",
                    confidence: 1.0, verdict: "related", evidence: "trailer", external_message_id: "m@x")
-    store.add_link(sha: "abc", topic_id: 200, mailing_list: "pgsql-bugs", method: "llm",
+    store.add_link(sha: "abc", topic_id: 200, mailing_list: "pgsql-bugs", method: "trailer",
                    confidence: 0.3, verdict: "unrelated", evidence: "no", external_message_id: nil)
   end
 
@@ -29,6 +29,5 @@ RSpec.describe HackorumCommits::Exporter do
     expect(rec["facts"].map { |f| f["kind"] }).to include("reviewer")
     expect(rec["thread_links"].map { |l| l["topic_id"] }).to eq([ 100 ])
     expect(rec["generator"]["tool_version"]).to eq(HackorumCommits::VERSION)
-    expect(rec["generator"]["model"]).to eq("qwen")
   end
 end

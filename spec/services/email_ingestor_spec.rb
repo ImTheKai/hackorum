@@ -392,4 +392,39 @@ RSpec.describe EmailIngestor do
       expect(found).to eq(bugs_msg)
     end
   end
+
+  describe "#ingest_raw patch paths" do
+    let(:ingestor) { described_class.new }
+    let(:mailing_list) { create(:mailing_list) }
+
+    def raw_email(body, message_id: "inline-diff-1@example.com")
+      <<~EMAIL
+        From: sender@example.com
+        To: recipient@example.com
+        Subject: Inline patch
+        Message-ID: <#{message_id}>
+        Date: #{Time.current.rfc2822}
+
+        #{body}
+      EMAIL
+    end
+
+    it "populates patch_submission_files for inline-diff messages with no attachments" do
+      body = "Here is a patch:\n\n--- a/src/inline.c\n+++ b/src/inline.c\n@@ -1 +1 @@\n-old\n+new\n"
+      msg = ingestor.ingest_raw(raw_email(body), mailing_list: mailing_list)
+
+      expect(msg.attachments).to be_empty
+      expect(msg.patch_submission_files.pluck(:path)).to eq([ "src/inline.c" ])
+    end
+
+    it "recomputes patch paths when re-import updates the body" do
+      msg = ingestor.ingest_raw(raw_email("plain text body"), mailing_list: mailing_list)
+      expect(msg.patch_submission_files).to be_empty
+
+      new_body = "--- a/src/two.c\n+++ b/src/two.c\n@@ -1 +1 @@\n"
+      ingestor.ingest_raw(raw_email(new_body), mailing_list: mailing_list, update_existing: [ :body ])
+
+      expect(msg.reload.patch_submission_files.pluck(:path)).to eq([ "src/two.c" ])
+    end
+  end
 end

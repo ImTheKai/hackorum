@@ -58,4 +58,46 @@ RSpec.describe HackorumCommits::CommitParser do
     expect(cve[:value]).to eq("CVE-2025-1234")
     expect(fixes[:value]).to eq("deadbeefcafe1234")
   end
+
+  it "classifies 'cherry picked from commit' as cherry_picked_from, not fixes_commit" do
+    result = HackorumCommits::CommitParser.new(
+      subject: "Some backport",
+      body: "(cherry picked from commit abcdef1234567890)",
+      committer_name: "C", committer_email: "c@x"
+    ).parse
+    expect(result.facts.select { |f| f[:kind] == "fixes_commit" }).to be_empty
+    cherry = result.facts.find { |f| f[:kind] == "cherry_picked_from" }
+    expect(cherry[:value]).to eq("abcdef1234567890")
+  end
+
+  it "still classifies 'fix for commit' as fixes_commit" do
+    result = HackorumCommits::CommitParser.new(
+      subject: "Repair oversight",
+      body: "This is the fix for commit deadbeefcafe1234.",
+      committer_name: "C", committer_email: "c@x"
+    ).parse
+    fixes = result.facts.find { |f| f[:kind] == "fixes_commit" }
+    expect(fixes[:value]).to eq("deadbeefcafe1234")
+    expect(result.facts.select { |f| f[:kind] == "cherry_picked_from" }).to be_empty
+  end
+
+  describe "discussion message-id extraction" do
+    {
+      "https://postgr.es/m/abc@x"                              => "abc@x",
+      "https://postgr.es/message-id/abc@x"                     => "abc@x",
+      "https://www.postgresql.org/message-id/abc@x"            => "abc@x",
+      "https://www.postgresql.org/message-id/flat/abc@x"       => "abc@x",
+      "https://postgr.es/message-id/flat/abc@x"                => "abc@x",
+      "http://postgre.es/m/abc@x"                              => "abc@x",
+      "see https://postgr.es/m/abc@x."                         => "abc@x"
+    }.each do |url, expected|
+      it "extracts #{expected} from #{url}" do
+        parser = HackorumCommits::CommitParser.new(
+          subject: "Fix things", body: "Discussion: #{url}\n",
+          committer_name: "C", committer_email: "c@x"
+        )
+        expect(parser.message_ids).to eq([ expected ])
+      end
+    end
+  end
 end

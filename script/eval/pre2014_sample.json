@@ -1,0 +1,459 @@
+[
+ {
+  "hash": "636edd553daafeaab775d0f4054ca02fa5240ad0",
+  "cdate": "2009-04-28T17:07:50Z",
+  "author": "Bruce Momjian",
+  "subject": "Blank line Makefile cleanups.",
+  "body": "Blank line Makefile cleanups.\n\n",
+  "files": [
+   "contrib/pg_trgm/Makefile",
+   "contrib/pgrowlocks/Makefile",
+   "contrib/pgstattuple/Makefile"
+  ]
+ },
+ {
+  "hash": "280744d461fddb3ad43ca4950de91ff91ee7cae5",
+  "cdate": "2009-11-26T15:55:57Z",
+  "author": "Michael Meskes",
+  "subject": "Added missing files.",
+  "body": "Added missing files.\n\n",
+  "files": [
+   "src/interfaces/ecpg/test/expected/preproc-cursor.c",
+   "src/interfaces/ecpg/test/expected/preproc-cursor.stderr",
+   "src/interfaces/ecpg/test/expected/preproc-cursor.stdout",
+   "src/interfaces/ecpg/test/preproc/cursor.pgc"
+  ]
+ },
+ {
+  "hash": "c44327afa4f22fc5f9dfef83b7ec377f001f0930",
+  "cdate": "2009-12-24T22:09:24Z",
+  "author": "Bruce Momjian",
+  "subject": "Binary upgrade:",
+  "body": "Binary upgrade:\n\nModify pg_dump --binary-upgrade and add backend support routines to\nsupport the preservation of pg_type oids when doing a binary upgrade.\nThis allows user-defined composite types and arrays to be binary\nupgraded.\n\n",
+  "files": [
+   "src/backend/catalog/heap.c",
+   "src/backend/catalog/pg_type.c",
+   "src/backend/catalog/toasting.c",
+   "src/backend/commands/typecmds.c",
+   "src/bin/pg_dump/pg_dump.c",
+   "src/include/commands/typecmds.h"
+  ]
+ },
+ {
+  "hash": "e5efda442cfcfa20a0cf6166952c671a0f39689b",
+  "cdate": "2009-03-24T22:06:03Z",
+  "author": "Tom Lane",
+  "subject": "Install a search tree depth limit in GIN bulk-insert operations, to prevent them from degrading badly when the input is sorted or nearly so.  In this scenario the tree is unbalanced to the point of becoming a mere linked list, so insertions become O(N^2).  The easiest and most safely back-patchable solution is to stop growing the tree sooner, ie limit the growth of N.  We might later consider a rebalancing tree algorithm, but it's not clear that the benefit would be worth the cost and complexity.  Per report from Sergey Burladyan and an earlier complaint from Heikki.",
+  "body": "Install a search tree depth limit in GIN bulk-insert operations, to prevent\nthem from degrading badly when the input is sorted or nearly so.  In this\nscenario the tree is unbalanced to the point of becoming a mere linked list,\nso insertions become O(N^2).  The easiest and most safely back-patchable\nsolution is to stop growing the tree sooner, ie limit the growth of N.  We\nmight later consider a rebalancing tree algorithm, but it's not clear that\nthe benefit would be worth the cost and complexity.  Per report from Sergey\nBurladyan and an earlier complaint from Heikki.\n\nBack-patch to 8.2; older versions didn't have GIN indexes.\n\n",
+  "files": [
+   "src/backend/access/gin/ginfast.c",
+   "src/backend/access/gin/gininsert.c",
+   "src/include/access/gin.h"
+  ]
+ },
+ {
+  "hash": "923413ac6d31826bd599711962ce9cb7d51a997f",
+  "cdate": "2009-09-21T20:10:21Z",
+  "author": "Tom Lane",
+  "subject": "Define a new, more extensible syntax for COPY options.",
+  "body": "Define a new, more extensible syntax for COPY options.\n\nThis is intentionally similar to the recently revised syntax for EXPLAIN\noptions, ie, (name value, ...).  The old syntax is still supported for\nbackwards compatibility, but we intend that any options added in future\nwill be provided only in the new syntax.\n\nRobert Haas, Emmanuel Cecchet\n\n",
+  "files": [
+   "doc/src/sgml/ref/copy.sgml",
+   "src/backend/commands/copy.c",
+   "src/backend/commands/define.c",
+   "src/backend/parser/gram.y",
+   "src/test/regress/expected/copy2.out",
+   "src/test/regress/sql/copy2.sql"
+  ]
+ },
+ {
+  "hash": "f9e9da666423f38d9c0f97277cf4e21973608baf",
+  "cdate": "2010-07-05T23:15:56Z",
+  "author": "Tom Lane",
+  "subject": "Fix a few single-file (MODULES, not MODULE_big) contrib makefiles that were supposing that they should set SHLIB_LINK rather than LDFLAGS_SL.  Since these don't go through Makefile.shlib that was a no-op on most platforms.  Also regularize the few platform-specific Makefiles that did pay attention to SHLIB_LINK: it seems that the real value of that is to pull in BE_DLLLIBS, so do that instead.  Per buildfarm failures on cygwin.",
+  "body": "Fix a few single-file (MODULES, not MODULE_big) contrib makefiles that were\nsupposing that they should set SHLIB_LINK rather than LDFLAGS_SL.  Since these\ndon't go through Makefile.shlib that was a no-op on most platforms.  Also\nregularize the few platform-specific Makefiles that did pay attention to\nSHLIB_LINK: it seems that the real value of that is to pull in BE_DLLLIBS,\nso do that instead.  Per buildfarm failures on cygwin.\n\n",
+  "files": [
+   "contrib/earthdistance/Makefile",
+   "contrib/spi/Makefile",
+   "contrib/tablefunc/Makefile",
+   "src/makefiles/Makefile.aix",
+   "src/makefiles/Makefile.cygwin",
+   "src/makefiles/Makefile.darwin",
+   "src/makefiles/Makefile.win32"
+  ]
+ },
+ {
+  "hash": "013ed0bd814218076385de8bb8438e2020abdf50",
+  "cdate": "2010-07-20T03:54:19Z",
+  "author": "Robert Haas",
+  "subject": "Add \\conninfo command to psql, to show current connection info.",
+  "body": "Add \\conninfo command to psql, to show current connection info.\n\nDavid Christensen. Reviewed by Steve Singer.  Some further changes by me.\n\n",
+  "files": [
+   "doc/src/sgml/ref/psql-ref.sgml",
+   "src/bin/psql/command.c",
+   "src/bin/psql/help.c",
+   "src/bin/psql/tab-complete.c"
+  ]
+ },
+ {
+  "hash": "c8c03d72e10cab3cc47975b2689c8efbb4eade94",
+  "cdate": "2010-09-25T19:03:50-04:00",
+  "author": "Tom Lane",
+  "subject": "Fix another join removal bug: the check on PlaceHolderVars was wrong.",
+  "body": "Fix another join removal bug: the check on PlaceHolderVars was wrong.\n\nThe previous coding would decide that join removal was unsafe upon finding\na PlaceHolderVar that needed to be evaluated at the inner rel and then used\nabove the join.  However, this fails to cover the case of PlaceHolderVars\nthat refer to both the inner rel and some other rels.  Per bug report from\nAndrus.\n\n",
+  "files": [
+   "src/backend/optimizer/plan/analyzejoins.c",
+   "src/test/regress/expected/join.out",
+   "src/test/regress/sql/join.sql"
+  ]
+ },
+ {
+  "hash": "a52aa6c6db13155bc0b1b1b18fedf2310d9e7a84",
+  "cdate": "2010-10-20T20:02:37Z",
+  "author": "Bruce Momjian",
+  "subject": "Clean up pg_upgrade cache lookup code;  remove useless NULL pointer tests.",
+  "body": "Clean up pg_upgrade cache lookup code;  remove useless NULL pointer tests.\n\n",
+  "files": [
+   "contrib/pg_upgrade/info.c",
+   "contrib/pg_upgrade/pg_upgrade.h"
+  ]
+ },
+ {
+  "hash": "8c843fff2d8db7889b81782ab4f3324cbda4ed2a",
+  "cdate": "2010-11-02T11:39:48+02:00",
+  "author": "Heikki Linnakangas",
+  "subject": "Bootstrap WAL to begin at segment logid=0 logseg=1 (000000010000000000000001) rather than 0/0, so that we can safely use 0/0 as an invalid value. This is a more future-proof fix for the corner-case bug in streaming replication that was fixed yesterday. We had a similar corner-case bug with log/seg 0/0 back in February as well. Avoiding 0/0 as a valid value should prevent bugs like that in the future. Per Tom Lane's idea.",
+  "body": "Bootstrap WAL to begin at segment logid=0 logseg=1 (000000010000000000000001)\nrather than 0/0, so that we can safely use 0/0 as an invalid value. This is a\nmore future-proof fix for the corner-case bug in streaming replication that\nwas fixed yesterday. We had a similar corner-case bug with log/seg 0/0 back in\nFebruary as well. Avoiding 0/0 as a valid value should prevent bugs like that\nin the future. Per Tom Lane's idea.\n\nBack-patch to 9.0. Since this only affects bootstrapping, it makes no\ndifference to existing installations. We don't need to worry about the\nbug in existing installations, because if you've managed to get past the\ninitial base backup already, you won't hit the bug in the future either.\n\n",
+  "files": [
+   "src/backend/access/transam/xlog.c",
+   "src/backend/replication/walsender.c"
+  ]
+ },
+ {
+  "hash": "61cf7bcdf76a2a32d2400a116c8da48d5fd4d3a2",
+  "cdate": "2011-02-10T19:50:43-03:00",
+  "author": "Alvaro Herrera",
+  "subject": "Fix isolation tester Makefile so that it runs in a VPATH build",
+  "body": "Fix isolation tester Makefile so that it runs in a VPATH build\n\n",
+  "files": [
+   "src/test/isolation/Makefile",
+   "src/test/isolation/README"
+  ]
+ },
+ {
+  "hash": "1abd146dddc1dc5efff5ccac065c460108acbaa9",
+  "cdate": "2011-04-23T12:51:47-04:00",
+  "author": "Tom Lane",
+  "subject": "Adjust comments about collate.linux.utf8 regression test.",
+  "body": "Adjust comments about collate.linux.utf8 regression test.\n\nThis test should now work in any database with UTF8 encoding, regardless\nof the database's default locale.  The former restriction was really\n\"doesn't work if default locale is C\", and that was because of not handling\nmbstowcs/wcstombs correctly.\n\n",
+  "files": [
+   "doc/src/sgml/regress.sgml",
+   "src/test/regress/expected/collate.linux.utf8.out",
+   "src/test/regress/sql/collate.linux.utf8.sql"
+  ]
+ },
+ {
+  "hash": "74a1d4fe7cc092076806767925d6f34ea347efde",
+  "cdate": "2011-12-15T19:02:38-05:00",
+  "author": "Robert Haas",
+  "subject": "Improve behavior of concurrent rename statements.",
+  "body": "Improve behavior of concurrent rename statements.\n\nPreviously, renaming a table, sequence, view, index, foreign table,\ncolumn, or trigger checked permissions before locking the object, which\nmeant that if permissions were revoked during the lock wait, we would\nstill allow the operation.  Similarly, if the original object is dropped\nand a new one with the same name is created, the operation will be allowed\nif we had permissions on the old object; the permissions on the new\nobject don't matter.  All this is now fixed.\n\nAlong the way, attempting to rename a trigger on a foreign table now gives\nthe same error message as trying to create one there in the first place\n(i.e. that it's not a table or view) rather than simply stating that no\ntrigger by that name exists.\n\nPatch by me; review by Noah Misch.\n\n",
+  "files": [
+   "src/backend/commands/alter.c",
+   "src/backend/commands/cluster.c",
+   "src/backend/commands/tablecmds.c",
+   "src/backend/commands/trigger.c",
+   "src/backend/commands/typecmds.c",
+   "src/include/commands/tablecmds.h",
+   "src/include/commands/trigger.h"
+  ]
+ },
+ {
+  "hash": "6d09b2105fb5fa6e6245e7b024bfbe465b1041ee",
+  "cdate": "2011-12-15T19:40:58-05:00",
+  "author": "Andrew Dunstan",
+  "subject": "include_if_exists facility for config file.",
+  "body": "include_if_exists facility for config file.\n\nThis works the same as include, except that an error is not thrown\nif the file is missing. Instead the fact that it's missing is\nlogged.\n\nGreg Smith, reviewed by Euler Taveira de Oliveira.\n\n",
+  "files": [
+   "doc/src/sgml/config.sgml",
+   "src/backend/utils/misc/guc-file.l",
+   "src/include/utils/guc.h"
+  ]
+ },
+ {
+  "hash": "2c30f96103c320d4e3c8cab2807d88476f584278",
+  "cdate": "2011-11-09T00:13:37-05:00",
+  "author": "Tom Lane",
+  "subject": "Tweak new regression test case for more portability.",
+  "body": "Tweak new regression test case for more portability.\n\nEnsure that same index gets selected on 32-bit and 64-bit machines.\nPer buildfarm results.\n\n",
+  "files": [
+   "src/test/regress/expected/inherit.out",
+   "src/test/regress/sql/inherit.sql"
+  ]
+ },
+ {
+  "hash": "e8969c4733b15857d6af2ec024a102897bfbfbf2",
+  "cdate": "2012-08-03T12:43:37-04:00",
+  "author": "Bruce Momjian",
+  "subject": "In pg_upgrade, use pg_log() instead of prep_status() for newline-terminated messages, per suggestion from Tom.",
+  "body": "In pg_upgrade, use pg_log() instead of prep_status() for\nnewline-terminated messages, per suggestion from Tom.\n\nBackpatch to 9.2.\n\n",
+  "files": [
+   "contrib/pg_upgrade/relfilenode.c",
+   "contrib/pg_upgrade/util.c"
+  ]
+ },
+ {
+  "hash": "8e617e29aaccfdd1b85af7f50dc83aa6dd7ef550",
+  "cdate": "2012-07-20T13:10:58-04:00",
+  "author": "Tom Lane",
+  "subject": "Fix whole-row Var evaluation to cope with resjunk columns (again).",
+  "body": "Fix whole-row Var evaluation to cope with resjunk columns (again).\n\nWhen a whole-row Var is reading the result of a subquery, we need it to\nignore any \"resjunk\" columns that the subquery might have evaluated for\nGROUP BY or ORDER BY purposes.  We've hacked this area before, in commit\n68e40998d058c1f6662800a648ff1e1ce5d99cba, but that fix only covered\nwhole-row Vars of named composite types, not those of RECORD type; and it\nwas mighty klugy anyway, since it just assumed without checking that any\nextra columns in the result must be resjunk.  A proper fix requires getting\nhold of the subquery's targetlist so we can actually see which columns are\nresjunk (whereupon we can use a JunkFilter to get rid of them).  So bite\nthe bullet and add some infrastructure to make that possible.\n\nPer report from Andrew Dunstan and additional testing by Merlin Moncure.\nBack-patch to all supported branches.  In 8.3, also back-patch commit\n292176a118da6979e5d368a4baf27f26896c99a5, which for some reason I had\nnot done at the time, but it's a prerequisite for this change.\n\n",
+  "files": [
+   "src/backend/executor/execQual.c",
+   "src/backend/executor/execUtils.c",
+   "src/include/nodes/execnodes.h",
+   "src/include/nodes/nodes.h",
+   "src/test/regress/expected/subselect.out",
+   "src/test/regress/sql/subselect.sql"
+  ]
+ },
+ {
+  "hash": "d06e2d200562837afa18058937f20460a3ea526a",
+  "cdate": "2012-02-10T02:33:00-05:00",
+  "author": "Tom Lane",
+  "subject": "Add ORDER BY to a query to prevent occasional regression test failures.",
+  "body": "Add ORDER BY to a query to prevent occasional regression test failures.\n\nPer buildfarm, we sometimes get row-ordering variations in the output.\nThis also makes this query look more like numerous other ones in the same\ntest file.\n\n",
+  "files": [
+   "src/test/regress/expected/inherit.out",
+   "src/test/regress/sql/inherit.sql"
+  ]
+ },
+ {
+  "hash": "a99c42f291421572aef2b0a9360294c7d89b8bc7",
+  "cdate": "2012-12-08T18:26:21-05:00",
+  "author": "Tom Lane",
+  "subject": "Support automatically-updatable views.",
+  "body": "Support automatically-updatable views.\n\nThis patch makes \"simple\" views automatically updatable, without the need\nto create either INSTEAD OF triggers or INSTEAD rules.  \"Simple\" views\nare those classified as updatable according to SQL-92 rules.  The rewriter\ntransforms INSERT/UPDATE/DELETE commands on such views directly into an\nequivalent command on the underlying table, which will generally have\nnoticeably better performance than is possible with either triggers or\nuser-written rules.  A view that has INSTEAD OF triggers or INSTEAD rules\ncontinues to operate the same as before.\n\nFor the moment, security_barrier views are not considered simple.\nAlso, we do not support WITH CHECK OPTION.  These features may be\nadded in future.\n\nDean Rasheed, reviewed by Amit Kapila\n\n",
+  "files": [
+   "doc/src/sgml/intro.sgml",
+   "doc/src/sgml/ref/alter_table.sgml",
+   "doc/src/sgml/ref/alter_view.sgml",
+   "doc/src/sgml/ref/create_rule.sgml",
+   "doc/src/sgml/ref/create_view.sgml",
+   "doc/src/sgml/rules.sgml",
+   "src/backend/catalog/information_schema.sql",
+   "src/backend/executor/execMain.c",
+   "src/backend/rewrite/rewriteHandler.c",
+   "src/backend/utils/adt/misc.c",
+   "src/include/catalog/catversion.h",
+   "src/include/catalog/pg_proc.h",
+   "src/include/rewrite/rewriteHandler.h",
+   "src/include/utils/builtins.h",
+   "src/test/regress/expected/triggers.out",
+   "src/test/regress/expected/updatable_views.out",
+   "src/test/regress/parallel_schedule",
+   "src/test/regress/serial_schedule",
+   "src/test/regress/sql/triggers.sql",
+   "src/test/regress/sql/updatable_views.sql"
+  ]
+ },
+ {
+  "hash": "c172b7b02e6f6008d6dad66ddee8f67faf223c5b",
+  "cdate": "2012-01-23T23:37:32Z",
+  "author": "Simon Riggs",
+  "subject": "Resolve timing issue with logging locks for Hot Standby. We log AccessExclusiveLocks for replay onto standby nodes, but because of timing issues on ProcArray it is possible to log a lock that is still held by a just committed transaction that is very soon to be removed. To avoid any timing issue we avoid applying locks made by transactions with InvalidXid.",
+  "body": "Resolve timing issue with logging locks for Hot Standby.\nWe log AccessExclusiveLocks for replay onto standby nodes,\nbut because of timing issues on ProcArray it is possible to\nlog a lock that is still held by a just committed transaction\nthat is very soon to be removed. To avoid any timing issue we\navoid applying locks made by transactions with InvalidXid.\n\nSimon Riggs, bug report Tom Lane, diagnosis Pavan Deolasee\n\n",
+  "files": [
+   "src/backend/storage/ipc/procarray.c",
+   "src/backend/storage/ipc/standby.c",
+   "src/backend/storage/lmgr/lock.c",
+   "src/include/storage/standby.h"
+  ]
+ },
+ {
+  "hash": "45f64f1bbf19283795762df6a54f9aa74fee05f7",
+  "cdate": "2013-11-01T13:57:31-04:00",
+  "author": "Tom Lane",
+  "subject": "Remove CTimeZone/HasCTZSet, root and branch.",
+  "body": "Remove CTimeZone/HasCTZSet, root and branch.\n\nThese variables no longer have any useful purpose, since there's no reason\nto special-case brute force timezones now that we have a valid\nsession_timezone setting for them.  Remove the variables, and remove the\nSET/SHOW TIME ZONE code that deals with them.\n\nThe user-visible impact of this is that SHOW TIME ZONE will now show a\nPOSIX-style zone specification, in the form \"<+-offset>-+offset\", rather\nthan an interval value when a brute-force zone has been set.  While perhaps\nless intuitive, this is a better definition than before because it's\nactually possible to give that string back to SET TIME ZONE and get the\nsame behavior, unlike what used to happen.\n\nWe did not previously mention the angle-bracket syntax when describing\nPOSIX timezone specifications; add some documentation so that people\ncan figure out what these strings do.  (There's still quite a lot of\nundocumented functionality there, but anybody who really cares can\ngo read the POSIX spec to find out about it.  In practice most people\nseem to prefer Olsen-style city names anyway.)\n\n",
+  "files": [
+   "doc/src/sgml/datatype.sgml",
+   "doc/src/sgml/ref/set.sgml",
+   "src/backend/commands/variable.c",
+   "src/backend/utils/init/globals.c",
+   "src/include/miscadmin.h",
+   "src/test/regress/expected/horology.out"
+  ]
+ },
+ {
+  "hash": "f897c4744fea221dfc7bbd277081edad41d1d58d",
+  "cdate": "2013-03-21T11:21:51+02:00",
+  "author": "Heikki Linnakangas",
+  "subject": "Fix \"element <@ range\" cost estimation.",
+  "body": "Fix \"element <@ range\" cost estimation.\n\nThe statistics-based cost estimation patch for range types broke that, by\nincorrectly assuming that the left operand of all range oeprators is a\nrange. That lead to a \"type x is not a range type\" error. Because it took so\nlong for anyone to notice, add a regression test for that case.\n\nWe still don't do proper statistics-based cost estimation for that, so you\njust get a default constant estimate. We should look into implementing that,\nbut this patch at least fixes the regression.\n\nSpotted by Tom Lane, when testing query from Josh Berkus.\n\n",
+  "files": [
+   "src/backend/utils/adt/rangetypes_selfuncs.c",
+   "src/test/regress/expected/rangetypes.out",
+   "src/test/regress/sql/rangetypes.sql"
+  ]
+ },
+ {
+  "hash": "6f5b8beb64d481c28a483090d10099c8d619c797",
+  "cdate": "2013-04-10T13:31:02-04:00",
+  "author": "Tom Lane",
+  "subject": "Make contrib/pg_trgm also support regex searches with GiST indexes.",
+  "body": "Make contrib/pg_trgm also support regex searches with GiST indexes.\n\nThis wasn't addressed in the original patch, but it doesn't take very\nmuch additional code to cover the case, so let's get it done.\n\nSince pg_trgm 1.1 hasn't been released yet, I just changed the definition\nof what's in it, rather than inventing a 1.2.\n\n",
+  "files": [
+   "contrib/pg_trgm/expected/pg_trgm.out",
+   "contrib/pg_trgm/pg_trgm--1.0--1.1.sql",
+   "contrib/pg_trgm/pg_trgm--1.1.sql",
+   "contrib/pg_trgm/sql/pg_trgm.sql",
+   "contrib/pg_trgm/trgm.h",
+   "contrib/pg_trgm/trgm_gin.c",
+   "contrib/pg_trgm/trgm_gist.c",
+   "contrib/pg_trgm/trgm_op.c",
+   "contrib/pg_trgm/trgm_regexp.c",
+   "doc/src/sgml/pgtrgm.sgml"
+  ]
+ },
+ {
+  "hash": "69602772700e62b7b03e3f0ac7b10aa651c0c998",
+  "cdate": "2013-03-23T19:17:44-04:00",
+  "author": "Tom Lane",
+  "subject": "Semi-automatically detect changes in timezone abbreviations.",
+  "body": "Semi-automatically detect changes in timezone abbreviations.\n\nAdd an option to zic.c to dump out all non-obsolete timezone abbreviations\ndefined in the Olson database.  Comparing this list to its previous state\nwill clue us in when something happens that we may need to account for in\nthe tznames/ time zone abbreviation lists.  The README file's previous\nexhortation to \"just grep for differences\" was completely useless advice,\nin my now-considerable experience; but maybe this will be a bit more\nuseful.  As a starting point I built the same list from the tzdata files\nas they existed in 2006, which is committed here as known_abbrevs.txt.\nComparison indeed turned up quite a few changes we had neglected to account\nfor, which I will commit separately.\n\n",
+  "files": [
+   "src/timezone/.gitignore",
+   "src/timezone/Makefile",
+   "src/timezone/README",
+   "src/timezone/known_abbrevs.txt",
+   "src/timezone/zic.c"
+  ]
+ },
+ {
+  "hash": "dc3eb5638349e74a6628130a5101ce866455f4a3",
+  "cdate": "2013-06-12T17:53:33-04:00",
+  "author": "Tom Lane",
+  "subject": "Improve updatability checking for views and foreign tables.",
+  "body": "Improve updatability checking for views and foreign tables.\n\nExtend the FDW API (which we already changed for 9.3) so that an FDW can\nreport whether specific foreign tables are insertable/updatable/deletable.\nThe default assumption continues to be that they're updatable if the\nrelevant executor callback function is supplied by the FDW, but finer\ngranularity is now possible.  As a test case, add an \"updatable\" option to\ncontrib/postgres_fdw.\n\nThis patch also fixes the information_schema views, which previously did\nnot think that foreign tables were ever updatable, and fixes\nview_is_auto_updatable() so that a view on a foreign table can be\nauto-updatable.\n\ninitdb forced due to changes in information_schema views and the functions\nthey rely on.  This is a bit unfortunate to do post-beta1, but if we don't\nchange this now then we'll have another API break for FDWs when we do\nchange it.\n\nDean Rasheed, somewhat editorialized on by Tom Lane\n\n",
+  "files": [
+   "contrib/postgres_fdw/expected/postgres_fdw.out",
+   "contrib/postgres_fdw/option.c",
+   "contrib/postgres_fdw/postgres_fdw.c",
+   "contrib/postgres_fdw/sql/postgres_fdw.sql",
+   "doc/src/sgml/fdwhandler.sgml",
+   "doc/src/sgml/postgres-fdw.sgml",
+   "src/backend/catalog/information_schema.sql",
+   "src/backend/executor/execMain.c",
+   "src/backend/rewrite/rewriteHandler.c",
+   "src/backend/utils/adt/misc.c",
+   "src/include/catalog/catversion.h",
+   "src/include/catalog/pg_proc.h",
+   "src/include/foreign/fdwapi.h",
+   "src/include/rewrite/rewriteHandler.h",
+   "src/include/utils/builtins.h"
+  ]
+ },
+ {
+  "hash": "a7e587863cab80b8896593f20b41e53d65155932",
+  "cdate": "2009-07-24T20:12:42Z",
+  "author": "Magnus Hagander",
+  "subject": "Reserve the shared memory region during backend startup on Windows, so that memory allocated by starting third party DLLs doesn't end up conflicting with it.",
+  "body": "Reserve the shared memory region during backend startup on Windows, so\nthat memory allocated by starting third party DLLs doesn't end up\nconflicting with it.\n\nHopefully this solves the long-time issue with \"could not reattach\nto shared memory\" errors on Win32.\n\nPatch from Tsutomu Yamada and me, based on idea from Trevor Talbot.\n\n",
+  "files": [
+   "src/backend/port/win32_shmem.c",
+   "src/backend/postmaster/postmaster.c",
+   "src/include/port/win32.h"
+  ]
+ },
+ {
+  "hash": "dacaeff5ae2978bd1e77c16bd79ce99d5f9b5382",
+  "cdate": "2009-09-18T13:13:32Z",
+  "author": "Michael Meskes",
+  "subject": "Added patch by Bernd Helmle <bernd.helmle@credativ.de> that adds a low level function that returns the current transaction status.",
+  "body": "Added patch by Bernd Helmle <bernd.helmle@credativ.de> that adds a low level\nfunction that returns the current transaction status.\n\n",
+  "files": [
+   "doc/src/sgml/ecpg.sgml",
+   "src/interfaces/ecpg/ecpglib/exports.txt",
+   "src/interfaces/ecpg/ecpglib/misc.c",
+   "src/interfaces/ecpg/include/ecpglib.h"
+  ]
+ },
+ {
+  "hash": "d0cfc018233b4cdcab28d460ee0e14dbf87ac4ce",
+  "cdate": "2010-01-29T17:44:12Z",
+  "author": "Robert Haas",
+  "subject": "Allow psql variables to be interpolated with literal or identifier escaping.",
+  "body": "Allow psql variables to be interpolated with literal or identifier escaping.\n\nLoosely based on a patch by Pavel Stehule.\n\n",
+  "files": [
+   "doc/src/sgml/ref/psql-ref.sgml",
+   "src/bin/psql/psqlscan.l"
+  ]
+ },
+ {
+  "hash": "b7fcf68e8632e757a50352c9567bb630ed285201",
+  "cdate": "2010-11-16T22:18:33-05:00",
+  "author": "Andrew Dunstan",
+  "subject": "Require VALUE keyword when extending an enum type. Based on a patch from Alvaro Herrera.",
+  "body": "Require VALUE keyword when extending an enum type. Based on a patch from Alvaro Herrera.\n\n",
+  "files": [
+   "doc/src/sgml/ref/alter_type.sgml",
+   "src/backend/parser/gram.y",
+   "src/test/regress/expected/enum.out",
+   "src/test/regress/sql/enum.sql"
+  ]
+ },
+ {
+  "hash": "ccd69b888641441b2332dc928ada1390dd0c318a",
+  "cdate": "2011-06-04T19:32:10-04:00",
+  "author": "Andrew Dunstan",
+  "subject": "Allow building with perl 5.14.",
+  "body": "Allow building with perl 5.14.\n\nPatch from Alex Hunsaker.\n\n",
+  "files": [
+   "src/pl/plperl/plperl.c",
+   "src/pl/plperl/plperl.h"
+  ]
+ },
+ {
+  "hash": "a9dad56441e4bc5d20c34bd56daf8e72df1b22d3",
+  "cdate": "2012-11-08T10:28:52+02:00",
+  "author": "Heikki Linnakangas",
+  "subject": "Teach pg_basebackup and pg_receivexlog to reply to server keepalives.",
+  "body": "Teach pg_basebackup and pg_receivexlog to reply to server keepalives.\n\nWithout this, the connection will be killed after timeout if\nwal_sender_timeout is set in the server.\n\nOriginal patch by Amit Kapila, modified by me to fit recent changes in the\ncode.\n\n",
+  "files": [
+   "doc/src/sgml/ref/pg_basebackup.sgml",
+   "doc/src/sgml/ref/pg_receivexlog.sgml",
+   "src/bin/pg_basebackup/receivelog.c"
+  ]
+ },
+ {
+  "hash": "ed962fd712bbc0836437c8f789d9152aca5711b5",
+  "cdate": "2012-05-22T19:42:05-04:00",
+  "author": "Tom Lane",
+  "subject": "Ensure that seqscans check for interrupts at least once per page.",
+  "body": "Ensure that seqscans check for interrupts at least once per page.\n\nIf a seqscan encounters many consecutive pages containing only dead tuples,\nit can remain in the loop in heapgettup for a long time, and there was no\nCHECK_FOR_INTERRUPTS anywhere in that loop.  This meant there were\nreal-world situations where a query would be effectively uncancelable for\nlong stretches.  Add a check placed to occur once per page, which should be\nenough to provide reasonable response time without adding any measurable\noverhead.\n\nReport and patch by Merlin Moncure (though I tweaked it a bit).\nBack-patch to all supported branches.\n\n",
+  "files": [
+   "src/backend/access/heap/heapam.c"
+  ]
+ },
+ {
+  "hash": "efc7952c89f3079c86156fae313255eadcd4a5e7",
+  "cdate": "2013-05-20T22:38:42-04:00",
+  "author": "Bruce Momjian",
+  "subject": "9.3 release docs: fix DROP TABLE IF EXISTS Patch from Joe Abbate.",
+  "body": "9.3 release docs: fix DROP TABLE IF EXISTS\nPatch from Joe Abbate.\n\n",
+  "files": [
+   "doc/src/sgml/release-9.3.sgml"
+  ]
+ },
+ {
+  "hash": "74242c23c1c6428c6da09fa37264c7f4f1438738",
+  "cdate": "2013-12-05T12:48:28-05:00",
+  "author": "Tom Lane",
+  "subject": "Clear retry flags properly in replacement OpenSSL sock_write function.",
+  "body": "Clear retry flags properly in replacement OpenSSL sock_write function.\n\nCurrent OpenSSL code includes a BIO_clear_retry_flags() step in the\nsock_write() function.  Either we failed to copy the code correctly, or\nthey added this since we copied it.  In any case, lack of the clear step\nappears to be the cause of the server lockup after connection loss reported\nin bug #8647 from Valentine Gogichashvili.  Assume that this is correct\ncoding for all OpenSSL versions, and hence back-patch to all supported\nbranches.\n\nDiagnosis and patch by Alexander Kukushkin.\n\n",
+  "files": [
+   "src/backend/libpq/be-secure.c"
+  ]
+ }
+]

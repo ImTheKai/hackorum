@@ -44,3 +44,8 @@ CLAUDE.md
 
 # Local PostgreSQL clone used by the commit-history-parsing tool/specs
 /postgres/
+
+# Working DB / output / patch cache produced by script/hackorum_commits.rb
+/.hackorum-commits/
+/state.db
+/commits.jsonl

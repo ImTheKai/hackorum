@@ -94,4 +94,11 @@ RSpec.describe HackorumCommits::GitWalker do
     expect(relations.first["method"]).to eq("heuristic")
     expect(relations.first["to_sha"]).to eq(sha1)
   end
+
+  it "captures changed files per commit" do
+    walker = described_class.new(repo: repo, store: store, branches: [ "master" ])
+    walker.walk!
+    files = store.db.execute("SELECT files FROM commits").map { |r| JSON.parse(r["files"] || "[]") }
+    expect(files).to all(eq([ "file.txt" ]))
+  end
 end

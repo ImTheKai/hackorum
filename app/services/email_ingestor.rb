@@ -85,6 +85,8 @@ class EmailIngestor
     add_mentions(msg, cc)
 
     handle_attachments(m, msg)
+    # attachment callbacks already recompute; only needed for inline-only diffs
+    msg.recompute_patch_paths! if msg.attachments.none?
 
     MessageActivityBuilder.new(msg).process!
 
@@ -101,7 +103,7 @@ class EmailIngestor
     return if update_existing.empty? && message.state != Message::STATE_PENDING
 
     updates = {}
-    updates[:body] = body if update_existing.include?(:body)
+    updates[:body] = body if update_existing.include?(:body) && message.body != body
 
     if update_existing.include?(:date) && sent_at && message.created_at != sent_at
       updates[:created_at] = sent_at
@@ -127,6 +129,7 @@ class EmailIngestor
     end
 
     message.update_columns(updates) if updates.any?
+    message.recompute_patch_paths! if updates.key?(:body)
 
     if flipped_to_sent
       pending_age = message.sent_at ? (Time.current - message.sent_at).to_i : nil

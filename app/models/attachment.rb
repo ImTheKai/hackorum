@@ -120,6 +120,7 @@ class Attachment < ApplicationRecord
 
   def recompute_message_patch_submission
     message&.recompute_patch_submission!
+    message&.recompute_patch_paths!
   end
 
   def update_topic_has_attachments

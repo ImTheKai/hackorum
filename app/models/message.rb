@@ -6,6 +6,7 @@ class Message < ApplicationRecord
 
   has_many :replies, class_name: "Message", foreign_key: "reply_to_id", inverse_of: :reply_to
   has_many :attachments
+  has_many :patch_submission_files, dependent: :delete_all
 
   has_many :mentions
   has_many :mentioned_aliases, through: :mentions, source: :alias
@@ -37,6 +38,19 @@ class Message < ApplicationRecord
   def recompute_patch_submission!
     new_value = attachments.reload.any?(&:patch_submission_candidate?)
     update_column(:is_patch_submission, new_value) if is_patch_submission != new_value
+  end
+
+  def recompute_patch_paths!
+    paths = PatchPathExtractor.call(self)
+    transaction do
+      patch_submission_files.delete_all
+      if paths.any?
+        PatchSubmissionFile.insert_all(paths.map { |p| { message_id: id, path: p } })
+      end
+    end
+    # delete_all marks the association loaded with a stale empty target;
+    # insert_all is raw SQL and never updates it, so drop the cache.
+    patch_submission_files.reset
   end
 
   private

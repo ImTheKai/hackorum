@@ -1,8 +1,25 @@
 version: "3.9"
 
+# Bounded, gzip-compressed logging so no container can fill the disk.
+# local driver rotates by size and compresses rotated files.
+x-logging-verbose: &logging-verbose
+  driver: local
+  options:
+    max-size: "250m"
+    max-file: "100"
+    compress: "true"
+
+x-logging-default: &logging-default
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "15"
+    compress: "true"
+
 services:
   db:
     image: postgres:18
+    logging: *logging-default
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -33,6 +50,7 @@ services:
 
   web:
     build: ..
+    logging: *logging-verbose
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackorum}}
@@ -75,6 +93,7 @@ services:
 
   mailserver:
     image: ghcr.io/docker-mailserver/docker-mailserver:14.0.0
+    logging: *logging-default
     hostname: mail.hackorum.dev
     env_file: mail.env
     ports:
@@ -97,6 +116,7 @@ services:
 
   umami:
     image: ghcr.io/umami-software/umami:latest
+    logging: *logging-default
     env_file: .env
     environment:
       DATABASE_URL: ${UMAMI_DATABASE_URL:-postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASSWORD:-umami}@db:5432/${UMAMI_DB:-umami}}
@@ -113,6 +133,7 @@ services:
 
   imap_worker:
     build: ..
+    logging: *logging-default
     command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
     env_file: .env
     environment:
@@ -139,6 +160,7 @@ services:
 
   imap_worker_local:
     build: ..
+    logging: *logging-default
     command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
     env_file: .env
     environment:
@@ -172,6 +194,7 @@ services:
 
   caddy:
     image: caddy:latest
+    logging: *logging-verbose
     ports:
       - "80:80"
       - "443:443"
@@ -187,6 +210,7 @@ services:
 
   autoheal:
     image: willfarrell/autoheal
+    logging: *logging-default
     environment:
       AUTOHEAL_CONTAINER_LABEL: autoheal
       AUTOHEAL_INTERVAL: 30
@@ -197,6 +221,7 @@ services:
 
   psql:
     image: postgres:18
+    logging: *logging-default
     entrypoint: ["psql", "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackorum}"]
     env_file: .env
     depends_on:

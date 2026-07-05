@@ -265,6 +265,26 @@ If you need to import the historical mailing list archive before running the app
    ```
    Ensure the same env in `deploy/.env` is present so the importer can connect to the DB.
 
+## Logging
+All services log to stdout/stderr, captured by Docker's `local` driver (see the
+`x-logging-*` anchors in `docker-compose.yml`). The driver rotates by size and
+gzip-compresses rotated files, so no container can fill the disk.
+
+- **Verbose tier** (`caddy`, `web`): `250m` × `100` files ≈ ~2.4 GB gzipped on disk,
+  roughly 3 months of history at current traffic.
+- **Default tier** (everyone else): `20m` × `15` files ≈ ~30 MB. Kept tight on purpose
+  so a misbehaving quiet service caps at ~300 MB instead of running away.
+- Retention is **size-based**, not time-based — the "months" figures are estimates
+  calibrated to current volume, not guarantees.
+
+View logs as before: `docker compose logs -f caddy`. Confirm the driver is applied with
+`docker inspect -f '{{.HostConfig.LogConfig}}' <container>`.
+
+**Applying a logging change requires recreating the container**, not just restarting it.
+`docker compose up -d` recreates containers to pick up new `logging:` config. Named
+volumes (`pgdata`, `caddy_data`, `maildata`, …) are untouched; only the container's old
+stdout/stderr capture file is discarded.
+
 ## Health and watchdog
 - Containers have healthchecks. `autoheal` will restart ones labeled `autoheal=true` when unhealthy.
 - `restart: unless-stopped` is enabled for long-lived services.
@@ -278,4 +298,6 @@ docker compose up -d --build
 
 ## Notes / future improvements
 - Swap local dumps for remote object storage later if needed.
-- Add log shipping/metrics if needed; for now Docker logs go to the host.
+- Docker logs are bounded/compressed on the host via the `local` driver (see "Logging").
+  Add log shipping/metrics (e.g. Loki, Vector) if off-host history or querying is needed.
+- Reduce Caddy log volume if desired (skip health-check / static-asset lines).

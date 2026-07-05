@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-RSpec.describe Imap::GmailClient, type: :service do
+RSpec.describe Imap::Client, type: :service do
   let(:imap_double) { instance_double(Net::IMAP) }
 
   before do
@@ -41,6 +41,18 @@ RSpec.describe Imap::GmailClient, type: :service do
     client.connect!
     expect(imap_double).to receive(:uid_store).with(123, '+FLAGS.SILENT', [ :Seen ])
     expect(client.mark_seen(123)).to be true
+  end
+
+  it 'accepts INBOX as the mailbox against a generic host' do
+    expect {
+      described_class.new(host: 'mailserver', port: 143, ssl: false, username: 'receiver@hackorum.dev', password: 'x', mailbox: 'INBOX')
+    }.not_to raise_error
+  end
+
+  it 'raises ArgumentError for a blank mailbox' do
+    expect {
+      described_class.new(username: 'u', password: 'p', mailbox: '')
+    }.to raise_error(ArgumentError)
   end
 
   it 'runs an idle cycle and yields responses when activity occurs' do

@@ -1,0 +1,8 @@
+# Track only hand-written config; ignore docker-mailserver runtime state.
+# (Each parent dir must be un-ignored before a nested file can be tracked.)
+*
+!.gitignore
+!dovecot.cf
+!rspamd
+!rspamd/override.d
+!rspamd/override.d/multimap.conf

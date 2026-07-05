@@ -27,3 +27,10 @@ dumps.hackorum.dev {
     output stdout
   }
 }
+
+mail.hackorum.dev {
+  respond "mail host" 404
+  log {
+    output stdout
+  }
+}

@@ -13,7 +13,7 @@
 # Required environment
 # - IMAP_USERNAME: Gmail username (email)
 # - IMAP_PASSWORD: Gmail App Password (with 2FA enabled)
-# - IMAP_MAILBOX_LABEL: dedicated Gmail label for list mail (configure a Gmail filter)
+# - IMAP_MAILBOX_LABEL: mailbox to read (INBOX for a dedicated account, or a Gmail label for a shared account)
 #
 # Optional environment
 # - IMAP_HOST (default: imap.gmail.com)
@@ -37,7 +37,7 @@ require_relative "../app/services/imap_idle_runner"
 logger = defined?(Rails) ? Rails.logger : Logger.new($stdout)
 label = ENV['IMAP_MAILBOX_LABEL']
 if label.nil? || label.strip.empty?
-  STDERR.puts 'ERROR: IMAP_MAILBOX_LABEL must be set to a dedicated Gmail label (not INBOX). Configure a Gmail filter to label list mail.'
+  STDERR.puts 'ERROR: IMAP_MAILBOX_LABEL must be set: use INBOX for a dedicated mail account, or a Gmail label for a shared account.'
   exit 1
 end
 

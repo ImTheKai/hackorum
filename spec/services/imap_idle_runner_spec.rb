@@ -3,7 +3,7 @@
 require 'rails_helper'
 
 RSpec.describe ImapIdleRunner, type: :service do
-  let(:imap_client) { instance_double(Imap::GmailClient) }
+  let(:imap_client) { instance_double(Imap::Client) }
 
   before do
     # Ensure the advisory lock yields in tests
@@ -48,6 +48,16 @@ RSpec.describe ImapIdleRunner, type: :service do
       # Mail.message_id returns value without angle brackets; DB stores it likewise
       expect(Message.find_by(message_id: 'uid-101@example.com')).to be_present
     end
+
+  describe "mailbox/label validation" do
+    it "accepts INBOX as the label" do
+      expect { described_class.new(label: "INBOX", client: imap_client) }.not_to raise_error
+    end
+
+    it "raises ArgumentError for a blank label" do
+      expect { described_class.new(label: "", client: imap_client) }.to raise_error(ArgumentError)
+    end
+  end
 
   describe "mailing list resolution from To/CC" do
     let!(:hackers_list) { create(:mailing_list, identifier: "pgsql-hackers", display_name: "hackers", email: "pgsql-hackers@lists.postgresql.org") }

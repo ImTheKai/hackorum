@@ -73,6 +73,28 @@ services:
     labels:
       autoheal: "true"
 
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:14.0.0
+    hostname: mail.hackorum.dev
+    env_file: mail.env
+    ports:
+      - "25:25"
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - maillogs:/var/log/mail
+      - ./dms/config:/tmp/docker-mailserver
+      - caddy_data:/caddy-certs:ro
+    restart: unless-stopped
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss -lnt | grep -q ':25 ' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      autoheal: "true"
+
   umami:
     image: ghcr.io/umami-software/umami:latest
     env_file: .env
@@ -106,6 +128,39 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -v grep | grep -q imap_idle.rb"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+
+  imap_worker_local:
+    build: ..
+    command: ["bundle", "exec", "ruby", "script/imap_idle.rb"]
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackorum}}
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-hackorum}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      IMAP_HOST: mailserver
+      IMAP_PORT: "143"
+      IMAP_SSL: "false"
+      IMAP_USERNAME: ${RECEIVER_EMAIL:-receiver@hackorum.dev}
+      IMAP_PASSWORD: ${RECEIVER_PASSWORD}
+      IMAP_MAILBOX_LABEL: INBOX
+    depends_on:
+      db:
+        condition: service_healthy
+      mailserver:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "ps -ef | grep -v grep | grep -q imap_idle.rb"]
       interval: 30s
@@ -154,3 +209,6 @@ volumes:
   pgdumps:
   caddy_data:
   caddy_config:
+  maildata:
+  mailstate:
+  maillogs:

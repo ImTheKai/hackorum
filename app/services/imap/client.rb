@@ -3,9 +3,9 @@
 require "net/imap"
 
 module Imap
-  # Thin wrapper around Net::IMAP for Gmail usage.
+  # Thin wrapper around Net::IMAP (Gmail or any IMAP server).
   # Provides connect/login/select, UID search/fetch, IDLE, and mark-seen helpers.
-  class GmailClient
+  class Client
     DEFAULT_HOST = "imap.gmail.com"
     DEFAULT_PORT = 993
 
@@ -26,7 +26,7 @@ module Imap
       @imap = nil
       @selected = nil
       if @mailbox.nil? || @mailbox.to_s.strip.empty?
-        raise ArgumentError, "IMAP_MAILBOX_LABEL is required and must not be INBOX; configure a dedicated Gmail label for list mail"
+        raise ArgumentError, "IMAP_MAILBOX_LABEL is required: use INBOX for a dedicated mail account, or a Gmail label for a shared account"
       end
     end
 

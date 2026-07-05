@@ -8,13 +8,13 @@ class ImapIdleRunner
                  ingestor: EmailIngestor.new,
                  logger: (defined?(Rails) ? Rails.logger : Logger.new($stdout)))
     @label = label
-    @client = client || Imap::GmailClient.new(mailbox: label)
+    @client = client || Imap::Client.new(mailbox: label)
     @ingestor = ingestor
     @logger = logger
     @backoff = 1
     @stop = false
     if @label.nil? || @label.to_s.strip.empty?
-      raise ArgumentError, "IMAP_MAILBOX_LABEL is required and must point to a dedicated Gmail label (not INBOX)"
+      raise ArgumentError, "IMAP_MAILBOX_LABEL is required: use INBOX for a dedicated mail account, or a Gmail label for a shared account"
     end
   end
 

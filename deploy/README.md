@@ -109,6 +109,67 @@ Access:
     run inside the `web` container's Puma process. Do not disable.
 - Rails runtime: `RAILS_ENV=production`, `RAILS_LOG_TO_STDOUT=1`, `RAILS_SERVE_STATIC_FILES=1`
 
+## Local mail server (list ingestion)
+Runs `docker-mailserver` as MX for `hackorum.dev`, receiving list mail at
+`receiver@hackorum.dev`. A second worker, `imap_worker_local`, ingests that
+mailbox in parallel with the Gmail `imap_worker` until cutover. Dedup is by
+`Message-ID`, so both workers can run at once with no duplicate messages.
+
+### DNS
+- `A   mail.hackorum.dev  → <VPS IP>`
+- `MX  hackorum.dev       → mail.hackorum.dev` (priority 10)
+
+### First-time setup
+1. Set `RECEIVER_EMAIL` and `RECEIVER_PASSWORD` in `deploy/.env`.
+2. Start the mailserver and create the account:
+   ```bash
+   cd deploy
+   docker compose up -d mailserver
+   docker compose exec mailserver setup email add receiver@hackorum.dev "$RECEIVER_PASSWORD"
+   ```
+3. (TLS) Ensure `mail.hackorum.dev` is in the Caddyfile so Caddy issues the cert
+   used for port-25 STARTTLS (see `mail.env` `SSL_*`). Verify Caddy's cert path
+   matches `SSL_CERT_PATH`/`SSL_KEY_PATH`:
+   `docker compose exec caddy ls /data/caddy/certificates`.
+4. Start the local ingester:
+   ```bash
+   docker compose up -d imap_worker_local
+   ```
+
+### Subscribe to the lists
+Subscribe `receiver@hackorum.dev` to `pgsql-hackers`, `pgsql-bugs`,
+`pgsql-committers`. The confirmation mails land in the mailbox — read them and
+complete the opt-in:
+```bash
+docker compose exec mailserver setup email list       # confirm the account exists
+docker compose exec mailserver bash -lc 'ls -la /var/mail/hackorum.dev/receiver/new'
+```
+
+### Parallel run and cutover
+- Both `imap_worker` (Gmail) and `imap_worker_local` (local) run at once.
+- Watch `/admin/imap_sync_states`: two rows appear (the Gmail label and `INBOX`).
+  Healthy signal — the local worker ingests messages Gmail was dropping.
+- Once local coverage is confirmed complete, cut over:
+  ```bash
+  docker compose stop imap_worker
+  # unsubscribe the Gmail account from the lists, then remove the imap_worker
+  # block from docker-compose.yml and redeploy.
+  ```
+
+### Spam filtering
+Rspamd is enabled so junk sent to `receiver@` is still filtered, but PostgreSQL
+list mail is allowlisted so it is never dropped: `rspamd/override.d/multimap.conf`
+gives a large negative score to mail whose **envelope sender** domain is
+`postgresql.org`/`lists.postgresql.org` **and** passes SPF (`require_symbols = "R_SPF_ALLOW"`),
+so it cannot be spoofed. To confirm it fires, check the Rspamd log / headers for the
+`POSTGRESQL_SPF_ALLOW` symbol on an ingested list message. To allowlist more
+infrastructure, add domains to the `map` list.
+
+### Backups
+The maildir (`maildata` volume) is a spool — Postgres is the source of truth once
+messages are ingested. Keep the volume as a replay safety net; it is intentionally
+not part of the monthly dump rotation.
+
 ## Credentials & encryption
 The app stores per-user Gmail OAuth tokens (`Identity#refresh_token`,
 `Identity#access_token`) using Active Record Encryption. The encryption keys

@@ -1,0 +1,597 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "049e98fc0c531c80dbcab8f8644dc7504f39aebec4ede7ac9cf4d54f61fe95e0",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 559,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (#{\"SELECT DISTINCT topic_id FROM thread_awarenesses WHERE user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\nUNION\\nSELECT DISTINCT topic_id FROM message_read_ranges WHERE user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\n\".squish})\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_new_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "11df77dafcba98b8cc277c31837e21e2d6e59db1b3e8e6ef5907f176c68a58f0",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/help_controller.rb",
+      "line": 25,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Rails.root.join(\"app/views/help/pages\", \"#{params[:slug]}.md\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "HelpController",
+        "method": "show"
+      },
+      "user_input": "params[:slug]",
+      "confidence": "Weak",
+      "note": "slug whitelisted against PAGES hash"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "211885196f9ecaba59b65b70a3318b7ac3a9661392aee62a03eb7bac490c8d42",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/page_load_stat.rb",
+      "line": 63,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"CASE\\n  WHEN render_time >= 0    AND render_time < 50   THEN 0\\n  WHEN render_time >= 50   AND render_time < 100  THEN 1\\n  WHEN render_time >= 100  AND render_time < 200  THEN 2\\n  WHEN render_time >= 200  AND render_time < 500  THEN 3\\n  WHEN render_time >= 500  AND render_time < 1000 THEN 4\\n  ELSE 5\\nEND AS #{as_name}\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "PageLoadStat",
+        "method": "PageLoadStat.histogram_case_sql"
+      },
+      "user_input": "as_name",
+      "confidence": "Medium",
+      "note": "as_name only called with literal"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "22b55615f295d086eb71ef7b720866ac46d04b23aebdf48cd61062050b66ef12",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 592,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.select_all(\"WITH buckets(bucket) AS (\\n  VALUES #{[{ :label => \"0-1\", :max => 1 }, { :label => \"2-7\", :max => 7 }, { :label => \"8-30\", :max => 30 }, { :label => \"31-90\", :max => 90 }, { :label => \"91-180\", :max => 180 }, { :label => \"181-365\", :max => 365 }, { :label => \"365+\", :max => nil }].map do\n \"('#{entry[:label]}')\"\n end.join(\", \")}\\n),\\ntopic_buckets AS (\\n  SELECT ita.interval_start,\\n         CASE\\n           WHEN tl.longevity_days <= 1 THEN '0-1'\\n           WHEN tl.longevity_days <= 7 THEN '2-7'\\n           WHEN tl.longevity_days <= 30 THEN '8-30'\\n           WHEN tl.longevity_days <= 90 THEN '31-90'\\n           WHEN tl.longevity_days <= 180 THEN '91-180'\\n           WHEN tl.longevity_days <= 365 THEN '181-365'\\n           ELSE '365+'\\n         END AS bucket\\n  FROM tmp_interval_topic_activity ita\\n  INNER JOIN tmp_topic_longevity tl ON tl.topic_id = ita.topic_id\\n),\\ncounts AS (\\n  SELECT interval_start, bucket, COUNT(*) AS count\\n  FROM topic_buckets\\n  GROUP BY interval_start, bucket\\n)\\nSELECT\\n  ti.interval_start,\\n  ti.interval_end,\\n  b.bucket,\\n  COALESCE(c.count, 0) AS count\\nFROM tmp_intervals ti\\nCROSS JOIN buckets b\\nLEFT JOIN counts c\\n  ON c.interval_start = ti.interval_start\\n AND c.bucket = b.bucket\\nORDER BY ti.interval_start, b.bucket\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StatsAggregator",
+        "method": "upsert_longevity_histogram"
+      },
+      "user_input": "[{ :label => \"0-1\", :max => 1 }, { :label => \"2-7\", :max => 7 }, { :label => \"8-30\", :max => 30 }, { :label => \"31-90\", :max => 90 }, { :label => \"91-180\", :max => 180 }, { :label => \"181-365\", :max => 365 }, { :label => \"365+\", :max => nil }].map do\n \"('#{entry[:label]}')\"\n end.join(\", \")",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "233ac9356da586294675ed69215bde43756e052b467bf93fcfbe9d9a0dd13c17",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 261,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"CREATE TEMP TABLE tmp_interval_topics AS\\nSELECT topics.id,\\n       #{interval_expr_for(granularity).gsub(\"created_at\", \"topics.created_at\")} AS interval_start\\nFROM topics\\nWHERE created_at BETWEEN '#{start_date.beginning_of_day.to_fs(:db)}' AND '#{end_date.end_of_day.to_fs(:db)}'\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StatsAggregator",
+        "method": "prepare_interval_tables"
+      },
+      "user_input": "interval_expr_for(granularity).gsub(\"created_at\", \"topics.created_at\")",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "266136db2a0fcda4efe07563a4b2905ee5bd5e6320b6c32f4258eed50051a142",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 824,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Message.where(\"messages.created_at #{(case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend or operator)} ?\", DateParser.new(value).parse)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_messages_date_selector"
+      },
+      "user_input": "case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "Cross-Site Scripting",
+      "warning_code": 2,
+      "fingerprint": "2ab98b9dbbe02af97e9c88b9aecb9784287e069185dd3fb58fdfb9c49697cf4b",
+      "check_name": "CrossSiteScripting",
+      "message": "Unescaped parameter value",
+      "file": "app/views/help/show.html.slim",
+      "line": 3,
+      "link": "https://brakemanscanner.org/docs/warning_types/cross_site_scripting",
+      "code": "render_markdown(File.read(Rails.root.join(\"app/views/help/pages\", \"#{params[:slug]}.md\")))",
+      "render_path": [
+        {
+          "type": "controller",
+          "class": "HelpController",
+          "method": "show",
+          "line": 28,
+          "file": "app/controllers/help_controller.rb",
+          "rendered": {
+            "name": "help/show",
+            "file": "app/views/help/show.html.slim"
+          }
+        }
+      ],
+      "location": {
+        "type": "template",
+        "template": "help/show"
+      },
+      "user_input": "params[:slug]",
+      "confidence": "Weak",
+      "note": "markdown rendered from repo-controlled files"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "32fc7c418fb59ade5c7ad49a81698c9b0975c481777b0f53739f97591ce9823e",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 230,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"INSERT INTO tmp_intervals (interval_start, interval_end)\\nVALUES #{intervals.map do\n \"('#{interval[:start].to_fs(:db)}', '#{interval[:end].to_fs(:db)}')\"\n end.join(\", \")}\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StatsAggregator",
+        "method": "prepare_interval_tables"
+      },
+      "user_input": "intervals.map do\n \"('#{interval[:start].to_fs(:db)}', '#{interval[:end].to_fs(:db)}')\"\n end.join(\", \")",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "3bb951c15c6166e79605c5d21f65d3205a61b9f005dcd5d0deb481d0c4a12c53",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 239,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "apply_participant_row_condition(TopicParticipant.where(:person_id => person_ids), cond).where(:topic_id => build_body_condition_subquery(person_ids, conditions.select do\n (c[:key] == :body)\n end.first[:value], conditions.select do\n (c[:key] == :body)\n end.first[:quoted])).group(:topic_id).having(\"SUM(topic_participants.message_count) #{op} ?\", num)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "build_from_condition_query"
+      },
+      "user_input": "op",
+      "confidence": "Weak",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "58ee2e7a33248da7c298485e751b522164eb19d947622136f811f6716067104c",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 562,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id NOT IN (#{\"SELECT DISTINCT topic_id FROM thread_awarenesses WHERE user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\nUNION\\nSELECT DISTINCT topic_id FROM message_read_ranges WHERE user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\n\".squish})\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_new_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "61b14e67ff94ad182e1ec4f0e131491bf8abeb82fccb09f213db85cfc77985a0",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/scripts_controller.rb",
+      "line": 11,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Rails.root.join(\"public\", \"scripts\", \"#{params[:name]}.changelog.json\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "ScriptsController",
+        "method": "version"
+      },
+      "user_input": "params[:name]",
+      "confidence": "High",
+      "note": "name validated against /\\A[a-z0-9-]+\\z/i before path use"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "711c6d6a2f181e536b9eed559a028e015799f8b642ace3fee118740a804d4e06",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 237,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"CREATE TEMP TABLE tmp_interval_messages AS\\nSELECT tm.*,\\n       #{interval_expr_for(granularity)} AS interval_start\\nFROM tmp_messages tm\\nWHERE created_at BETWEEN '#{start_date.beginning_of_day.to_fs(:db)}' AND '#{end_date.end_of_day.to_fs(:db)}'\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StatsAggregator",
+        "method": "prepare_interval_tables"
+      },
+      "user_input": "interval_expr_for(granularity)",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "7987434b01f84254163964fabc0e00de95fcf30d37d701904f0686d56fe38838",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 250,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.execute(\"CREATE TEMP TABLE tmp_interval_new_users AS\\nSELECT tf.person_id,\\n       tf.first_at,\\n       #{interval_expr_for(granularity).gsub(\"created_at\", \"tf.first_at\")} AS interval_start\\nFROM tmp_firsts tf\\nWHERE first_at BETWEEN '#{start_date.beginning_of_day.to_fs(:db)}' AND '#{end_date.end_of_day.to_fs(:db)}'\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StatsAggregator",
+        "method": "prepare_interval_tables"
+      },
+      "user_input": "interval_expr_for(granularity).gsub(\"created_at\", \"tf.first_at\")",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "Path Traversal",
+      "warning_code": 125,
+      "fingerprint": "7d1e6619a920063534a5f942506d3c51736d1812e16faab427d522f29d87289d",
+      "check_name": "Pathname",
+      "message": "Absolute paths in `Pathname#join` cause the entire path to be relative to the absolute path, ignoring any prior values",
+      "file": "app/controllers/help_controller.rb",
+      "line": 22,
+      "link": "https://brakemanscanner.org/docs/warning_types/path_traversal/",
+      "code": "Rails.root.join(\"app/views/help/pages\", \"#{params[:slug]}.md\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "HelpController",
+        "method": "show"
+      },
+      "user_input": "params[:slug]",
+      "confidence": "High",
+      "note": "slug whitelisted against PAGES hash"
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "7f8107d174111089c8f6e672fdddc3e6be2ed5cfb38f741c6c5e4f068f3165db",
+      "check_name": "FileAccess",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/scripts_controller.rb",
+      "line": 21,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read(Rails.root.join(\"public\", \"scripts\", \"#{params[:name]}.changelog.json\"))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "ScriptsController",
+        "method": "version"
+      },
+      "user_input": "params[:name]",
+      "confidence": "Weak",
+      "note": "name validated against /\\A[a-z0-9-]+\\z/i before path use"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "8a5516fad33126e95b227095d053f48daba0ddb25b1825f3e12eab9a53eb7768",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 462,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (\\n  SELECT mrr.topic_id FROM message_read_ranges mrr\\n  JOIN topics t ON t.id = mrr.topic_id\\n  WHERE mrr.user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\n  GROUP BY mrr.topic_id, t.last_message_id\\n  HAVING MAX(mrr.range_end_message_id) >= t.last_message_id\\n)\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_read_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "8a5516fad33126e95b227095d053f48daba0ddb25b1825f3e12eab9a53eb7768",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 464,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (\\n  SELECT mrr.topic_id FROM message_read_ranges mrr\\n  JOIN topics t ON t.id = mrr.topic_id\\n  WHERE mrr.user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\n  GROUP BY mrr.topic_id, t.last_message_id\\n  HAVING MAX(mrr.range_end_message_id) >= t.last_message_id\\n)\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_read_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "8f43df4403fc9ff86d77fb8fa54a157202adf22df40c667b1c23603e189e266e",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 489,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (\\n  SELECT mrr.topic_id FROM message_read_ranges mrr\\n  JOIN topics t ON t.id = mrr.topic_id\\n  WHERE mrr.user_id IN (#{ValueResolver.new(:user => user).resolve_state_subject(value).user_ids.map(&:to_i).join(\",\")})\\n  GROUP BY mrr.topic_id, t.last_message_id\\n  HAVING MAX(mrr.range_end_message_id) > 0\\n    AND MAX(mrr.range_end_message_id) < t.last_message_id\\n)\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_reading_selector"
+      },
+      "user_input": "ValueResolver.new(:user => user).resolve_state_subject(value).user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "8f43df4403fc9ff86d77fb8fa54a157202adf22df40c667b1c23603e189e266e",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 491,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (\\n  SELECT mrr.topic_id FROM message_read_ranges mrr\\n  JOIN topics t ON t.id = mrr.topic_id\\n  WHERE mrr.user_id IN (#{ValueResolver.new(:user => user).resolve_state_subject(value).user_ids.map(&:to_i).join(\",\")})\\n  GROUP BY mrr.topic_id, t.last_message_id\\n  HAVING MAX(mrr.range_end_message_id) > 0\\n    AND MAX(mrr.range_end_message_id) < t.last_message_id\\n)\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_reading_selector"
+      },
+      "user_input": "ValueResolver.new(:user => user).resolve_state_subject(value).user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "9c182ed8a0c5dc789ad2dc3926c42a40d6a98de6723d3ee5c61d5d81c5a3b6e4",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 695,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.select_all(\"WITH firsts AS (\\n  SELECT aliases.person_id, date_trunc('month', MIN(messages.created_at))::date AS cohort_start\\n  FROM messages\\n  INNER JOIN aliases ON aliases.id = messages.sender_id\\n  GROUP BY aliases.person_id\\n),\\ncohort_bucketed AS (\\n  SELECT\\n    person_id,\\n    cohort_start,\\n    CASE\\n      WHEN #{:BRAKEMAN_SAFE_LITERAL} = 3 THEN date_trunc('quarter', cohort_start)::date\\n      ELSE cohort_start\\n    END AS cohort_start_bucket\\n  FROM firsts\\n),\\ntopic_starters AS (\\n  SELECT DISTINCT ON (messages.topic_id)\\n    messages.topic_id,\\n    aliases.person_id AS starter_person_id\\n  FROM messages\\n  INNER JOIN aliases ON aliases.id = messages.sender_id\\n  ORDER BY messages.topic_id, messages.created_at ASC, messages.id ASC\\n),\\neligible_users AS (\\n  SELECT DISTINCT cb.person_id, cb.cohort_start_bucket\\n  FROM cohort_bucketed cb\\n  #{if segment[:reply_filter] then\n  \"INNER JOIN aliases a ON a.person_id = cb.person_id\\nINNER JOIN messages m ON m.sender_id = a.id\\nINNER JOIN topic_starters ts ON ts.topic_id = m.topic_id\\nWHERE m.created_at >= cb.cohort_start_bucket\\n  AND m.created_at < (cb.cohort_start_bucket + interval '#{:BRAKEMAN_SAFE_LITERAL} months')\\n  AND ts.starter_person_id <> cb.person_id\\n\".squish\nelse\n  \"\"\nend}\\n  #{if segment[:reply_filter] then\n  \"\"\nelse\n  \"WHERE cb.cohort_start_bucket IS NOT NULL\"\nend}\\n),\\ncohort_sizes AS (\\n  SELECT cohort_start_bucket, COUNT(*) AS cohort_size\\n  FROM eligible_users\\n  GROUP BY cohort_start_bucket\\n),\\nmessages_by_month AS (\\n  SELECT eu.person_id,\\n         eu.cohort_start_bucket,\\n         date_trunc('month', m.created_at)::date AS msg_month\\n  FROM messages m\\n  INNER JOIN aliases a ON a.id = m.sender_id\\n  INNER JOIN eligible_users eu ON eu.person_id = a.person_id\\n),\\nper_person_month AS (\\n  SELECT\\n    cohort_start_bucket AS cohort_start,\\n    (\\n      (date_part('year', msg_month) - date_part('year', cohort_start_bucket)) * 12 +\\n      (date_part('month', msg_month) - date_part('month', cohort_start_bucket))\\n    )::int AS months_since,\\n    person_id,\\n    COUNT(*) AS message_count\\n  FROM messages_by_month\\n  GROUP BY cohort_start_bucket, months_since, person_id\\n),\\nbucketed AS (\\n  SELECT\\n    cohort_start,\\n    (months_since / #{:BRAKEMAN_SAFE_LITERAL}) * #{:BRAKEMAN_SAFE_LITERAL} AS months_since_bucket,\\n    person_id,\\n    SUM(message_count) AS message_count\\n  FROM per_person_month\\n  GROUP BY cohort_start, months_since_bucket, person_id\\n),\\naggregated AS (\\n  SELECT\\n    cohort_start,\\n    months_since_bucket AS months_since,\\n    COUNT(*) AS active_users,\\n    SUM(message_count) AS total_messages\\n  FROM bucketed\\n  GROUP BY cohort_start, months_since\\n)\\nSELECT\\n  aggregated.cohort_start,\\n  aggregated.months_since,\\n  cohort_sizes.cohort_size,\\n  aggregated.active_users,\\n  CASE\\n    WHEN aggregated.active_users > 0 THEN aggregated.total_messages::float / aggregated.active_users\\n    ELSE 0\\n  END AS avg_messages_per_active_user\\nFROM aggregated\\nINNER JOIN cohort_sizes ON cohort_sizes.cohort_start_bucket = aggregated.cohort_start\\nWHERE aggregated.cohort_start BETWEEN '#{start_date.beginning_of_month.to_fs(:db)}' AND '#{end_date.beginning_of_month.to_fs(:db)}'\\nORDER BY aggregated.cohort_start, aggregated.months_since\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RetentionAggregator",
+        "method": "run!"
+      },
+      "user_input": "if segment[:reply_filter] then\n  \"INNER JOIN aliases a ON a.person_id = cb.person_id\\nINNER JOIN messages m ON m.sender_id = a.id\\nINNER JOIN topic_starters ts ON ts.topic_id = m.topic_id\\nWHERE m.created_at >= cb.cohort_start_bucket\\n  AND m.created_at < (cb.cohort_start_bucket + interval '#{:BRAKEMAN_SAFE_LITERAL} months')\\n  AND ts.starter_person_id <> cb.person_id\\n\".squish\nelse\n  \"\"\nend",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "c32ca57eb5f71091f7ec9eafd10046bdaa522c075cb0ea35bda10fe93a93025e",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 253,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "participants.where(\"topic_participants.message_count #{op} ?\", num)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_participant_row_condition"
+      },
+      "user_input": "op",
+      "confidence": "Weak",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "c43a351da057e2df0523857c35fc936c45e8db0cc01a8be5fa5716c5c5415d04",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 70,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "relation.where(\"topics.id IN (#{children.map do\n apply_node(child, Topic.all)\n end.map do\n sq.select(:id)\n end.map do\n \"(#{sq.to_sql})\"\n end.join(\" UNION \")})\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_or"
+      },
+      "user_input": "Topic.all",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "ca9a96809ff2e527cb5c19c57f2246df7d68d0bf8688a11b05d992fa58f6fb9d",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 410,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id IN (#{\"SELECT DISTINCT mrr.topic_id FROM message_read_ranges mrr\\nJOIN topics t ON t.id = mrr.topic_id\\nWHERE mrr.user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\nGROUP BY mrr.topic_id, t.last_message_id\\nHAVING MAX(mrr.range_end_message_id) >= t.last_message_id\\n\".squish})\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_unread_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "cfdd030349dbe843cead8112eb93b4775f09db5b918010528f9f55a1d029af3c",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 413,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"topics.id NOT IN (#{\"SELECT DISTINCT mrr.topic_id FROM message_read_ranges mrr\\nJOIN topics t ON t.id = mrr.topic_id\\nWHERE mrr.user_id IN (#{user_ids.map(&:to_i).join(\",\")})\\nGROUP BY mrr.topic_id, t.last_message_id\\nHAVING MAX(mrr.range_end_message_id) >= t.last_message_id\\n\".squish})\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_unread_for_users"
+      },
+      "user_input": "user_ids.map(&:to_i).join(\",\")",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "dd16b8076fe2005c0242afe5dabcb8e4ca9f8e9792ae0bdccde968be9eea2ec7",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 843,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "relation.where(\"topics.last_message_at #{(case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend or operator)} ?\", DateParser.new(value).parse)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_last_date_selector"
+      },
+      "user_input": "case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nelse\n  operator\nend",
+      "confidence": "Weak",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "e2ca8d8837368299eedd2fa3fbd382099e5528211134fac8a3cd68cf2ccfa8c1",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/outgoing/message_builder.rb",
+      "line": 18,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "from(\"#{draft.sender_alias.name} <#{draft.sender_alias.email}>\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Outgoing::MessageBuilder",
+        "method": "self.build"
+      },
+      "user_input": "draft.sender_alias.name",
+      "confidence": "Medium",
+      "note": "Mail.new block, not SQL"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "e7e0fbfa1e4cc73ad37efa90000e30e9b2f9365c1d2bab2dd1f2a7c5f58bb8d2",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "script/build_stats.rb",
+      "line": 783,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "ActiveRecord::Base.connection.select_all(\"WITH horizons AS (\\n  #{[3, 6, 12, 18, 24, 30, 36, 48, 60].map do\n \"SELECT #{:BRAKEMAN_SAFE_LITERAL} AS horizon_months\"\n end.join(\" UNION ALL \")}\\n),\\nfirsts AS (\\n  SELECT aliases.person_id, date_trunc('month', MIN(messages.created_at))::date AS cohort_start\\n  FROM messages\\n  INNER JOIN aliases ON aliases.id = messages.sender_id\\n  GROUP BY aliases.person_id\\n),\\ncohort_bucketed AS (\\n  SELECT\\n    person_id,\\n    cohort_start,\\n    CASE\\n      WHEN #{:BRAKEMAN_SAFE_LITERAL} = 3 THEN date_trunc('quarter', cohort_start)::date\\n      ELSE cohort_start\\n    END AS cohort_start_bucket\\n  FROM firsts\\n),\\ntopic_starters AS (\\n  SELECT DISTINCT ON (messages.topic_id)\\n    messages.topic_id,\\n    aliases.person_id AS starter_person_id\\n  FROM messages\\n  INNER JOIN aliases ON aliases.id = messages.sender_id\\n  ORDER BY messages.topic_id, messages.created_at ASC, messages.id ASC\\n),\\neligible_users AS (\\n  SELECT DISTINCT cb.person_id, cb.cohort_start_bucket\\n  FROM cohort_bucketed cb\\n  #{if segment[:reply_filter] then\n  \"INNER JOIN aliases a ON a.person_id = cb.person_id\\nINNER JOIN messages m ON m.sender_id = a.id\\nINNER JOIN topic_starters ts ON ts.topic_id = m.topic_id\\nWHERE m.created_at >= cb.cohort_start_bucket\\n  AND m.created_at < (cb.cohort_start_bucket + interval '#{:BRAKEMAN_SAFE_LITERAL} months')\\n  AND ts.starter_person_id <> cb.person_id\\n\".squish\nelse\n  \"\"\nend}\\n  #{if segment[:reply_filter] then\n  \"\"\nelse\n  \"WHERE cb.cohort_start_bucket IS NOT NULL\"\nend}\\n),\\ncohort_sizes AS (\\n  SELECT cohort_start_bucket, COUNT(*) AS cohort_size\\n  FROM eligible_users\\n  GROUP BY cohort_start_bucket\\n),\\nmessages_by_month AS (\\n  SELECT eu.person_id,\\n         eu.cohort_start_bucket,\\n         date_trunc('month', m.created_at)::date AS msg_month\\n  FROM messages m\\n  INNER JOIN aliases a ON a.id = m.sender_id\\n  INNER JOIN eligible_users eu ON eu.person_id = a.person_id\\n),\\nper_person_month AS (\\n  SELECT\\n    cohort_start_bucket AS cohort_start,\\n    (\\n      (date_part('year', msg_month) - date_part('year', cohort_start_bucket)) * 12 +\\n      (date_part('month', msg_month) - date_part('month', cohort_start_bucket))\\n    )::int AS months_since,\\n    person_id\\n  FROM messages_by_month\\n  GROUP BY cohort_start_bucket, months_since, person_id\\n),\\nmax_activity AS (\\n  SELECT cohort_start, person_id, MAX(months_since) AS max_months\\n  FROM per_person_month\\n  GROUP BY cohort_start, person_id\\n)\\nSELECT\\n  cohort_sizes.cohort_start_bucket AS cohort_start,\\n  horizons.horizon_months,\\n  cohort_sizes.cohort_size,\\n  SUM(CASE WHEN max_activity.max_months >= horizons.horizon_months THEN 1 ELSE 0 END) AS retained_users\\nFROM cohort_sizes\\nLEFT JOIN max_activity ON max_activity.cohort_start = cohort_sizes.cohort_start_bucket\\nCROSS JOIN horizons\\nWHERE cohort_sizes.cohort_start_bucket BETWEEN '#{start_date.beginning_of_month.to_fs(:db)}' AND '#{end_date.beginning_of_month.to_fs(:db)}'\\nGROUP BY cohort_sizes.cohort_start_bucket, horizons.horizon_months, cohort_sizes.cohort_size\\nORDER BY cohort_sizes.cohort_start_bucket, horizons.horizon_months\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "RetentionAggregator",
+        "method": "run!"
+      },
+      "user_input": "[3, 6, 12, 18, 24, 30, 36, 48, 60].map do\n \"SELECT #{:BRAKEMAN_SAFE_LITERAL} AS horizon_months\"\n end.join(\" UNION ALL \")",
+      "confidence": "Medium",
+      "note": "offline admin script, interpolated values internally generated"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "e88b96b6d8252af5bdf3cbec1ed60e3ee0b3afbe1c09d264a35462fbfb1a7a71",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 807,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "relation.where(\"topics.#{:BRAKEMAN_SAFE_LITERAL} #{(case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nwhen :> then\n  :<=\nwhen :<= then\n  :>\nelse\n  operator\nend or operator)} ?\", DateParser.new(value).parse)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "apply_date_selector"
+      },
+      "user_input": "case operator\nwhen :>= then\n  :<\nwhen :< then\n  :>=\nwhen :> then\n  :<=\nwhen :<= then\n  :>\nelse\n  operator\nend",
+      "confidence": "Weak",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "f8712aa8d6d53f433789b699a439dab1565c8c5dffc7ac986f415c054203e7de",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/services/search/query_builder.rb",
+      "line": 740,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Attachment.joins(:message).where(:messages => ({ :is_patch_submission => true })).where(:messages => ({ :sender_person_id => ValueResolver.new(:user => user).resolve_author(conditions.find do\n (c[:key] == :from)\n end[:value], :quoted => conditions.find do\n (c[:key] == :from)\n end[:quoted]).person_ids })).where(\"attachments.file_name ILIKE ?\", \"%#{sanitize_like(conditions.find do\n (c[:key] == :name)\n end[:value])}%\").group(\"messages.topic_id\").having(\"COUNT(*) #{op} ?\", num)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Search::QueryBuilder",
+        "method": "build_has_condition_query"
+      },
+      "user_input": "op",
+      "confidence": "Medium",
+      "note": "operators/columns whitelisted via parse_count_value regex, symbol case maps, ALLOWED_DATE_COLUMNS; ids via to_i"
+    }
+  ],
+  "updated": "2026-07-10",
+  "brakeman_version": "8.0.5"
+}

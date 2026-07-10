@@ -8,7 +8,11 @@
         .confirm-value = "#{@draft.sender_alias.name} <#{@draft.sender_alias.email}>"
       .confirm-row
         strong To
-        .confirm-value = @recipient
+        .confirm-value = @recipients.to.join(", ")
+      - if @recipients.cc.any?
+        .confirm-row
+          strong Cc
+          .confirm-value = @recipients.cc.join(", ")
       .confirm-row
         strong Subject
         .confirm-value = @draft.subject
@@ -24,6 +28,6 @@
       .confirm-actions
         = button_tag "Cancel", type: "button", class: "button-secondary",
                      data: { action: "click->send-confirmation#cancel" }
-        = button_to "Send to #{@recipient}", send_now_draft_path(@draft),
+        = button_to "Send to #{pluralize(@recipients.all.size, 'recipient')}", send_now_draft_path(@draft),
                     method: :post, class: "button-primary",
                     data: { send_confirmation_target: "submit", disabled: true }

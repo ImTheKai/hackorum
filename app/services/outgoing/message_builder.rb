@@ -9,24 +9,25 @@ module Outgoing
     DEFAULT_DOMAIN = "hackorum.dev"
 
     def self.build(draft)
-      recipient = RecipientResolver.for(draft.topic)
-      domain    = ENV.fetch("HACKORUM_OUTGOING_DOMAIN", DEFAULT_DOMAIN)
-      msg_id    = "<#{SecureRandom.uuid}@#{domain}>"
+      recipients = RecipientResolver.for(draft)
+      domain     = ENV.fetch("HACKORUM_OUTGOING_DOMAIN", DEFAULT_DOMAIN)
+      msg_id     = "<#{SecureRandom.uuid}@#{domain}>"
 
       from_addr = draft.sender_alias
       mail = Mail.new do
         from       "#{from_addr.name} <#{from_addr.email}>"
-        to         recipient
+        to         recipients.to
         subject    draft.subject
         message_id msg_id
         body       draft.body
       end
+      mail.cc = recipients.cc if recipients.cc.any?
       mail.content_type "text/plain; charset=UTF-8"
       mail.in_reply_to = draft.reply_to_message.message_id.to_s.gsub(/[<>]/, "")
       mail.references  = build_references(draft.reply_to_message)
 
       Result.new(encoded: mail.encoded, message_id: msg_id,
-                 subject: draft.subject, recipient: recipient)
+                 subject: draft.subject, recipient: recipients.all.join(", "))
     end
 
     def self.build_references(parent)

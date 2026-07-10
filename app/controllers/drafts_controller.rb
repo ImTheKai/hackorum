@@ -83,7 +83,7 @@ class DraftsController < ApplicationController
   end
 
   def confirm
-    @recipient = Outgoing::RecipientResolver.for(@draft.topic)
+    @recipients = Outgoing::RecipientResolver.for(@draft)
     render layout: false
   rescue Outgoing::RecipientResolver::MissingPostAddressError
     render plain: "This mailing list isn't configured for sending. An admin must set its post_address.",

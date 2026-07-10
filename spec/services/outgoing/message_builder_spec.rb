@@ -11,9 +11,14 @@ RSpec.describe Outgoing::MessageBuilder do
            mailing_lists: [ list ])
   }
 
+  def recipients(to:, cc: [])
+    Outgoing::RecipientResolver::Recipients.new(to: to, cc: cc)
+  end
+
   before do
     allow(Outgoing::RecipientResolver).to receive(:for)
-      .with(topic).and_return('test@example.com')
+      .with(kind_of(OutgoingDraft))
+      .and_return(recipients(to: [ 'test@example.com' ]))
   end
 
   def build_draft(overrides = {})
@@ -80,10 +85,31 @@ RSpec.describe Outgoing::MessageBuilder do
     end
   end
 
-  it 'returns the resolver result as recipient' do
+  it 'joins all recipients into Result#recipient' do
+    allow(Outgoing::RecipientResolver).to receive(:for)
+      .with(kind_of(OutgoingDraft))
+      .and_return(recipients(to: [ 'a@x' ], cc: [ 'list@x', 'c@x' ]))
     with_env('HACKORUM_OUTGOING_DOMAIN' => 'hackorum.local') do
       result = described_class.build(build_draft)
-      expect(result.recipient).to eq('test@example.com')
+      expect(result.recipient).to eq('a@x, list@x, c@x')
+    end
+  end
+
+  it 'sets To and Cc headers from the resolver' do
+    allow(Outgoing::RecipientResolver).to receive(:for)
+      .with(kind_of(OutgoingDraft))
+      .and_return(recipients(to: [ 'a@x' ], cc: [ 'list@x', 'c@x' ]))
+    with_env('HACKORUM_OUTGOING_DOMAIN' => 'hackorum.local') do
+      mail = Mail.new(described_class.build(build_draft).encoded)
+      expect(mail.to).to eq([ 'a@x' ])
+      expect(mail.cc).to eq([ 'list@x', 'c@x' ])
+    end
+  end
+
+  it 'omits the Cc header when there are no cc recipients' do
+    with_env('HACKORUM_OUTGOING_DOMAIN' => 'hackorum.local') do
+      mail = Mail.new(described_class.build(build_draft).encoded)
+      expect(mail.cc).to be_nil
     end
   end
 

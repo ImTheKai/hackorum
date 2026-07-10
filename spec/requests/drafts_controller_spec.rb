@@ -159,6 +159,7 @@ RSpec.describe DraftsController, type: :request do
         get confirm_draft_path(draft)
         expect(response).to be_successful
         expect(response.body).to include('test@example.com')
+        expect(response.body).not_to include('<strong>Cc</strong>')
       end
     end
 
@@ -167,6 +168,19 @@ RSpec.describe DraftsController, type: :request do
         get confirm_draft_path(draft)
         expect(response).to have_http_status(:unprocessable_entity)
       end
+    end
+
+    it 'renders To and Cc rows when the resolver returns cc recipients' do
+      allow(Outgoing::RecipientResolver).to receive(:for).and_return(
+        Outgoing::RecipientResolver::Recipients.new(
+          to: [ 'Bob <bob@x>' ], cc: [ 'list@x', 'Carol <carol@x>' ]))
+      get confirm_draft_path(draft)
+      expect(response).to be_successful
+      expect(response.body).to include('bob@x')
+      expect(response.body).to include('list@x')
+      expect(response.body).to include('<strong>Cc</strong>')
+      expect(response.body).to include('Send to 3 recipients')
+      expect(response.body).to include('Bob &lt;bob@x&gt;')
     end
   end
 

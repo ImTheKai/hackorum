@@ -157,6 +157,34 @@ RSpec.describe "Topics", type: :request do
         end
       end
     end
+
+    context "ignore filter on index" do
+      let!(:user) { create(:user) }
+      let!(:normal_topic) { create(:topic) }
+      let!(:ignored_topic) { create(:topic) }
+      let!(:ignored_and_starred_topic) { create(:topic) }
+      let!(:msg1) { create(:message, topic: normal_topic, created_at: 3.hours.ago) }
+      let!(:msg2) { create(:message, topic: ignored_topic, created_at: 2.hours.ago) }
+      let!(:msg3) { create(:message, topic: ignored_and_starred_topic, created_at: 1.hour.ago) }
+
+      before do
+        sign_in_as(user)
+        create(:topic_ignore, user: user, topic: ignored_topic)
+        create(:topic_ignore, user: user, topic: ignored_and_starred_topic)
+        create(:topic_star, user: user, topic: ignored_and_starred_topic)
+      end
+
+      it "excludes ignored topics" do
+        get topics_path
+        expect(response.body).to include(normal_topic.title)
+        expect(response.body).not_to include(ignored_topic.title)
+      end
+
+      it "shows ignored topics that are also starred (star wins)" do
+        get topics_path
+        expect(response.body).to include(ignored_and_starred_topic.title)
+      end
+    end
   end
 
   describe "GET /topics/:id" do
@@ -519,6 +547,19 @@ RSpec.describe "Topics", type: :request do
         expect(response).to have_http_status(:not_found)
       end
     end
+
+    context "when signed in, search renders without user-state frame" do
+      let!(:user) { create(:user) }
+      let!(:topic1) { create(:topic, title: "pgconf planning") }
+      let!(:msg1) { create(:message, topic: topic1, body: "test") }
+
+      before { sign_in_as(user) }
+
+      it "does not include user-state-root turbo frame" do
+        get search_topics_path, params: { q: "pgconf" }
+        expect(response.body).not_to include('id="user-state-root"')
+      end
+    end
   end
 
   describe "GET /topics/search personalization" do
@@ -713,6 +754,62 @@ RSpec.describe "Topics", type: :request do
       expect(response).to have_http_status(:success)
       expect(response.body).to include("message-body-#{message.id}")
       expect(response.body).to include(message.body)
+    end
+  end
+
+  describe "POST /topics/:id/ignore" do
+    let!(:user) { create(:user) }
+    let!(:creator) { create(:alias) }
+    let!(:topic) { create(:topic, creator: creator) }
+    let!(:message) { create(:message, topic: topic, sender: creator) }
+
+    context "when signed in" do
+      before { sign_in_as(user) }
+
+      it "creates a TopicIgnore record" do
+        expect {
+          post ignore_topic_path(topic), headers: { "Accept" => "application/json" }
+        }.to change(TopicIgnore, :count).by(1)
+        expect(response).to have_http_status(:success)
+        expect(JSON.parse(response.body)["ignored"]).to be true
+      end
+
+      it "is idempotent" do
+        create(:topic_ignore, user: user, topic: topic)
+        expect {
+          post ignore_topic_path(topic), headers: { "Accept" => "application/json" }
+        }.not_to change(TopicIgnore, :count)
+        expect(response).to have_http_status(:success)
+      end
+    end
+
+    context "when not signed in" do
+      it "redirects to sign in" do
+        post ignore_topic_path(topic)
+        expect(response).to redirect_to(new_session_path)
+      end
+    end
+  end
+
+  describe "DELETE /topics/:id/unignore" do
+    let!(:user) { create(:user) }
+    let!(:creator) { create(:alias) }
+    let!(:topic) { create(:topic, creator: creator) }
+    let!(:message) { create(:message, topic: topic, sender: creator) }
+
+    context "when signed in" do
+      before do
+        sign_in_as(user)
+        create(:topic_ignore, user: user, topic: topic)
+      end
+
+      it "destroys the TopicIgnore record" do
+        expect {
+          delete unignore_topic_path(topic), headers: { "Accept" => "application/json" }
+        }.to change(TopicIgnore, :count).by(-1)
+        expect(response).to have_http_status(:success)
+        expect(JSON.parse(response.body)["ignored"]).to be false
+      end
     end
   end
 end

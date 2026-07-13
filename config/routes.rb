@@ -81,6 +81,8 @@ Rails.application.routes.draw do
       post :unread_all
       post :star
       delete :unstar
+      post :ignore
+      delete :unignore
       get :latest_patchset
       get :message_batch
       get :attachments_sidebar

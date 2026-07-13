@@ -331,6 +331,20 @@ a.topic-icon {
   }
 }
 
+.activity-ignore {
+  display: none;
+  color: var(--color-text-secondary);
+}
+
+.activity-ignore.is-ignored {
+  display: inline-block;
+  background-color: var(--color-bg-activity-team);
+}
+
+.topic-row:hover .activity-ignore {
+  display: inline-block;
+}
+
 .is-hidden {
   display: none !important;
 }

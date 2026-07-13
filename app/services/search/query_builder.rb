@@ -20,6 +20,11 @@ module Search
       return Result.new(relation: Topic.none, warnings: []) if @ast.nil?
 
       relation = apply_node(@ast, Topic.all)
+
+      if @user && !has_ignored_selector?(@ast)
+        relation = apply_default_ignore_filter(relation)
+      end
+
       Result.new(relation: relation, warnings: @warnings)
     end
 
@@ -99,6 +104,8 @@ module Search
                  apply_new_selector(value, relation, negated: negated)
       when :starred
                  apply_starred_selector(value, relation, negated: negated)
+      when :ignored
+                 apply_ignored_selector(value, relation, negated: negated)
       when :notes
                  apply_notes_selector(value, relation, negated: negated)
       when :tag
@@ -576,6 +583,44 @@ module Search
         relation.where.not(id: starred_topic_ids)
       else
         relation.where(id: starred_topic_ids)
+      end
+    end
+
+    def apply_ignored_selector(value, relation, negated:)
+      result = @value_resolver.resolve_state_subject(value)
+      @warnings.concat(result.warnings)
+
+      user_ids = result.user_ids
+      return relation if user_ids.empty?
+
+      ignored_topic_ids = TopicIgnore.where(user_id: user_ids).select(:topic_id)
+
+      if negated
+        relation.where.not(id: ignored_topic_ids)
+      else
+        relation.where(id: ignored_topic_ids)
+      end
+    end
+
+    def apply_default_ignore_filter(relation)
+      user_id = @user.id
+      relation.where(
+        "topics.id NOT IN (SELECT topic_id FROM topic_ignores WHERE user_id = ?) " \
+        "OR topics.id IN (SELECT topic_id FROM topic_stars WHERE user_id = ?)",
+        user_id, user_id
+      )
+    end
+
+    def has_ignored_selector?(node)
+      return false if node.nil?
+
+      case node[:type]
+      when :selector
+        node[:key] == :ignored
+      when :and, :or
+        node[:children].any? { |child| has_ignored_selector?(child) }
+      else
+        false
       end
     end
 

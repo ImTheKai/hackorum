@@ -160,6 +160,24 @@ module TopicsHelper
     end
   end
 
+  def ignore_icon_html(topic:, ignored:)
+    ignored = ignored || false
+    path = ignored ? unignore_topic_path(topic) : ignore_topic_path(topic)
+    method = ignored ? :delete : :post
+    icon_class = ignored ? "fa-solid fa-eye-slash" : "fa-regular fa-eye-slash"
+    classes = [ "topic-icon", "activity-ignore" ]
+    classes << "is-ignored" if ignored
+
+    link_to path,
+      method: method,
+      data: { turbo_method: method, turbo_stream: true },
+      class: classes.join(" "),
+      title: ignored ? "Unignore" : "Ignore",
+      id: dom_id(topic, "ignore_button") do
+      tag.i(class: icon_class)
+    end
+  end
+
   # Replaces app/views/topics/_participation_icon.html.slim
   def participation_icon_html(topic:, participation:)
     participation = participation || {}

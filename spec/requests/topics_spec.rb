@@ -95,6 +95,27 @@ RSpec.describe "Topics", type: :request do
       end
     end
 
+    context "when there is a full page of topics" do
+      let!(:creator) { create(:alias) }
+
+      before do
+        25.times do |i|
+          topic = create(:topic, creator: creator, created_at: (i + 1).days.ago)
+          create(:message, topic: topic, sender: creator, created_at: (i + 1).days.ago)
+        end
+      end
+
+      it "marks the pagination frame for prefetching" do
+        get topics_path
+        expect(response.body).to include('data-controller="prefetch-frame"')
+      end
+
+      it "marks the replaced pagination frame for prefetching" do
+        get topics_path(format: :turbo_stream)
+        expect(response.body).to include('data-controller="prefetch-frame"')
+      end
+    end
+
     context "personalized rendering" do
       let!(:creator) { create(:alias) }
       let!(:topic) { create(:topic, creator: creator) }
@@ -362,6 +383,25 @@ RSpec.describe "Topics", type: :request do
       it "shows the search query" do
         get search_topics_path, params: { q: "PostgreSQL" }
         expect(response.body).to include('value="PostgreSQL"')
+      end
+
+      context "with a full page of results" do
+        before do
+          25.times do |i|
+            topic = create(:topic, title: "PostgreSQL result #{i}", creator: creator1, created_at: (i + 1).days.ago)
+            create(:message, topic: topic, sender: creator1, created_at: (i + 1).days.ago)
+          end
+        end
+
+        it "marks the pagination frame for prefetching" do
+          get search_topics_path, params: { q: "PostgreSQL" }
+          expect(response.body).to include('data-controller="prefetch-frame"')
+        end
+
+        it "marks the replaced pagination frame for prefetching" do
+          get search_topics_path, params: { q: "PostgreSQL", format: :turbo_stream }
+          expect(response.body).to include('data-controller="prefetch-frame"')
+        end
       end
 
       it "finds topics by message content" do

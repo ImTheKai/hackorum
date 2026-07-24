@@ -1,10 +1,5 @@
 = turbo_stream.append "topics" do
-  = render partial: "topics", locals: { topics: @topics }
-
-- if user_signed_in?
-  - frame_id = params[:cursor].present? ? "user-state-#{params[:cursor]}" : "user-state-root"
-  = turbo_stream.append "user-state-requests" do
-    = turbo_frame_tag frame_id, src: user_state_frame_topics_path(topic_ids: @topics.map(&:id), format: :turbo_stream), loading: :eager
+  = render partial: "topics", locals: { topics: @topics, personalization: @personalization }
 
 - if @topics.size == 25
   - last_topic = @topics.last

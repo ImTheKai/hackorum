@@ -1,3 +1,4 @@
+- personalization = local_assigns[:personalization]
 - topic_participants_map ||= @topic_participants_map || {}
 
 - if topics.empty?
@@ -11,9 +12,19 @@
   - tp_data = topic_participants_map[topic.id] || {}
   - top_participants = tp_data[:top] || []
   - contributor_participants = tp_data[:contributors] || []
+  - state = personalization ? personalization.state_for(topic) : {}
+  - note_count = personalization ? personalization.note_count_for(topic) : 0
+  - participation = personalization ? personalization.participation_for(topic) : {}
+  - team_readers = personalization ? personalization.team_readers_for(topic) : []
+  - star_data = personalization ? personalization.star_data_for(topic) : {}
+  - row_class = [ "topic-row" ]
+  - if personalization
+    - status = state[:status] || "new"
+    - row_class << "topic-#{status}"
+    - row_class << "has-new-replies" if status.to_s == "reading"
 
-  tr id=dom_id(topic) class="topic-row" data-topic-id=topic.id data-last-message-id=topic.last_message_id
-    = render partial: "topics/status_cell", locals: { topic: topic, state: {}, note_count: 0, team_readers: [], star_data: {} }
+  tr id=dom_id(topic) class=row_class.join(" ") data-topic-id=topic.id data-last-message-id=topic.last_message_id
+    = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data }
     td.topic-mailing-lists data-label="Mailing Lists"
       - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
       - if topic_lists.any?
@@ -35,4 +46,4 @@
             .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
               - contributor_data.each do |participant|
                 = participant_row_html(participant: participant, avatar_size: 32)
-      = participation_icon_html(topic: topic, participation: {})
+      = participation_icon_html(topic: topic, participation: participation)

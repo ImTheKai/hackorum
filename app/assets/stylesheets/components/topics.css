@@ -664,49 +664,6 @@ a.topic-icon {
   gap: 4px;
 }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-text-secondary);
-}
-
-.status-shape {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--color-gray-50);
-  border: 2px solid transparent;
-  color: inherit;
-}
-
-.is-new .status-shape {
-  border-color: var(--color-danger);
-  background: var(--color-danger-soft);
-}
-
-.is-aware .status-shape {
-  border-color: var(--color-warning);
-  background: var(--color-warning-bg);
-  border-radius: 999px;
-}
-
-.is-reading .status-shape {
-  border-color: var(--color-info);
-  background: var(--color-info-soft);
-  border-radius: 4px;
-}
-
-.is-read .status-shape {
-  border-color: var(--color-primary-600);
-  background: var(--color-primary-100);
-  border-radius: 4px;
-}
-
 .team-reader-avatars {
   display: flex;
   align-items: center;

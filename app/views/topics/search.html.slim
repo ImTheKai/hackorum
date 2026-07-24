@@ -50,9 +50,6 @@
 
 - if @search_query.present?
   - if @topics.any?
-    - if user_signed_in?
-      #user-state-requests
-        = turbo_frame_tag "user-state-root", src: user_state_frame_topics_path(topic_ids: @topics.map(&:id), format: :turbo_stream), loading: :eager
     .topics-table
       table
         thead
@@ -62,7 +59,7 @@
             th.activity-header Activity
             th.participants-header Participants
         tbody#topics
-          = render partial: "topics", locals: { topics: @topics }
+          = render partial: "topics", locals: { topics: @topics, personalization: @personalization }
 
       - if @topics.size == 25
         - last_topic = @topics.last

@@ -2,7 +2,7 @@ class TopicsController < ApplicationController
   include DraftSidebarLoader
 
   before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset, :summary, :messages ]
-  before_action :require_authentication, only: [ :aware, :aware_bulk, :aware_all, :read_all, :unread_all, :star, :unstar ]
+  before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar ]
 
   def index
     @search_query = nil
@@ -13,7 +13,13 @@ class TopicsController < ApplicationController
     preload_commitfest_summaries
     preload_topic_mailing_lists
     @new_topics_count = 0
-    @page_cache_key = topics_page_cache_key
+
+    if user_signed_in?
+      @personalization = TopicListPersonalization.new(user: current_user, topics: @topics)
+      @page_cache_key = nil
+    else
+      @page_cache_key = topics_page_cache_key
+    end
 
     load_visible_tags if user_signed_in?
     load_saved_searches
@@ -22,10 +28,14 @@ class TopicsController < ApplicationController
     respond_to do |format|
       format.html
       format.turbo_stream do
-        body = topics_turbo_stream_cache_fetch do
-          render_to_string(:index, formats: [ :turbo_stream ])
+        if user_signed_in?
+          render :index
+        else
+          body = topics_turbo_stream_cache_fetch do
+            render_to_string(:index, formats: [ :turbo_stream ])
+          end
+          render body:, content_type: "text/vnd.turbo-stream.html"
         end
-        render body:, content_type: "text/vnd.turbo-stream.html"
       end
     end
   end
@@ -164,28 +174,6 @@ class TopicsController < ApplicationController
       format.json { render json: { status: "ok" } }
       format.html { head :ok }
     end
-  end
-
-  def aware_bulk
-    topics_param = params[:topics]
-    return render json: { error: "topics required" }, status: :unprocessable_entity unless topics_param.is_a?(Array)
-
-    topics_param.each do |entry|
-      topic = Topic.find_by(id: entry[:topic_id] || entry["topic_id"])
-      next unless topic
-      up_to = (entry[:up_to_message_id] || entry["up_to_message_id"]).to_i
-      up_to = topic.messages.maximum(:id) if up_to.zero?
-      ThreadAwareness.mark_until(user: current_user, topic:, until_message_id: up_to) if up_to
-    end
-
-    render json: { status: "ok" }
-  end
-
-  def aware_all
-    timestamp = params[:before].present? ? Time.zone.parse(params[:before]) : Time.current
-    current_user.update!(aware_before: [ current_user.aware_before, timestamp ].compact.max)
-
-    render json: { status: "ok", aware_before: current_user.aware_before }
   end
 
   def read_all
@@ -384,7 +372,7 @@ class TopicsController < ApplicationController
     preload_topic_participants
     preload_commitfest_summaries
     preload_topic_mailing_lists
-    preload_participation_flags if user_signed_in?
+    @personalization = TopicListPersonalization.new(user: current_user, topics: @topics) if user_signed_in?
     load_visible_tags if user_signed_in?
     load_saved_searches
     @all_mailing_lists = MailingList.order(:display_name)
@@ -392,68 +380,6 @@ class TopicsController < ApplicationController
     respond_to do |format|
       format.html
       format.turbo_stream { render :search }
-    end
-  end
-
-  def user_state
-    topic_ids = params[:topic_ids].is_a?(Array) ? params[:topic_ids].map(&:to_i).uniq : []
-    return render json: { topics: {} } unless user_signed_in? && topic_ids.any?
-
-    @topics = Topic.where(id: topic_ids)
-    preload_topic_states
-    preload_note_counts
-    preload_participation_flags
-    preload_star_counts
-
-    payload = topic_ids.index_with do |tid|
-      state = @topic_states[tid] || {}
-      readers = Array(state[:team_readers]).map do |entry|
-        {
-          status: entry[:status],
-          user_id: entry[:user]&.id,
-          team_ids: entry[:team_ids]
-        }
-      end
-      participation = @participation_flags&.dig(tid) || { mine: false, team: false, aliases: [] }
-      participation_payload = {
-        mine: participation[:mine],
-        team: participation[:team],
-        aliases_count: Array(participation[:aliases]).size
-      }
-      star_data = @topic_star_data&.dig(tid) || { starred_by_me: false, team_starrers: [] }
-      {
-        status: state[:status],
-        progress: state[:progress],
-        read_count: state[:read_count],
-        last_id: state[:last_id],
-        aware_until: state[:aware_until],
-        team_readers: readers,
-        note_count: @topic_note_counts&.dig(tid).to_i,
-        participation: participation_payload,
-        star: star_data
-      }
-    end
-
-    render json: { topics: payload }
-  end
-
-  def user_state_frame
-    topic_ids = params[:topic_ids].is_a?(Array) ? params[:topic_ids].map(&:to_i).uniq : []
-    return head :unauthorized unless user_signed_in?
-    return head :ok if topic_ids.empty?
-
-    @topics = Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias).where(id: topic_ids)
-    preload_topic_states
-    preload_note_counts
-    preload_participation_flags
-    preload_commitfest_summaries
-    preload_star_counts
-    preload_topic_participants
-    preload_topic_mailing_lists
-
-    respond_to do |format|
-      format.turbo_stream
-      format.html { head :not_acceptable }
     end
   end
 
@@ -659,94 +585,6 @@ class TopicsController < ApplicationController
                      .load
   end
 
-  def preload_topic_states
-    topic_ids = @topics.map(&:id)
-    return if topic_ids.empty?
-
-    last_ids = @topics.index_by(&:id).transform_values(&:last_message_id)
-
-    if user_signed_in?
-      aware_map = ThreadAwareness.where(user: current_user, topic_id: topic_ids)
-                                 .pluck(:topic_id, :aware_until_message_id)
-                                 .to_h
-      read_counts = MessageReadRange.where(user: current_user, topic_id: topic_ids)
-                                    .group(:topic_id)
-                                    .sum(:message_count)
-      global_aware_before = current_user.aware_before
-
-      team_readers = preload_team_reader_states(topic_ids, last_ids)
-    end
-
-    @topic_states = {}
-    @topics.each do |topic|
-      last_id = topic.last_message_id
-      last_time = topic.last_message_at
-      if user_signed_in?
-        aware_until = aware_map[topic.id]
-        total = topic.message_count
-        read_count = read_counts[topic.id].to_i
-        status = compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
-        progress = compute_progress(total:, read_count:)
-      else
-        status = :new
-        aware_until = nil
-        read_count = 0
-        progress = 0
-      end
-
-      @topic_states[topic.id] = { status:, aware_until:, read_count:, last_id:, last_time:, progress:, team_readers: team_readers[topic.id] || [] }
-    end
-  end
-
-  def preload_note_counts
-    topic_ids = @topics.map(&:id)
-    return if topic_ids.empty?
-
-    @topic_note_counts = Note.visible_to(current_user)
-                              .where(topic_id: topic_ids)
-                              .active
-                              .group(:topic_id)
-                              .count
-  end
-
-  def preload_star_counts
-    topic_ids = @topics.map(&:id)
-    return if topic_ids.empty?
-    return unless user_signed_in?
-
-    my_stars = TopicStar.where(user: current_user, topic_id: topic_ids)
-                        .pluck(:topic_id)
-                        .to_set
-
-    team_ids = TeamMember.where(user_id: current_user.id).pluck(:team_id)
-    team_stars = {}
-
-    if team_ids.any?
-      teammate_ids = TeamMember.where(team_id: team_ids)
-                               .where.not(user_id: current_user.id)
-                               .pluck(:user_id)
-
-      if teammate_ids.any?
-        stars = TopicStar.where(user_id: teammate_ids, topic_id: topic_ids)
-                         .includes(user: { person: :default_alias })
-
-        stars.each do |star|
-          team_stars[star.topic_id] ||= []
-          alias_record = star.user.person&.default_alias || star.user.aliases&.first
-          team_stars[star.topic_id] << alias_record if alias_record
-        end
-      end
-    end
-
-    @topic_star_data = {}
-    @topics.each do |topic|
-      @topic_star_data[topic.id] = {
-        starred_by_me: my_stars.include?(topic.id),
-        team_starrers: team_stars[topic.id] || []
-      }
-    end
-  end
-
   def load_visible_tags
     @available_note_tags = NoteTag.joins(:note)
                                   .merge(Note.active.visible_to(current_user))
@@ -793,108 +631,6 @@ class TopicsController < ApplicationController
       @topic_participants_map[topic_id][:contributors] = sorted.select(&:is_contributor)
       @topic_participants_map[topic_id][:all] = sorted
     end
-  end
-
-  def preload_participation_flags
-    topic_ids = @topics.map(&:id)
-    return if topic_ids.empty?
-
-    my_person_id = current_user.person_id
-
-    my_team_ids = TeamMember.where(user_id: current_user.id).select(:team_id)
-    teammate_user_ids = TeamMember.where(team_id: my_team_ids).pluck(:user_id).uniq
-
-    if teammate_user_ids.empty?
-      teammate_user_ids = [ current_user.id ]
-    end
-
-    other_user_ids = teammate_user_ids - [ current_user.id ]
-    teammate_person_ids = [ my_person_id ]
-    teammate_person_ids += User.where(id: other_user_ids).pluck(:person_id) if other_user_ids.any?
-
-    # Use topic_participants instead of messages for efficiency
-    rows = TopicParticipant.where(topic_id: topic_ids, person_id: teammate_person_ids)
-                           .select(:topic_id, :person_id)
-
-    person_map = Person.includes(:default_alias).where(id: teammate_person_ids).index_by(&:id)
-
-    @participation_flags = Hash.new { |h, k| h[k] = { mine: false, team: false, aliases: [] } }
-
-    rows.each do |row|
-      entry = @participation_flags[row.topic_id]
-      person = person_map[row.person_id]
-      next unless person
-
-      alias_record = person.default_alias
-      next unless alias_record
-
-      entry[:aliases] << alias_record
-      entry[:mine] ||= row.person_id == my_person_id
-      entry[:team] = true
-    end
-
-    @participation_flags.transform_values! do |v|
-      v[:aliases] = v[:aliases].uniq { |a| a.id }
-      v
-    end
-  end
-
-  def compute_topic_status(total:, last_time:, aware_until:, read_count:, global_aware_before:)
-    return :new unless aware_until || read_count.positive? || global_aware_before
-    return :read if total.positive? && read_count >= total
-    return :reading if read_count.positive?
-
-    if global_aware_before && last_time && last_time <= global_aware_before
-      return :aware
-    end
-
-    return :aware if aware_until
-    :new
-  end
-
-  def compute_progress(total:, read_count:)
-    return 0 unless total.positive?
-    return 1.0 if read_count >= total
-
-    ratio = read_count.to_f / total.to_f
-    [ [ ratio, 0 ].max, 1 ].min
-  end
-
-  def preload_team_reader_states(topic_ids, last_ids)
-    return {} unless user_signed_in?
-
-    my_team_ids = TeamMember.where(user_id: current_user.id).select(:team_id)
-    memberships = TeamMember.where(team_id: my_team_ids).pluck(:user_id, :team_id)
-    return {} if memberships.empty?
-
-    member_user_ids = memberships.map(&:first).uniq
-    team_users = User.includes(:aliases, person: [ :default_alias, :contributor_memberships ])
-                     .where(id: member_user_ids)
-                     .index_by(&:id)
-
-    rows = MessageReadRange.where(user_id: memberships.map(&:first), topic_id: topic_ids)
-                           .select(:topic_id, :user_id, "MAX(range_end_message_id) AS max_end")
-                           .group(:topic_id, :user_id)
-
-    result = Hash.new { |h, k| h[k] = [] }
-
-    rows.each do |row|
-      last_id = last_ids[row.topic_id]
-      next unless last_id
-      max_end = row.read_attribute(:max_end).to_i
-      status = if max_end >= last_id
-                 :read
-      elsif max_end.positive?
-                 :reading
-      end
-      next unless status
-      user = team_users[row.user_id]
-      next unless user
-      reader_team_ids = memberships.select { |uid, _tid| uid == row.user_id }.map(&:second)
-      result[row.topic_id] << { user: user, status: status, team_ids: reader_team_ids }
-    end
-
-    result
   end
 
   def topics_base_query(search_query: nil)
@@ -1081,28 +817,14 @@ class TopicsController < ApplicationController
 
     latest_topic = @topics.first
     watermark = "#{latest_topic.last_activity.to_i}_#{latest_topic.id}"
-    [ "topics-index", watermark, topic_link_pref_cache_key ]
+    [ "topics-index", watermark ]
   end
 
   def topics_turbo_stream_cache_key
-    [
-      "topics-index-turbo",
-      params[:cursor].presence || "root",
-      topic_link_pref_cache_key
-    ]
-  end
-
-  def topics_turbo_stream_cache_read
-    Rails.cache.read(topics_turbo_stream_cache_key)
+    [ "topics-index-turbo", params[:cursor].presence || "root" ]
   end
 
   def topics_turbo_stream_cache_fetch
     Rails.cache.fetch(topics_turbo_stream_cache_key, expires_in: 10.minutes) { yield }
-  end
-
-  def topic_link_pref_cache_key
-    return "top" unless user_signed_in?
-
-    current_user.open_threads_at_first_unread? ? "first-unread" : "top"
   end
 end

@@ -61,6 +61,48 @@ RSpec.describe "Topics", type: :request do
         expect(response.body).to include("topics-table")
       end
     end
+
+    context "personalized rendering" do
+      let!(:creator) { create(:alias) }
+      let!(:topic) { create(:topic, creator: creator) }
+      let!(:message_a) { create(:message, topic: topic, sender: creator, created_at: 2.hours.ago) }
+      let!(:message_b) { create(:message, topic: topic, sender: creator, created_at: 1.hour.ago) }
+
+      context "as a guest" do
+        it "renders neutral rows without user-state frame plumbing" do
+          get topics_path
+          expect(response.body).to include('class="topic-row"')
+          expect(response.body).not_to include("topic-new")
+          expect(response.body).not_to include("user-state-root")
+          expect(response.body).not_to include("user-state-requests")
+        end
+      end
+
+      context "when signed in" do
+        let(:user) { create(:user) }
+
+        before { sign_in_as(user) }
+
+        it "renders personalized rows in the initial HTML without the frame" do
+          get topics_path
+          expect(response.body).to include('class="topic-row topic-new"')
+          expect(response.body).not_to include("user-state-root")
+          expect(response.body).not_to include("user-state-requests")
+        end
+
+        it "marks fully read topics as read" do
+          MessageReadRange.add_range(user: user, topic: topic, start_id: message_a.id, end_id: message_b.id)
+          get topics_path
+          expect(response.body).to include('class="topic-row topic-read"')
+        end
+
+        it "renders personalized rows on turbo-stream pagination" do
+          get topics_path(format: :turbo_stream)
+          expect(response.body).to include('class="topic-row topic-new"')
+          expect(response.body).not_to include("user-state-")
+        end
+      end
+    end
   end
 
   describe "GET /topics/:id" do
@@ -403,6 +445,28 @@ RSpec.describe "Topics", type: :request do
         get search_topics_path, params: { saved_search_id: private_search.id }
         expect(response).to have_http_status(:not_found)
       end
+    end
+  end
+
+  describe "GET /topics/search personalization" do
+    let!(:creator) { create(:alias) }
+    let!(:topic) { create(:topic, creator: creator) }
+    let!(:message) { create(:message, topic: topic, sender: creator, body: "zebrafish migration details") }
+
+    it "renders neutral rows without frame plumbing for guests" do
+      get search_topics_path(q: "zebrafish")
+      expect(response).to have_http_status(:success)
+      expect(response.body).not_to include("user-state-root")
+      expect(response.body).not_to include("user-state-requests")
+      expect(response.body).not_to include("topic-new")
+    end
+
+    it "renders personalized rows without the frame when signed in" do
+      sign_in_as(create(:user))
+      get search_topics_path(q: "zebrafish")
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include('class="topic-row topic-new"')
+      expect(response.body).not_to include("user-state-root")
     end
   end
 

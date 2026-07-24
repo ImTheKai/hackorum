@@ -57,7 +57,7 @@ module Settings
     end
 
     def team_update_params
-      params.require(:team).permit(:visibility)
+      params.require(:team).permit(:visibility, :week_start_day)
     end
 
     def require_team_admin!

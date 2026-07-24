@@ -68,7 +68,8 @@
 .settings-page input[type="text"],
 .settings-page input[type="email"],
 .settings-page input[type="password"],
-.settings-page input[type="number"] {
+.settings-page input[type="number"],
+.settings-page select {
   width: 100%;
   padding: var(--spacing-4) var(--spacing-6);
   border-radius: 999px;

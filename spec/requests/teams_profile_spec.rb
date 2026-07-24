@@ -106,5 +106,32 @@ RSpec.describe "TeamsProfile", type: :request do
       expect(response.body).to include(person_path("sender@example.com"))
       expect(response.body).to include("Sender activity thread")
     end
+
+    it "renders the new team stats tiles" do
+      team.update!(visibility: :visible)
+
+      member_alias = attach_verified_alias(member, email: "member@example.com")
+      topic = create(:topic, creator_alias: member_alias, title: "New discussion thread", created_at: 2.days.ago)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id, created_at: 2.days.ago)
+
+      get team_profile_path("test-team")
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include("Active threads")
+      expect(response.body).to include("Discussions started")
+      expect(response.body).to include("New patch series")
+      expect(response.body).to include("Thread engagement")
+      expect(response.body).to include("Responsiveness")
+      expect(response.body).to include("Community reach")
+    end
+
+    it "renders zero-value tiles without error for a team with no activity" do
+      team.update!(visibility: :visible)
+
+      get team_profile_path("test-team")
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include("Active threads")
+    end
   end
 end

@@ -323,6 +323,61 @@
   justify-content: center;
 }
 
+.team-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.team-stats-group-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-2);
+}
+
+.team-stats-group-note {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-normal);
+  margin-left: var(--spacing-1);
+}
+
+.team-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.team-stat-tile {
+  padding: var(--spacing-3);
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+}
+
+.team-stat-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.team-stat-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.team-stat-sub {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+@media (max-width: 720px) {
+  .team-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .activity-types {
   display: flex;
   flex-wrap: wrap;

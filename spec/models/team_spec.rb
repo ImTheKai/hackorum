@@ -95,6 +95,26 @@ RSpec.describe Team, type: :model do
     end
   end
 
+  describe "week_start_day" do
+    it "defaults to Monday" do
+      expect(team.week_start_day).to eq(1)
+    end
+
+    it "accepts any day 0..6" do
+      team.week_start_day = 0
+      expect(team).to be_valid
+
+      team.week_start_day = 6
+      expect(team).to be_valid
+    end
+
+    it "rejects values outside 0..6" do
+      team.week_start_day = 7
+      expect(team).not_to be_valid
+      expect(team.errors[:week_start_day]).to be_present
+    end
+  end
+
   describe "#mentionable_by?" do
     it "allows only members to mention private teams" do
       expect(team.mentionable_by?(user)).to be(true)

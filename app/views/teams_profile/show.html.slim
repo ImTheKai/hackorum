@@ -37,6 +37,7 @@
         = pluralize(@members.count, 'member')
 
   = turbo_frame_tag "team-activity" do
+    = render "team_stats"
     = render "activity_filters"
     .profile-section
       = render "contributions"

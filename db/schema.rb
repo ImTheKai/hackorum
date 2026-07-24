@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_04_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -648,6 +648,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_04_000000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.enum "visibility", default: "private", null: false, enum_type: "team_visibility"
+    t.integer "week_start_day", default: 1, null: false
   end
 
   create_table "thread_awarenesses", force: :cascade do |t|

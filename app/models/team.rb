@@ -13,6 +13,7 @@ class Team < ApplicationRecord
 
   validates :name, presence: true
   validates :name, format: { with: /\A[a-zA-Z0-9_\-\.]+\z/ }
+  validates :week_start_day, inclusion: { in: 0..6 }
   validate :name_available_in_reservations
 
   after_create :reserve_name

@@ -30,6 +30,11 @@
                 span.radio-text
                   strong Open
                   span.radio-description Anyone can see this team and mention @#{@team.name}
+          .form-group
+            label
+              strong Week starts on
+            = f.select :week_start_day, Date::DAYNAMES.each_with_index.map { |name, i| [ name, i ] }
+            p.settings-hint Used for the team's weekly activity view and contribution heatmap. Times are shown in UTC.
           = f.submit "Save", class: "button-primary"
       - elsif @is_member
         p.settings-hint

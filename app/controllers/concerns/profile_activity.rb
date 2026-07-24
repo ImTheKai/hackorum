@@ -20,10 +20,12 @@ module ProfileActivity
     ids.is_a?(Set) ? ids.to_a : ids
   end
 
-  def load_activity_data(scope: nil, year: nil)
+  def load_activity_data(scope: nil, year: nil, window_start: nil, window_end: nil)
     @week_start_day = parse_week_start_day
     @activity_filters = parse_activity_filters
     effective_scope = scope || default_recent_scope
+    @activity_window_start = window_start || default_window_start
+    @activity_window_end = window_end || Time.current
     @activity_entries = build_activity_entries(scope: effective_scope, filters: @activity_filters)
     @activity_summary = build_activity_summary(scope: effective_scope, filters: @activity_filters)
     @activity_period ||= { type: :recent } if scope.nil?
@@ -33,10 +35,13 @@ module ProfileActivity
     @weekday_labels = WeekCalculation.weekday_labels(@week_start_day)
   end
 
+  def default_window_start
+    1.month.ago.beginning_of_day
+  end
+
   def default_recent_scope
     ids = person_ids_for_query
-    start_date = 1.month.ago.beginning_of_day
-    Message.where(sender_person_id: ids, created_at: start_date..)
+    Message.where(sender_person_id: ids, created_at: default_window_start..)
   end
 
   def build_activity_entries(scope: nil, filters: nil)
@@ -99,17 +104,11 @@ module ProfileActivity
 
     filter_symbols = filters&.map(&:to_sym)&.to_set
 
-    summary = {
-      total: 0,
-      started_thread: 0,
-      replied_own_thread: 0,
-      replied_other_thread: 0,
-      replied_other_topics: 0,
-      sent_first_patch: 0,
-      sent_followup_patch: 0
-    }
+    summary = empty_activity_summary
 
     replied_other_topic_ids = Set.new
+    active_thread_ids = Set.new
+    contributor_ids = Set.new
 
     messages.each do |message|
       topic = message.topic
@@ -129,10 +128,18 @@ module ProfileActivity
         if activity_types.include?(:replied_other_thread)
           replied_other_topic_ids << topic.id
         end
+        if activity_types.include?(:started_thread)
+          key = message.is_patch_submission? ? :new_patch_series_count : :discussion_started_count
+          summary[key] += 1
+        end
+        active_thread_ids << topic.id
+        contributor_ids << message.sender_person_id
       end
     end
 
     summary[:replied_other_topics] = replied_other_topic_ids.size
+    summary[:active_thread_count] = active_thread_ids.size
+    summary[:unique_contributor_count] = contributor_ids.size
     summary
   end
 
@@ -143,6 +150,10 @@ module ProfileActivity
       replied_own_thread: 0,
       replied_other_thread: 0,
       replied_other_topics: 0,
+      active_thread_count: 0,
+      unique_contributor_count: 0,
+      discussion_started_count: 0,
+      new_patch_series_count: 0,
       sent_first_patch: 0,
       sent_followup_patch: 0
     }

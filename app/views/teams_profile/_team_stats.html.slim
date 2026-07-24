@@ -1,0 +1,74 @@
+- if @team_stats
+  .team-stats
+    .team-stats-group
+      h3.team-stats-group-title Activity
+      .team-stats-grid
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:active_thread_count] || 0
+          .team-stat-label Active threads
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:unique_contributor_count] || 0
+          .team-stat-label Team contributors active
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:discussion_started_count] || 0
+          .team-stat-label Discussions started
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:new_patch_series_count] || 0
+          .team-stat-label New patch series
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:sent_first_patch] || 0
+          .team-stat-label Patches sent
+        .team-stat-tile
+          .team-stat-value = @activity_summary[:sent_followup_patch] || 0
+          .team-stat-label Patch revisions
+
+    .team-stats-group
+      h3.team-stats-group-title Thread engagement
+      .team-stats-grid
+        .team-stat-tile
+          .team-stat-value = @team_stats.new_thread_count
+          .team-stat-label New threads
+        .team-stat-tile
+          .team-stat-value = @team_stats.joined_thread_count
+          .team-stat-label Threads joined
+        .team-stat-tile
+          .team-stat-value = @team_stats.continuing_thread_count
+          .team-stat-label Threads continued
+
+    .team-stats-group
+      h3.team-stats-group-title
+        | Responsiveness
+        span.team-stats-group-note
+          | (UTC)
+      .team-stats-grid
+        .team-stat-tile
+          .team-stat-value = @team_stats.median_first_response_hours ? format_duration_hours(@team_stats.median_first_response_hours) : "–"
+          .team-stat-label Median time to first response
+          - if @team_stats.first_response_sample_size.positive?
+            .team-stat-sub
+              = "n=#{@team_stats.first_response_sample_size}"
+        .team-stat-tile
+          .team-stat-value = @team_stats.waiting_for_response_count
+          .team-stat-label Threads waiting for a response
+          .team-stat-sub last 90 days
+        .team-stat-tile
+          .team-stat-value = @team_stats.patches_waiting_for_update_count
+          .team-stat-label Patches waiting for an author update
+          .team-stat-sub last 90 days
+        .team-stat-tile
+          .team-stat-value = @team_stats.external_reply_pct_within_2_bdays ? "#{@team_stats.external_reply_pct_within_2_bdays}%" : "–"
+          .team-stat-label Answered within 2 business days
+        .team-stat-tile
+          .team-stat-value = @team_stats.external_reply_pct_within_5_bdays ? "#{@team_stats.external_reply_pct_within_5_bdays}%" : "–"
+          .team-stat-label Answered within 5 business days
+
+    .team-stats-group
+      h3.team-stats-group-title Community reach
+      .team-stats-grid
+        .team-stat-tile
+          .team-stat-value = @team_stats.unique_external_contributor_count
+          .team-stat-label = "Contributors outside #{@team.name} engaged"
+        .team-stat-tile
+          .team-stat-value = @team_stats.threads_with_further_engagement_count
+          .team-stat-label Threads with further community engagement
+          .team-stat-sub as of now

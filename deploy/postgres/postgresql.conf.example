@@ -16,3 +16,5 @@ wal_level = replica
 wal_compression = on
 max_wal_size = 8GB
 min_wal_size = 2GB
+
+autovacuum_vacuum_cost_limit = 1000

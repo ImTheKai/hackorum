@@ -105,7 +105,9 @@ class EmailIngestor
     updates = {}
     updates[:body] = body if update_existing.include?(:body) && message.body != body
 
-    if update_existing.include?(:date) && sent_at && message.created_at != sent_at
+    date_changed = update_existing.include?(:date) && sent_at && message.created_at != sent_at
+
+    if date_changed
       updates[:created_at] = sent_at
 
       # Update topic date if this is the first message
@@ -130,6 +132,7 @@ class EmailIngestor
 
     message.update_columns(updates) if updates.any?
     message.recompute_patch_paths! if updates.key?(:body)
+    resync_activity_after_date_change(message) if date_changed
 
     if flipped_to_sent
       pending_age = message.sent_at ? (Time.current - message.sent_at).to_i : nil
@@ -137,6 +140,25 @@ class EmailIngestor
         message_id: message.message_id,
         pending_age_seconds: pending_age)
     end
+  end
+
+  # created_at carries the mail Date:, so correcting it moves the message within
+  # the thread. The counter callbacks only run on create/destroy, so the cached
+  # latest-activity timestamps have to be recomputed here.
+  def resync_activity_after_date_change(message)
+    topic = message.topic
+    return unless topic
+
+    topic.resync_last_message!
+
+    participant = TopicParticipant.find_by(topic_id: topic.id, person_id: message.sender_person_id)
+    return unless participant
+
+    stats = topic.messages.where(sender_person_id: message.sender_person_id)
+                 .pick(Arel.sql("MIN(created_at), MAX(created_at)"))
+    return unless stats
+
+    participant.update_columns(first_message_at: stats[0], last_message_at: stats[1])
   end
 
   def build_from_aliases(m, sent_at)

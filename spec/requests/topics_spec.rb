@@ -47,6 +47,39 @@ RSpec.describe "Topics", type: :request do
         expect(topic2_position).to be < topic1_position
       end
 
+      context "with viewing_since holding the list steady" do
+        it "keeps a topic at its snapshot position after it receives a newer message" do
+          viewing_since = 12.hours.ago
+
+          # topic1's newest message as of viewing_since is 2 days old, so it stays
+          # below topic2 even though the new message makes it the latest overall.
+          create(:message, topic: topic1, sender: creator1, created_at: 1.hour.ago)
+
+          get topics_path, params: { viewing_since: viewing_since.iso8601 }
+
+          expect(response).to have_http_status(:success)
+          expect(response.body.index(topic2.title)).to be < response.body.index(topic1.title)
+        end
+
+        it "excludes topics whose only messages are newer than viewing_since" do
+          future_topic = create(:topic, creator: creator1, created_at: 1.hour.ago)
+          create(:message, topic: future_topic, sender: creator1, created_at: 30.minutes.ago)
+
+          get topics_path, params: { viewing_since: 12.hours.ago.iso8601 }
+
+          expect(response.body).not_to include(future_topic.title)
+          expect(response.body).to include(topic1.title)
+        end
+
+        it "omits topics that have no messages at all" do
+          empty_topic = create(:topic, creator: creator1, created_at: 3.days.ago)
+
+          get topics_path
+
+          expect(response.body).not_to include(empty_topic.title)
+        end
+      end
+
       it "displays creator names" do
         get topics_path
         expect(response.body).to include(creator1.name)

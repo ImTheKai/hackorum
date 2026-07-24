@@ -249,6 +249,19 @@ class Topic < ApplicationRecord
     )
   end
 
+  # Resync only the denormalized last-message columns. Message create/destroy
+  # keep these current, but a message whose created_at changes afterwards leaves
+  # them pointing at the wrong timestamp.
+  def resync_last_message!
+    last_msg = messages.order(created_at: :desc, id: :desc).first
+
+    update_columns(
+      last_message_at: last_msg&.created_at,
+      last_message_id: last_msg&.id,
+      last_sender_person_id: last_msg&.sender_person_id
+    )
+  end
+
   def self.commitfest_summaries(topic_ids)
     ids = Array(topic_ids).map(&:to_i).uniq
     return {} if ids.empty?

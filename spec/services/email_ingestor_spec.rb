@@ -427,4 +427,79 @@ RSpec.describe EmailIngestor do
       expect(msg.reload.patch_submission_files.pluck(:path)).to eq([ "src/two.c" ])
     end
   end
+
+  describe "#ingest_raw date correction" do
+    let(:ingestor) { described_class.new }
+    let(:mailing_list) { create(:mailing_list) }
+
+    def raw_email_at(sent_at, message_id:)
+      <<~EMAIL
+        From: sender@example.com
+        To: recipient@example.com
+        Subject: Dated mail
+        Message-ID: <#{message_id}>
+        Date: #{sent_at.rfc2822}
+
+        body text
+      EMAIL
+    end
+
+    it "resyncs the topic's cached last message when a corrected date moves it later" do
+      original = Time.zone.parse("2026-01-10 12:00:00")
+      msg = ingestor.ingest_raw(raw_email_at(original, message_id: "date-fix-1@example.com"),
+                                mailing_list: mailing_list)
+      topic = msg.topic
+      expect(topic.reload.last_message_at).to be_within(1.second).of(original)
+
+      corrected = Time.zone.parse("2026-02-20 08:30:00")
+      ingestor.ingest_raw(raw_email_at(corrected, message_id: "date-fix-1@example.com"),
+                          mailing_list: mailing_list, update_existing: [ :date ])
+
+      expect(msg.reload.created_at).to be_within(1.second).of(corrected)
+      expect(topic.reload.last_message_at).to be_within(1.second).of(corrected)
+      expect(topic.last_message_id).to eq(msg.id)
+    end
+
+    it "resyncs when the corrected date moves the message earlier" do
+      original = Time.zone.parse("2026-03-15 09:00:00")
+      msg = ingestor.ingest_raw(raw_email_at(original, message_id: "date-fix-2@example.com"),
+                                mailing_list: mailing_list)
+      topic = msg.topic
+
+      corrected = Time.zone.parse("2026-01-05 07:15:00")
+      ingestor.ingest_raw(raw_email_at(corrected, message_id: "date-fix-2@example.com"),
+                          mailing_list: mailing_list, update_existing: [ :date ])
+
+      expect(topic.reload.last_message_at).to be_within(1.second).of(corrected)
+    end
+
+    it "resyncs the sender's participant timestamps" do
+      original = Time.zone.parse("2026-01-10 12:00:00")
+      msg = ingestor.ingest_raw(raw_email_at(original, message_id: "date-fix-3@example.com"),
+                                mailing_list: mailing_list)
+      participant = TopicParticipant.find_by!(topic_id: msg.topic_id,
+                                              person_id: msg.sender_person_id)
+
+      corrected = Time.zone.parse("2026-02-20 08:30:00")
+      ingestor.ingest_raw(raw_email_at(corrected, message_id: "date-fix-3@example.com"),
+                          mailing_list: mailing_list, update_existing: [ :date ])
+
+      participant.reload
+      expect(participant.last_message_at).to be_within(1.second).of(corrected)
+      expect(participant.first_message_at).to be_within(1.second).of(corrected)
+    end
+
+    it "leaves cached timestamps alone when the date is unchanged" do
+      sent_at = Time.zone.parse("2026-01-10 12:00:00")
+      msg = ingestor.ingest_raw(raw_email_at(sent_at, message_id: "date-fix-4@example.com"),
+                                mailing_list: mailing_list)
+      topic = msg.topic
+      before = topic.reload.last_message_at
+
+      ingestor.ingest_raw(raw_email_at(sent_at, message_id: "date-fix-4@example.com"),
+                          mailing_list: mailing_list, update_existing: [ :date ])
+
+      expect(topic.reload.last_message_at).to eq(before)
+    end
+  end
 end

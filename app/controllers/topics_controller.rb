@@ -4,9 +4,11 @@ class TopicsController < ApplicationController
   before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset, :summary, :messages ]
   before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar ]
 
+  TOPIC_LIST_PRELOADS = [ :creator, { creator_person: :default_alias }, { last_sender_person: :default_alias } ].freeze
+
   def index
     @search_query = nil
-    base_query = Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias)
+    base_query = Topic.includes(*TOPIC_LIST_PRELOADS)
 
     apply_cursor_pagination(base_query)
     preload_topic_participants
@@ -566,23 +568,91 @@ class TopicsController < ApplicationController
   def apply_cursor_pagination(base_query)
     @viewing_since = viewing_since_param
 
-    windowed_query = base_query.joins(:messages)
-                               .where(messages: { created_at: ..@viewing_since })
-                               .group("topics.id")
-                               .having("MAX(messages.created_at) <= ?", @viewing_since)
-                               .select("topics.*, MAX(messages.created_at) as last_activity")
+    @topics = activity_window(base_query, limit: 25, cursor: params[:cursor],
+                              preload: TOPIC_LIST_PRELOADS).load
+  end
 
-    if params[:cursor].present?
-      cursor_time, cursor_id = params[:cursor].split("_")
-      @topics = windowed_query.having("(MAX(messages.created_at), topics.id) < (?, ?)",
-                                          Time.zone.parse(cursor_time), cursor_id.to_i)
-    else
-      @topics = windowed_query
-    end
+  # Topics ordered by their latest message as of viewing_since.
+  #
+  # Aggregating MAX(messages.created_at) cannot be short-circuited by the LIMIT --
+  # every group has to be computed before the top N is known. Split on
+  # viewing_since instead: topics at or below it read the indexed
+  # topics.last_message_at, and only topics that have moved past it need a real
+  # MAX, which is bounded by activity since the page loaded.
+  #
+  # Built from a clean Topic scope rather than by unscoping base_query, whose
+  # left_joins would multiply rows again; only its id restriction is wanted.
+  def activity_window(base_query, limit:, offset: 0, cursor: nil, select: "topics.*", preload: nil)
+    cursor_time, cursor_id = parse_activity_cursor(cursor)
+    ids = activity_id_restriction(base_query)
 
-    @topics = @topics.order("MAX(messages.created_at) DESC, topics.id DESC")
-                     .limit(25)
-                     .load
+    settled = settled_activity_scope(ids, cursor_time, cursor_id).limit(limit + offset)
+    recent = recent_activity_scope(ids, cursor_time, cursor_id)
+
+    candidates = "(#{settled.to_sql}) UNION ALL (#{recent.to_sql})"
+
+    scope = Topic.select("#{select}, activity.last_activity")
+                 .from(Arel.sql("(#{candidates}) AS activity"))
+                 .joins("INNER JOIN topics ON topics.id = activity.id")
+                 .order(Arel.sql("activity.last_activity DESC, activity.id DESC"))
+                 .limit(limit)
+                 .offset(offset)
+
+    preload ? scope.preload(*preload) : scope
+  end
+
+  # Taking only the first limit+offset settled rows is safe: they are ordered by
+  # the same key as the merged result, so a settled row outside that prefix can
+  # never outrank one inside it.
+  def settled_activity_scope(ids, cursor_time, cursor_id)
+    scope = activity_base_scope(ids).where(last_message_at: ..@viewing_since)
+    scope = scope.where("(topics.last_message_at, topics.id) < (?, ?)", cursor_time, cursor_id) if cursor_time
+    scope.select("topics.id, topics.last_message_at AS last_activity")
+         .order(Arel.sql("topics.last_message_at DESC, topics.id DESC"))
+  end
+
+  def recent_activity_scope(ids, cursor_time, cursor_id)
+    scope = activity_base_scope(ids)
+              .where("topics.last_message_at > ?", @viewing_since)
+              .joins(Arel.sql(ActiveRecord::Base.sanitize_sql_array([ <<~SQL.squish, @viewing_since ])))
+                CROSS JOIN LATERAL (
+                  SELECT MAX(messages.created_at) AS last_activity
+                  FROM messages
+                  WHERE messages.topic_id = topics.id AND messages.created_at <= ?
+                ) snapshot
+              SQL
+              .where("snapshot.last_activity IS NOT NULL")
+    scope = scope.where("(snapshot.last_activity, topics.id) < (?, ?)", cursor_time, cursor_id) if cursor_time
+    scope.select("topics.id, snapshot.last_activity")
+  end
+
+  # Merged topics keep a stale last_message_at but own no messages, so the old
+  # INNER JOIN on messages dropped them. Ordering by the column would surface
+  # them, hence the explicit filter.
+  def activity_base_scope(ids)
+    scope = Topic.where(merged_into_topic_id: nil)
+    ids ? scope.where(id: ids) : scope
+  end
+
+  # Search relations left_join commitfest tables and can return a topic more
+  # than once; the aggregate used to collapse those rows. Restricting by id
+  # subquery keeps the outer scan on topics alone, so it dedupes and stays
+  # indexable at the same time.
+  def activity_id_restriction(base_query)
+    return nil unless activity_query_needs_dedup?(base_query)
+
+    base_query.unscope(:includes, :eager_load, :order, :limit, :offset, :select).select("topics.id")
+  end
+
+  def activity_query_needs_dedup?(base_query)
+    base_query.where_clause.any? || base_query.joins_values.any? || base_query.left_outer_joins_values.any?
+  end
+
+  def parse_activity_cursor(cursor)
+    return [ nil, nil ] if cursor.blank?
+
+    cursor_time, cursor_id = cursor.split("_")
+    [ Time.zone.parse(cursor_time), cursor_id.to_i ]
   end
 
   def load_visible_tags
@@ -634,7 +704,7 @@ class TopicsController < ApplicationController
   end
 
   def topics_base_query(search_query: nil)
-    return Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias) if search_query.nil?
+    return Topic.includes(*TOPIC_LIST_PRELOADS) if search_query.nil?
 
     cleaned_query = search_query.to_s.strip
     return Topic.none if cleaned_query.blank?
@@ -663,13 +733,14 @@ class TopicsController < ApplicationController
     end
   end
 
+  # A topic has a message newer than viewing_since exactly when its latest
+  # message is newer, so the indexed column answers this without grouping.
   def count_new_topics(base_query, viewing_since)
-    base_query.joins(:messages)
-              .where(messages: { created_at: viewing_since.. })
-              .group("topics.id")
-              .having("MAX(messages.created_at) > ?", viewing_since)
-              .count
-              .size
+    base_query.unscope(:includes, :order, :limit, :offset, :select)
+              .where(merged_into_topic_id: nil)
+              .where("topics.last_message_at > ?", viewing_since)
+              .distinct
+              .count(:id)
   end
 
   def load_notes
@@ -717,15 +788,12 @@ class TopicsController < ApplicationController
   end
 
   def execute_search_query(base_relation, longpage)
-    results = base_relation
-      .joins(:messages)
-      .where(messages: { created_at: ..@viewing_since })
-      .group("topics.id")
-      .select("topics.id, topics.creator_id, MAX(messages.created_at) as last_activity")
-      .order("MAX(messages.created_at) DESC, topics.id DESC")
-      .limit(SEARCH_PAGE_SIZE)
-      .offset(SEARCH_PAGE_SIZE * longpage)
-      .load
+    results = activity_window(
+      base_relation,
+      limit: SEARCH_PAGE_SIZE,
+      offset: SEARCH_PAGE_SIZE * longpage,
+      select: "topics.id, topics.creator_id"
+    ).load
 
     results.map do |row|
       {
@@ -802,7 +870,7 @@ class TopicsController < ApplicationController
     ids = entries.map { |e| e[:id] }
     return [] if ids.empty?
 
-    topics_map = Topic.includes(:creator, creator_person: :default_alias, last_sender_person: :default_alias).where(id: ids).index_by(&:id)
+    topics_map = Topic.includes(*TOPIC_LIST_PRELOADS).where(id: ids).index_by(&:id)
     entries.filter_map do |entry|
       topic = topics_map[entry[:id]]
       next unless topic

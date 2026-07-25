@@ -28,6 +28,7 @@ Useful commands:
 * Tests: `task test` (pass args after `--`, e.g. `task test -- spec/models`)
 * Import a DB dump: `task db-import SCHEMA=/path/to/schema-YYYY-MM.sql.gz PUBLIC_DATA=/path/to/public-data-YYYY-MM.sql.gz`
 * If you need private data too, add `PRIVATE_DATA=/path/to/private-data-YYYY-MM.sql.gz` to the same command
+* Import postgres commit history: `task commit-import` (expects a checkout in `./postgres`, override with `PG_REPO=/path/to/postgres`; extra importer args after `--`, e.g. `-- --limit 100`)
 * Other targets: `task dev-detach` / `task down` / `task logs` / `task db-reset` / `task psql`
 
 Public database dumps (schema + public data) are published at https://dumps.hackorum.dev/

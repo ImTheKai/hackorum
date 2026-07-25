@@ -4,6 +4,9 @@ tmp
 storage
 node_modules
 vendor/bundle
+# Local postgresql clone used by the commit importer: huge, and mounted at
+# runtime by `task commit-import` rather than baked into the image.
+postgres
 spec/tmp
 coverage
 *.log

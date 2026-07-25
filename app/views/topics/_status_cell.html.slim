@@ -15,6 +15,9 @@
   = star_icon_html(topic: topic, star_data: star_data)
   = note_icon_html(topic: topic, count: note_count.to_i)
   = team_readers_icon_html(topic: topic, readers: team_readers)
+  - commit_summary = @commit_summaries&.dig(topic.id)
+  - if commit_summary
+    = render partial: "topics/commit_icon", locals: { summary: commit_summary }
   - commitfest_summary = @commitfest_summaries&.dig(topic.id)
   - if commitfest_summary
     = render partial: "topics/commitfest_icon", locals: { summary: commitfest_summary }

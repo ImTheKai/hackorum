@@ -13,6 +13,7 @@ class TopicsController < ApplicationController
     apply_cursor_pagination(base_query)
     preload_topic_participants
     preload_commitfest_summaries
+    preload_commit_summaries
     preload_topic_mailing_lists
     @new_topics_count = 0
 
@@ -86,6 +87,7 @@ class TopicsController < ApplicationController
     build_participants_sidebar_data(messages_scope)
     build_thread_outline(@messages)
     load_commitfest_sidebar
+    load_commit_sidebar
 
     @topic_mailing_lists = @topic.mailing_lists.to_a
     @topic_is_multi_list = @topic_mailing_lists.size > 1
@@ -373,6 +375,7 @@ class TopicsController < ApplicationController
 
     preload_topic_participants
     preload_commitfest_summaries
+    preload_commit_summaries
     preload_topic_mailing_lists
     @personalization = TopicListPersonalization.new(user: current_user, topics: @topics) if user_signed_in?
     load_visible_tags if user_signed_in?
@@ -821,6 +824,11 @@ class TopicsController < ApplicationController
     @commitfest_summaries = Topic.commitfest_summaries(topic_ids)
   end
 
+  def preload_commit_summaries
+    topic_ids = @topics.select { |topic| topic.commit_count.to_i.positive? }.map(&:id)
+    @commit_summaries = Topic.commit_summaries(topic_ids)
+  end
+
   def load_commitfest_sidebar
     entries = CommitfestPatchCommitfest
       .joins(commitfest_patch: :commitfest_patch_topics)
@@ -847,6 +855,40 @@ class TopicsController < ApplicationController
 
     committers = deduped_entries.map { |entry| entry.commitfest_patch.committer.to_s.strip }.reject(&:blank?).uniq
     @commitfest_committers = committers
+  end
+
+  def load_commit_sidebar
+    commits = Commit.for_topic(@topic.id).to_a
+    @commit_groups = Commit.group_backports(commits)
+    @commit_credits = commit_credits_for(commits)
+  end
+
+  # role => [{ name:, email: }], deduplicated across a change and its backports.
+  def commit_credits_for(commits)
+    return {} if commits.empty?
+
+    rows = CommitPerson.where(commit_id: commits.map(&:id))
+                       .includes(person: :default_alias)
+    grouped = rows.group_by(&:role)
+
+    CommitPerson::DISPLAY_ORDER.each_with_object({}) do |role, acc|
+      entries = (grouped[role] || []).map do |row|
+        alias_record = row.person&.default_alias
+        {
+          name: row.raw_name.presence || alias_record&.name || row.raw_email,
+          email: alias_record&.email
+        }
+      end
+
+      # dedupe by name, but a resolved (linked) entry wins over an unresolved
+      # duplicate of the same name -- otherwise a name colliding with an
+      # earlier unresolved row would silently drop its person link.
+      deduped = entries.group_by { |entry| entry[:name].to_s.downcase }.map do |_, dups|
+        dups.find { |entry| entry[:email].present? } || dups.first
+      end
+
+      acc[role] = deduped if deduped.any?
+    end
   end
 
   def slice_cached_entries(entries, cursor_param)

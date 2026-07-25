@@ -2,6 +2,37 @@
 
 - content_for :sidebar do
   .sidebar
+    - if @commit_groups.present?
+      details.sidebar-section open=true
+        summary.sidebar-heading Commits
+        .sidebar-section
+          .commit-sidebar-list
+            - @commit_groups.each do |group|
+              .commit-sidebar-entry
+                = link_to group[:subject], "https://git.postgresql.org/pg/commitdiff/#{group[:sha]}", target: "_blank", rel: "noopener", class: "commit-sidebar-link"
+                .commit-sidebar-branches
+                  = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
+                .commit-sidebar-meta
+                  - if group[:committer_name].present?
+                    span.commit-sidebar-committer = "Committed by #{group[:committer_name]}"
+                  span.commit-sidebar-date = absolute_time_display(group[:committed_at])
+
+    - if @commit_credits.present?
+      details.sidebar-section open=true
+        summary.sidebar-heading Credits
+        .sidebar-section
+          - @commit_credits.each do |role, entries|
+            .commit-credit-row
+              span.commit-credit-role = role.humanize
+              span.commit-credit-people
+                - entries.each_with_index do |entry, index|
+                  - separator = index.zero? ? "" : ", "
+                  = separator
+                  - if entry[:email].present?
+                    = link_to entry[:name], person_path(entry[:email]), class: "commit-credit-link"
+                  - else
+                    = entry[:name]
+
     - if @commitfest_sidebar_entries.present?
       details.sidebar-section open=true
         summary.sidebar-heading Commitfests

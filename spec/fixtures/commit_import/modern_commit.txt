@@ -8,4 +8,5 @@ Reported-by: Bob Reporter <bob@example.com>
 Co-authored-by: Carol Coder <carol@example.com>
 Author: Dan Dev <dan@example.com>
 Tested-by: Tina Tester <tina@example.com>
+Backpatch-through: 13
 Discussion: https://postgr.es/m/5ccbdbde-6467-4a10-bf4d-0be73a05ce8d@dunslane.net

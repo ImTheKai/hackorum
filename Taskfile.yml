@@ -200,6 +200,22 @@ tasks:
           -v {{.MBOX_DIR}}:/import:ro,z \
           web bash -c "ruby script/mbox_import.rb --list {{.LIST}} {{.CLI_ARGS}}$files"
 
+  commit-import:
+    desc: 'Import postgres commits from a local checkout (vars: PG_REPO=./postgres; extra args after --, e.g. -- --limit 100)'
+    preconditions:
+      - sh: git -C "{{.PG_REPO | default "./postgres"}}" rev-parse --git-dir >/dev/null 2>&1
+        msg: 'not a git repository: {{.PG_REPO | default "./postgres"}} - clone postgresql there, or pass PG_REPO=/path/to/postgres'
+    cmds:
+      # The checkout is mounted read-only at /pgrepo (the path the importer
+      # defaults to), so it is never fetched into or otherwise touched; hence
+      # --no-fetch. safe.directory is needed because the container runs as root
+      # while the bind-mounted repo is owned by the host user.
+      - |
+        REPO_ABS=$(cd "{{.PG_REPO | default "./postgres"}}" && pwd) || exit 1
+        {{.COMPOSE}} run --rm \
+          -v "$REPO_ABS":/pgrepo:ro,z \
+          web bash -c 'git config --global --add safe.directory /pgrepo && ruby script/commit_import.rb --no-fetch {{.CLI_ARGS}}'
+
   stats:
     desc: 'Rebuild stats (vars: GRANULARITY=all|daily|weekly|monthly)'
     cmds:

@@ -31,6 +31,8 @@ class Topic < ApplicationRecord
   has_many :topic_merges_as_target, class_name: "TopicMerge", foreign_key: :target_topic_id
   has_many :topic_mailing_lists, dependent: :destroy
   has_many :mailing_lists, through: :topic_mailing_lists
+  has_many :commit_topics, dependent: :destroy
+  has_many :commits, through: :commit_topics
 
   scope :active, -> { where(merged_into_topic_id: nil) }
   scope :merged, -> { where.not(merged_into_topic_id: nil) }
@@ -308,6 +310,30 @@ class Topic < ApplicationRecord
         tags: tags,
         committed: row["status"].to_s == "Committed"
       }
+    end
+  end
+
+  # topic_id => { groups: [Commit.group_backports entries] }
+  # body left out of the select on purpose, these rows are index-row display
+  # data, not full commit records. No count key here on purpose: groups is
+  # already the post-collapse list, callers count from that.
+  def self.commit_summaries(topic_ids)
+    ids = Array(topic_ids).map(&:to_i).uniq
+    return {} if ids.empty?
+
+    rows = Commit
+      .joins(:commit_topics)
+      .where(commit_topics: { topic_id: ids })
+      .select(<<~COLUMNS.squish)
+        commits.id, commits.sha, commits.subject, commits.branches,
+        commits.released_in, commits.released_at, commits.committed_at,
+        commits.committer_name, commits.cherry_picked_from_sha,
+        commits.authored_at, commit_topics.topic_id AS ct_topic_id
+      COLUMNS
+      .order(committed_at: :desc)
+
+    rows.group_by { |row| row.ct_topic_id.to_i }.transform_values do |commits|
+      { groups: Commit.group_backports(commits) }
     end
   end
 

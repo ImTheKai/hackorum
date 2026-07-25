@@ -1,0 +1,16 @@
+- groups = summary[:groups] || []
+- visible_groups = groups.first(5)
+- remaining_count = groups.size - visible_groups.size
+
+div class="topic-icon commit-icon" data-controller="hover-popover" data-hover-popover-delay-value="200" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+  i.fa-solid.fa-code-commit
+  .topic-icon-hover data-hover-popover-target="popover" data-action="mouseenter->hover-popover#show mouseleave->hover-popover#scheduleHide"
+    .commit-hover
+      .commit-hover-title = pluralize(groups.size, "commit")
+      - visible_groups.each do |group|
+        .commit-hover-entry
+          .commit-hover-subject = group[:subject]
+          .commit-hover-branches
+            = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
+      - if remaining_count.positive?
+        .commit-hover-more = "+#{remaining_count} more"

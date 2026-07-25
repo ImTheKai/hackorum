@@ -39,7 +39,6 @@ Rails.application.routes.draw do
   end
   get "messages/by-id/*message_id", to: "messages#by_message_id", as: :message_by_id,
       constraints: { format: /html|json/ }, defaults: { format: "html" }
-  get "patch_submissions", to: "patch_submissions#index", defaults: { format: :json }
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest

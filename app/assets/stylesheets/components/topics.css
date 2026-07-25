@@ -999,3 +999,59 @@ a.topic-icon {
   display: inline-flex;
   gap: 4px;
 }
+
+.commit-icon {
+  background: var(--color-bg-icon);
+}
+
+.commit-icon i {
+  color: var(--color-success);
+}
+
+.commit-hover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-width: 18rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.commit-hover-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.commit-hover-entry {
+  padding: var(--spacing-1) 0;
+}
+
+.commit-hover-subject {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.commit-hover-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-1);
+}
+
+.commit-badge {
+  display: inline-flex;
+  gap: var(--spacing-1);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--color-primary-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.commit-badge-release {
+  opacity: 0.75;
+}
+
+.commit-hover-more {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

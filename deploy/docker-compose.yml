@@ -64,6 +64,8 @@ services:
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
       # Run Solid Queue supervisor inside Puma so background jobs (emails, etc.) get processed.
       SOLID_QUEUE_IN_PUMA: "1"
+      # Local mirror of the PostgreSQL git history, used by the hourly commit importer.
+      HACKORUM_PG_REPO: /pgrepo
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       # Required: decrypts credentials.yml.enc, which holds the Active Record
       # encryption keys used for Identity OAuth tokens (Gmail send feature).
@@ -77,6 +79,8 @@ services:
       SMTP_DOMAIN: ${SMTP_DOMAIN}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
+    volumes:
+      - pgrepo:/pgrepo
     depends_on:
       db:
         condition: service_healthy
@@ -232,6 +236,7 @@ services:
 volumes:
   pgdata:
   pgdumps:
+  pgrepo:
   caddy_data:
   caddy_config:
   maildata:

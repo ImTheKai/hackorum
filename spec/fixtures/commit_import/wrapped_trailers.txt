@@ -1,0 +1,8 @@
+Fix race in parallel vacuum leader
+
+The leader could exit before workers finished reporting.
+
+Reviewed-by: Tom Lane <tgl@sss.pgh.pa.us>,
+    Andres Freund <andres@anarazel.de>
+Author: Masahiko Sawada <sawada.mshk@gmail.com>
+Discussion: https://postgr.es/m/CAD21AoA%3Dabc%40mail.gmail.com

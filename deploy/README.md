@@ -265,6 +265,58 @@ If you need to import the historical mailing list archive before running the app
    ```
    Ensure the same env in `deploy/.env` is present so the importer can connect to the DB.
 
+## Commit import (PostgreSQL git mirror)
+The `web` service mounts a named volume, `pgrepo`, at `/pgrepo`. It holds a bare
+mirror of the PostgreSQL git history and is read/written only by `CommitImportJob`,
+which runs hourly (see `config/recurring.yml`) via the Solid Queue supervisor
+inside Puma (`SOLID_QUEUE_IN_PUMA: "1"`). No other service needs it.
+
+The first run clones the mirror from scratch (a few hundred MB) and can take
+several minutes; every run after that is an incremental `git fetch`. The job
+takes a Postgres advisory lock before touching the mirror or the database, so
+if an hourly tick fires while the previous one is still running (e.g. still
+cloning), it finds the lock held and returns immediately instead of running a
+second import in parallel.
+
+The clone is not atomic: if the container is killed mid-clone, `/pgrepo` is
+left repo-shaped but incomplete. Usually the next run's `git fetch` picks up
+where it left off. If instead the mirror is actually corrupted, every future
+run fails the same way with no automatic recovery, since we do not auto-reclone.
+To recover by hand:
+```bash
+docker compose stop web
+docker run --rm -v deploy_pgrepo:/pgrepo alpine sh -c 'rm -rf /pgrepo/*'
+docker compose up -d web
+```
+(adjust the volume name if your compose project uses a different prefix; check
+with `docker volume ls`). The next hourly tick, or a manual run, will re-clone.
+
+To run the import by hand inside the container, e.g. to verify after a recovery:
+```bash
+docker compose exec web bundle exec ruby script/commit_import.rb
+```
+A manual run takes the same advisory lock as the hourly job, so it refuses to
+start (prints a message, exits non-zero) while the hourly job is mid-run, and
+the hourly job likewise skips a tick while a manual run is still going. If you
+hit this, just wait for the other one to finish; stop the `web` container if
+you really need to force a run right now.
+
+`commits.released_in` is assigned write-once and never revisited: once a tag's
+ancestry excludes a commit from the walk, that commit is done for good, even if
+an older tag turns up later and should have claimed it first. This only bites
+if tags become visible out of date order, e.g. a volume rebuilt from a shallow
+clone, or a fetch that exposes old tags late. A normal first run is unaffected,
+since a full `--mirror` clone fetches all ~400 tags at once and the job walks
+them oldest-first. If you do suspect misattribution, the fix is a full
+re-derivation: clear `release_tags` and null out `released_in`/`released_at` on
+`commits`, then let the next hourly run reassign everything from scratch.
+```bash
+docker compose exec web bin/rails runner '
+  ReleaseTag.delete_all
+  Commit.update_all(released_in: nil, released_at: nil)
+'
+```
+
 ## Logging
 All services log to stdout/stderr, captured by Docker's `local` driver (see the
 `x-logging-*` anchors in `docker-compose.yml`). The driver rotates by size and

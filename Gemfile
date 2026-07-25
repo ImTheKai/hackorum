@@ -73,7 +73,6 @@ group :development, :test do
   gem "factory_bot_rails"
   gem "shoulda-matchers"
 
-  gem "sqlite3"
   gem "webmock"
 end
 

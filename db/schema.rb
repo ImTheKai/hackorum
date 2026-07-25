@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_25_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -77,6 +77,31 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["message_id"], name: "index_attachments_on_message_id"
+  end
+
+  create_table "commit_files", force: :cascade do |t|
+    t.bigint "commit_id", null: false
+    t.string "path", null: false
+    t.index ["commit_id", "path"], name: "index_commit_files_on_commit_id_and_path", unique: true
+    t.index ["path"], name: "index_commit_files_on_path"
+  end
+
+  create_table "commit_people", force: :cascade do |t|
+    t.bigint "commit_id", null: false
+    t.string "role", null: false
+    t.string "raw_name"
+    t.string "raw_email"
+    t.bigint "person_id"
+    t.index ["commit_id", "role"], name: "index_commit_people_on_commit_id_and_role"
+    t.index ["person_id"], name: "index_commit_people_on_person_id"
+  end
+
+  create_table "commit_topics", force: :cascade do |t|
+    t.bigint "commit_id", null: false
+    t.bigint "topic_id", null: false
+    t.string "external_message_id"
+    t.index ["commit_id", "topic_id"], name: "index_commit_topics_on_commit_id_and_topic_id", unique: true
+    t.index ["topic_id"], name: "index_commit_topics_on_topic_id"
   end
 
   create_table "commitfest_patch_commitfests", force: :cascade do |t|
@@ -160,6 +185,31 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["external_id"], name: "index_commitfests_on_external_id", unique: true
+  end
+
+  create_table "commits", force: :cascade do |t|
+    t.string "sha", null: false
+    t.string "subject", null: false
+    t.text "body"
+    t.datetime "authored_at", null: false
+    t.datetime "committed_at", null: false
+    t.string "author_name"
+    t.string "author_email"
+    t.string "committer_name"
+    t.string "committer_email"
+    t.string "branches", default: [], null: false, array: true
+    t.string "released_in"
+    t.datetime "released_at"
+    t.string "cherry_picked_from_sha"
+    t.string "unresolved_message_ids", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cherry_picked_from_sha"], name: "index_commits_on_cherry_picked_from_sha"
+    t.index ["committed_at"], name: "index_commits_on_committed_at"
+    t.index ["committed_at"], name: "index_commits_pending_message_ids", where: "(cardinality(unresolved_message_ids) > 0)"
+    t.index ["released_in"], name: "index_commits_on_released_in"
+    t.index ["sha"], name: "index_commits_on_sha", unique: true
+    t.index ["subject", "author_email", "committed_at", "id"], name: "index_commits_on_subject_and_author_email"
   end
 
   create_table "contributor_memberships", force: :cascade do |t|
@@ -411,6 +461,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["default_alias_id"], name: "index_people_on_default_alias_id"
+  end
+
+  create_table "release_tags", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "version"
+    t.datetime "released_at"
+    t.string "commit_sha"
+    t.index ["name"], name: "index_release_tags_on_name", unique: true
   end
 
   create_table "saved_search_preferences", force: :cascade do |t|
@@ -726,6 +784,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
     t.bigint "last_message_id"
     t.bigint "merged_into_topic_id"
     t.virtual "title_tsv", type: :tsvector, as: "to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text)", stored: true
+    t.integer "commit_count", default: 0, null: false
     t.index ["created_at"], name: "index_topics_on_created_at"
     t.index ["creator_id"], name: "index_topics_on_creator_id"
     t.index ["creator_person_id"], name: "index_topics_on_creator_person_id"
@@ -784,6 +843,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_24_230001) do
   add_foreign_key "aliases", "people"
   add_foreign_key "aliases", "users", validate: false
   add_foreign_key "attachments", "messages"
+  add_foreign_key "commit_files", "commits"
+  add_foreign_key "commit_people", "commits"
+  add_foreign_key "commit_people", "people"
+  add_foreign_key "commit_topics", "commits"
+  add_foreign_key "commit_topics", "topics"
   add_foreign_key "commitfest_patch_commitfests", "commitfest_patches"
   add_foreign_key "commitfest_patch_commitfests", "commitfests"
   add_foreign_key "commitfest_patch_messages", "commitfest_patches"

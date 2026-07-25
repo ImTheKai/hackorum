@@ -35,7 +35,7 @@ ENV BUNDLE_WITHOUT="development:test" \
     NODE_ENV=production
 
 RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends libpq5 curl && \
+    apt-get install -y --no-install-recommends libpq5 curl git && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

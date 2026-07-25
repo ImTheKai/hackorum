@@ -1051,6 +1051,12 @@ a.topic-icon {
   opacity: 0.75;
 }
 
+.commit-badge-more {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 .commit-hover-more {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);

@@ -1,0 +1,18 @@
+- total = summary[:total] || 0
+- backported = summary[:backported] || 0
+
+.activity-summary-groups
+  .summary-group
+    .summary-group-head
+      span.summary-group-title Commits
+      span.summary-group-total
+        b> = number_with_delimiter(total)
+        = 'commit'.pluralize(total)
+        - if backported.positive?
+          span.notable-meta = " of which #{number_with_delimiter(backported)} backported"
+    .summary-boxes
+      - CommitActivity::ROLES.each do |role|
+        - count = summary[role.to_sym] || 0
+        div class=["summary-box", ("zero" if count.zero?)]
+          span.summary-box-value = number_with_delimiter(count)
+          span.summary-box-label = commit_role_label(role)

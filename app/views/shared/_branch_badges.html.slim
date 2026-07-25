@@ -1,4 +1,12 @@
-- branches.each do |badge|
+/ capped because a mis-grouped change can carry dozens of branches; a real
+/ backport never spans more than master plus the live stable branches
+- limit = local_assigns.fetch(:limit, 8)
+- shown = branches.first(limit)
+- hidden = branches.size - shown.size
+
+- shown.each do |badge|
   span.commit-badge
     span.commit-badge-branch = badge[:branch]
     span.commit-badge-release = badge[:released_label]
+- if hidden.positive?
+  span.commit-badge-more title="#{hidden} further #{'branch'.pluralize(hidden)}" = "+#{hidden} more"

@@ -67,6 +67,11 @@ module ApplicationHelper
     "message-id-#{CGI.escape(message.message_id)}"
   end
 
+  # git.postgresql.org gitweb is flaky (502s); the github mirror serves the same shas
+  def commit_web_url(sha)
+    "https://github.com/postgres/postgres/commit/#{sha}"
+  end
+
   def commitfest_ci_label(summary)
     case summary[:ci_status]
     when "not_processed"

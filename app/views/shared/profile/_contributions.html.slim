@@ -1,4 +1,8 @@
-div data-controller="contrib-calendar" data-contrib-calendar-filter-selector-value=".activity-filters form"
+- unit = local_assigns.fetch(:unit, "message")
+/ scoped by frame id: the calendar controller resolves this document-wide, so an
+/ unscoped selector would pick up another frame's filter form
+- filter_selector = local_assigns.fetch(:filter_selector, "##{turbo_frame} .activity-filters form")
+div data-controller="contrib-calendar" data-contrib-calendar-filter-selector-value=filter_selector
   h2 = title
   - if contribution_years.any?
     .year-selector
@@ -29,7 +33,7 @@ div data-controller="contrib-calendar" data-contrib-calendar-filter-selector-val
           - contribution_weeks.each do |week|
             - day = week[:days][row]
             td
-              - tooltip = "#{day[:date]}: #{pluralize(day[:count], 'message')}"
+              - tooltip = "#{day[:date]}: #{pluralize(day[:count], unit)}"
               - if day[:count].positive?
                 = link_to profile_routes[:daily].call(day[:date].iso8601), data: { turbo_frame: turbo_frame, action: "click->contrib-calendar#clickDate" }, class: "contrib-day-link" do
                   span.contrib-day class="level-#{day[:level]}" title=tooltip

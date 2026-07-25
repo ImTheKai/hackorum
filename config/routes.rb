@@ -115,6 +115,13 @@ Rails.application.routes.draw do
 
   # Script version endpoint
   get "scripts/:name/version", to: "scripts#version", as: :script_version
+  # must precede the person/*email glob - it would otherwise swallow /commits
+  # into the email itself
+  get "person/*email/commits/contributions/:year", to: "person_commits#contributions", as: :person_commit_contributions, format: false
+  get "person/*email/commits/activity/:date", to: "person_commits#daily_activity", as: :person_commit_activity, format: false
+  get "person/*email/commits/activity/month/:year/:month", to: "person_commits#monthly_activity", as: :person_commit_monthly_activity, format: false
+  get "person/*email/commits/activity/week/:year/:week", to: "person_commits#weekly_activity", as: :person_commit_weekly_activity, format: false
+  get "person/*email/commits", to: "person_commits#show", as: :person_commits, format: false
   get "person/*email/contributions/:year", to: "people#contributions", as: :person_contributions, format: false
   get "person/*email/activity/:date", to: "people#daily_activity", as: :person_activity, format: false
   get "person/*email/activity/month/:year/:month", to: "people#monthly_activity", as: :person_monthly_activity, format: false
@@ -122,6 +129,11 @@ Rails.application.routes.draw do
   get "person/*email", to: "people#show", as: :person, format: false
   get "people/*email", to: redirect { |params, _req| "/person/#{params[:email]}" }, format: false
 
+  get "team/:name/commits/contributions/:year", to: "team_commits#contributions", as: :team_commit_contributions
+  get "team/:name/commits/activity/:date", to: "team_commits#daily_activity", as: :team_commit_activity
+  get "team/:name/commits/activity/month/:year/:month", to: "team_commits#monthly_activity", as: :team_commit_monthly_activity
+  get "team/:name/commits/activity/week/:year/:week", to: "team_commits#weekly_activity", as: :team_commit_weekly_activity
+  get "team/:name/commits", to: "team_commits#show", as: :team_commits
   get "team/:name/contributions/:year", to: "teams_profile#contributions", as: :team_contributions
   get "team/:name/activity/:date", to: "teams_profile#daily_activity", as: :team_activity
   get "team/:name/activity/month/:year/:month", to: "teams_profile#monthly_activity", as: :team_monthly_activity

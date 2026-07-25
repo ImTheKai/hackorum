@@ -6,7 +6,7 @@ RSpec.describe "Thread sidebar commits", type: :request do
     topic.update_columns(commit_count: topic.commit_topics.count)
   end
 
-  it "shows commits with branch badges and a commitdiff link" do
+  it "shows commits with branch badges and a commit link" do
     topic = create(:topic, :with_messages)
     commit = create(:commit, subject: "Fix the vacuum leader race", sha: "abc123def456",
                              branches: [ "REL_18_STABLE" ], released_in: "18.5",
@@ -17,7 +17,7 @@ RSpec.describe "Thread sidebar commits", type: :request do
 
     expect(response.body).to include("Commits")
     expect(response.body).to include("Fix the vacuum leader race")
-    expect(response.body).to include("https://git.postgresql.org/pg/commitdiff/abc123def456")
+    expect(response.body).to include("https://github.com/postgres/postgres/commit/abc123def456")
     expect(response.body).to include("REL_18_STABLE")
     expect(response.body).to include("18.5")
     expect(response.body).to include("Alvaro Herrera")

@@ -9,7 +9,7 @@
           .commit-sidebar-list
             - @commit_groups.each do |group|
               .commit-sidebar-entry
-                = link_to group[:subject], "https://git.postgresql.org/pg/commitdiff/#{group[:sha]}", target: "_blank", rel: "noopener", class: "commit-sidebar-link"
+                = link_to group[:subject], commit_web_url(group[:sha]), target: "_blank", rel: "noopener", class: "commit-sidebar-link"
                 .commit-sidebar-branches
                   = render partial: "shared/branch_badges", locals: { branches: group[:branches] }
                 .commit-sidebar-meta

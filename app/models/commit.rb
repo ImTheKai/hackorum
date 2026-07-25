@@ -20,6 +20,9 @@ class Commit < ApplicationRecord
   # A cherry-pick of another (usually master) commit into a stable branch.
   scope :backports, -> { where.not(cherry_picked_from_sha: nil) }
 
+  # The change as it originally landed, as opposed to a cherry-pick of it.
+  scope :canonical, -> { where(cherry_picked_from_sha: nil) }
+
   def released?
     released_in.present?
   end
@@ -46,26 +49,36 @@ class Commit < ApplicationRecord
     grouped.map do |canonical_sha, members|
       canonical = members.find { |c| c.sha == canonical_sha } ||
                   best_representative(members)
-      branch_rows = members.flat_map do |member|
-        member.sorted_branches.map do |branch|
-          {
-            branch: branch,
-            version: member.display_version(branch),
-            released_in: member.released_in,
-            released_label: member.released_in.presence || "unreleased"
-          }
-        end
-      end
-
       {
         sha: canonical.sha,
         subject: canonical.subject,
         committed_at: canonical.committed_at,
         committer_name: canonical.committer_name,
         commit_ids: members.map(&:id),
-        branches: branch_rows.sort_by { |row| branch_sort_key(row[:branch]) }
+        branches: branch_badges(members)
       }
     end.sort_by { |group| group[:committed_at] }.reverse
+  end
+
+  # Branch badge rows for one logical change: [{ branch:, version:,
+  # released_in:, released_label: }], newest branch first, one row per branch.
+  #
+  # One branch can turn up on several members - a group can hold more than one
+  # commit touching the same branch - and repeating the badge says nothing, so
+  # the earliest release carrying that branch wins. The sort key includes the
+  # label to keep the survivor deterministic, since sort_by is not stable.
+  def self.branch_badges(members)
+    members.flat_map { |member|
+      member.sorted_branches.map do |branch|
+        {
+          branch: branch,
+          version: member.display_version(branch),
+          released_in: member.released_in,
+          released_label: member.released_in.presence || "unreleased"
+        }
+      end
+    }.sort_by { |row| [ branch_sort_key(row[:branch]), row[:released_label] ] }
+     .uniq { |row| row[:branch] }
   end
 
   def self.branch_sort_key(branch)

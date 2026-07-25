@@ -1,0 +1,10 @@
+- active_index = panels.index { |panel| panel[:key] == active } || 0
+
+div data-controller="tabs"
+  nav.profile-tabs role="tablist"
+    - panels.each_with_index do |panel, index|
+      button.profile-tab type="button" role="tab" id="profile-tab-#{panel[:key]}" aria-controls="profile-panel-#{panel[:key]}" data-tabs-target="tab" data-action="click->tabs#select" data-index=index aria-selected=(index == active_index ? "true" : "false") class=("is-active" if index == active_index)
+        = panel[:label]
+  - panels.each_with_index do |panel, index|
+    .profile-tab-panel id="profile-panel-#{panel[:key]}" aria-labelledby="profile-tab-#{panel[:key]}" data-tabs-target="panel" role="tabpanel" class=("is-active" if index == active_index)
+      = panel[:body]

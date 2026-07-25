@@ -1,0 +1,54 @@
+- show_members = local_assigns.fetch(:show_members, false)
+
+.profile-section
+  h2 = commit_period_heading(activity_period)
+  = render "shared/profile/commit_summary", summary: commit_summary || {}
+
+  - if commit_rows.any?
+    table.activity-table.commit-activity-table
+      thead
+        tr
+          th = show_members ? "Credited members" : "Credit"
+          th Commit
+          th Branches
+          th Thread(s)
+          th Committed
+      tbody
+        - commit_rows.each do |row|
+          - commit = row[:commit]
+          tr
+            td.activity-types
+              - if show_members
+                - row[:member_credits].each do |credit|
+                  - member_alias = credit[:person].default_alias
+                  .commit-member-credit
+                    - if member_alias
+                      = link_to person_path(member_alias.email), class: "activity-sender", data: { turbo_frame: "_top" } do
+                        = image_tag member_alias.gravatar_url(size: 32), class: "activity-sender-avatar", alt: member_alias.name
+                        span.activity-sender-name = member_alias.name
+                    .commit-role-tags
+                      - credit[:roles].each do |role|
+                        span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
+              - else
+                - row[:roles].each do |role|
+                  span class="activity-tag #{commit_role_tag_class(role)}" = commit_role_label(role)
+              - if row[:backported]
+                span.activity-tag.tag-backported Backported
+            td
+              = link_to commit.subject, commit_web_url(commit.sha), target: "_blank", rel: "noopener", class: "activity-topic"
+              .commit-cell-meta
+                span.commit-cell-sha = commit.sha[0, 8]
+                - if commit.committer_name.present? && !row[:roles].include?("committer")
+                  span.commit-cell-committer = "committed by #{commit.committer_name}"
+            td
+              .commit-cell-branches
+                = render partial: "shared/branch_badges", locals: { branches: row[:branches] }
+            td
+              - if row[:topics].any?
+                - row[:topics].each do |topic|
+                  = link_to topic.title, topic_path(topic), class: "activity-topic", data: { turbo_frame: "_top" }
+              - else
+                span.notable-meta No linked thread
+            td = row[:committed_on].strftime("%b %d, %Y")
+  - else
+    p No commit activity in this period.

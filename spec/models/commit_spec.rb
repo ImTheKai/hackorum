@@ -68,6 +68,18 @@ RSpec.describe Commit do
       ])
     end
 
+    it "lists a branch once when several members touch it, keeping the earliest release" do
+      canonical = create(:commit, sha: "dup1", branches: [ "REL_17_STABLE" ], released_in: "17.9",
+                                   committed_at: 3.days.ago)
+      other = create(:commit, sha: "dup2", branches: [ "REL_17_STABLE" ], released_in: "17.6",
+                               cherry_picked_from_sha: "dup1", committed_at: 2.days.ago)
+
+      badges = described_class.branch_badges([ canonical, other ])
+
+      expect(badges.map { |b| b[:branch] }).to eq([ "REL_17_STABLE" ])
+      expect(badges.first[:released_label]).to eq("17.6")
+    end
+
     it "sets released_label to the release for a released branch and unreleased otherwise" do
       canonical = create(:commit, sha: "kkk1", branches: [ "master" ], released_in: nil,
                                    committed_at: 2.days.ago)

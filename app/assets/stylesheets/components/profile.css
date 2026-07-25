@@ -857,3 +857,83 @@ a.stat-tile:hover {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
 }
+
+.commit-activity-table td {
+  vertical-align: top;
+}
+
+.commit-cell-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.commit-cell-sha {
+  font-family: var(--font-mono);
+}
+
+.commit-cell-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+}
+
+.commit-member-credit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin-bottom: var(--spacing-2);
+}
+
+.commit-role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+}
+
+.activity-tag.tag-backported {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.profile-tabs {
+  display: flex;
+  gap: var(--spacing-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+  margin-bottom: var(--spacing-4);
+}
+
+.profile-tab {
+  padding: var(--spacing-3) var(--spacing-4);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.profile-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.profile-tab.is-active {
+  color: var(--color-text-link);
+  font-weight: var(--font-weight-semibold);
+  border-bottom: 2px solid var(--color-text-link);
+  margin-bottom: -1px;
+}
+
+/* must stay display:none - a loading="lazy" frame inside a panel hidden any
+   other way still intersects the viewport and fetches on page load */
+.profile-tab-panel {
+  display: none;
+}
+
+.profile-tab-panel.is-active {
+  display: block;
+}

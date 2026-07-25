@@ -1,0 +1,1 @@
+= render "shared/profile/commit_activity_filters", commit_roles: @commit_roles, activity_period: @activity_period, profile_routes: person_commit_profile_routes(@profile_email, week_start: WeekCalculation.week_start_param(@week_start_day)), week_start_param: WeekCalculation.week_start_param(@week_start_day), turbo_frame: "person-commit-activity"

@@ -12,9 +12,11 @@ export default class extends Controller {
     const url = new URL(link.href)
 
     if (filterForm) {
-      const checkboxes = filterForm.querySelectorAll('input[name="filters[]"]:checked')
+      // carry over whatever the form calls its boxes, so a second filter form
+      // with a different param name keeps working
+      const checkboxes = filterForm.querySelectorAll('input[type="checkbox"]:checked')
       checkboxes.forEach(checkbox => {
-        url.searchParams.append('filters[]', checkbox.value)
+        url.searchParams.append(checkbox.name, checkbox.value)
       })
     }
 

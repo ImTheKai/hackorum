@@ -9,6 +9,8 @@ module ProfileHelper
       profile_routes[:weekly].call(activity_period[:year], activity_period[:week])
     when :month
       profile_routes[:monthly].call(activity_period[:year], activity_period[:month])
+    when :year
+      profile_routes[:contributions].call(activity_period[:year])
     else
       profile_routes[:default]
     end
@@ -23,6 +25,66 @@ module ProfileHelper
       monthly: ->(year, month) { person_monthly_activity_path(email, year, month, **ws) },
       contributions: ->(year) { person_contributions_path(email, year: year, **ws) }
     }
+  end
+
+  def person_commit_profile_routes(email, week_start: nil)
+    ws = week_start ? { week_start: week_start } : {}
+    {
+      default: person_commits_path(email, **ws),
+      daily: ->(date) { person_commit_activity_path(email, date, **ws) },
+      weekly: ->(year, week) { person_commit_weekly_activity_path(email, year, week, **ws) },
+      monthly: ->(year, month) { person_commit_monthly_activity_path(email, year, month, **ws) },
+      contributions: ->(year) { person_commit_contributions_path(email, year: year, **ws) }
+    }
+  end
+
+  def team_commit_profile_routes(name, week_start: nil)
+    ws = week_start ? { week_start: week_start } : {}
+    {
+      default: team_commits_path(name, **ws),
+      daily: ->(date) { team_commit_activity_path(name, date, **ws) },
+      weekly: ->(year, week) { team_commit_weekly_activity_path(name, year, week, **ws) },
+      monthly: ->(year, month) { team_commit_monthly_activity_path(name, year, month, **ws) },
+      contributions: ->(year) { team_commit_contributions_path(name, year: year, **ws) }
+    }
+  end
+
+  COMMIT_ROLE_LABELS = {
+    "author" => "Author",
+    "committer" => "Committer",
+    "reviewer" => "Reviewer",
+    "reported_by" => "Reported by",
+    "co_author" => "Co-author"
+  }.freeze
+
+  # Reuses the message tab's three tag colours rather than inventing five more.
+  COMMIT_ROLE_TAG_CLASSES = {
+    "author" => "tag-patch",
+    "co_author" => "tag-patch",
+    "committer" => "tag-started",
+    "reviewer" => "tag-replied",
+    "reported_by" => "tag-replied"
+  }.freeze
+
+  def commit_role_label(role) = COMMIT_ROLE_LABELS.fetch(role, role.to_s.humanize)
+
+  def commit_role_tag_class(role) = COMMIT_ROLE_TAG_CLASSES.fetch(role, "tag-replied")
+
+  def commit_period_heading(activity_period)
+    return "Commits" if activity_period.blank?
+
+    case activity_period[:type]
+    when :day
+      "Commits on #{activity_period[:date].strftime('%B %d, %Y')}"
+    when :week
+      "Commits in week #{activity_period[:week]} (#{activity_period[:start_date].strftime('%b %d')} - #{activity_period[:end_date].strftime('%b %d, %Y')})"
+    when :month
+      "Commits in #{Date.new(activity_period[:year], activity_period[:month], 1).strftime('%B %Y')}"
+    when :year
+      "Commits in #{activity_period[:year]}"
+    else
+      "Commits"
+    end
   end
 
   def team_profile_routes(name, week_start: nil)

@@ -1,59 +1,65 @@
 module ProfileActivity
   extend ActiveSupport::Concern
+  include ProfilePeriodParams
 
   ALL_ACTIVITY_FILTERS = %w[started_thread replied_own_thread replied_other_thread sent_first_patch sent_followup_patch].freeze
 
+  # Requires from the includer: #activity_person_ids returning a Person id,
+  # an array of ids or a Set of ids.
+
   private
-
-  def activity_person_ids
-    # Can return a single ID, array of IDs, or Set of IDs
-    raise NotImplementedError, "Controllers must implement #activity_person_ids"
-  end
-
-  def person_ids_collection
-    ids = activity_person_ids
-    ids.is_a?(Set) ? ids : Array(ids)
-  end
 
   def person_ids_for_query
     ids = activity_person_ids
     ids.is_a?(Set) ? ids.to_a : ids
   end
 
-  def load_activity_data(scope: nil, year: nil)
+  def load_activity_data(period:)
     @week_start_day = parse_week_start_day
     @activity_filters = parse_activity_filters
-    effective_scope = scope || default_recent_scope
+    @activity_period = period.to_h
 
     # classify once, derive both the table rows and the summary tally from
     # the same pass - the summary is unfiltered, so its classification is
     # byte-identical to the entries' classification before the filter is applied
-    classified_entries = build_activity_entries(scope: effective_scope)
+    classified_entries = build_activity_entries(scope: messages_scope_for(period))
     @activity_summary = summarize_activity_entries(classified_entries)
     @activity_entries = filter_activity_entries(classified_entries, @activity_filters)
 
-    @activity_period ||= { type: :recent } if scope.nil?
     @contribution_years = contribution_years
-    @contribution_year = year || select_contribution_year(@contribution_years)
+    @contribution_year = calendar_year_for(period, @contribution_years)
     @contribution_weeks, @contribution_month_spans = build_contribution_weeks(@contribution_year, filters: @activity_filters)
     @weekday_labels = WeekCalculation.weekday_labels(@week_start_day)
   end
 
-  def default_recent_scope
+  # The recent window keeps an open upper bound: a message written moments ago
+  # must show up without depending on how end_of_day rounds.
+  def messages_scope_for(period)
     ids = person_ids_for_query
-    start_date = 30.days.ago.beginning_of_day
-    Message.where(sender_person_id: ids, created_at: start_date..)
+    return Message.where(sender_person_id: ids, created_at: period.start_date.beginning_of_day..) if period.recent?
+
+    Message.where(sender_person_id: ids, created_at: period.time_range)
+  end
+
+  # Any explicit period pins the calendar to its own year. Only the open-ended
+  # "recent" default leaves the year free for the year buttons to pick.
+  def calendar_year_for(period, years)
+    return period.year unless period.recent?
+
+    requested = params[:year].presence&.to_i
+    return requested if requested && years.include?(requested)
+
+    years.first || Date.current.year
   end
 
   # Fully classified, unfiltered entries. Both the table (after filtering,
   # see filter_activity_entries) and the summary (see summarize_activity_entries)
   # are derived from this single pass, so a profile load classifies every
   # message once rather than twice.
-  def build_activity_entries(scope: nil)
+  def build_activity_entries(scope:)
     ids = person_ids_for_query
     return [] if ids.blank?
 
-    scope ||= Message.where(sender_person_id: ids)
     messages = scope.includes(:topic, :sender, sender_person: :default_alias)
                     .order(created_at: :desc)
 
@@ -153,59 +159,11 @@ module ProfileActivity
     ids = person_ids_for_query
     return [ [], [] ] if ids.blank?
 
-    year = year.to_i
     wday_start = @week_start_day || WeekCalculation::DEFAULT_WEEK_START
-    start_date, end_date = WeekCalculation.year_weeks_range(year, wday_start)
-
+    start_date, end_date = WeekCalculation.year_weeks_range(year.to_i, wday_start)
     counts = build_filtered_contribution_counts(start_date, end_date, filters)
 
-    total_days = (end_date - start_date).to_i + 1
-    days = (0...total_days).map do |idx|
-      date = start_date + idx
-      count = counts[date] || 0
-      { date: date, count: count, level: contribution_level(count) }
-    end
-
-    weeks_data = days.each_slice(7).map do |week_days|
-      first_day = week_days.first[:date]
-      week_num = WeekCalculation.week_number(first_day, year, wday_start)
-      { days: week_days, year: year, week: week_num, count: week_days.sum { |d| d[:count] } }
-    end
-
-    weeks_data.each do |week|
-      next if week[:days].length == 7
-      missing = 7 - week[:days].length
-      missing.times do |idx|
-        date = week[:days].last[:date] + (idx + 1)
-        week[:days] << { date: date, count: 0, level: 0 }
-      end
-    end
-
-    month_spans = build_month_spans(weeks_data)
-    [ weeks_data, month_spans ]
-  end
-
-  def build_month_spans(weeks_data)
-    month_spans = []
-    current_month = nil
-    current_span = 0
-
-    weeks_data.each do |week|
-      first_date = week[:days].first[:date]
-      month_key = [ first_date.year, first_date.month ]
-      if current_month != month_key
-        if current_month
-          month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime("%b"), year: current_month[0], month: current_month[1], span: current_span }
-        end
-        current_month = month_key
-        current_span = 1
-      else
-        current_span += 1
-      end
-    end
-
-    month_spans << { label: Date.new(current_month[0], current_month[1], 1).strftime("%b"), year: current_month[0], month: current_month[1], span: current_span } if current_month
-    month_spans
+    ContributionCalendar.build(counts, year, wday_start)
   end
 
   def build_filtered_contribution_counts(start_date, end_date, filters)
@@ -261,41 +219,8 @@ module ProfileActivity
            .reverse
   end
 
-  def select_contribution_year(years)
-    year_param = params[:year].presence&.to_i
-    return year_param if year_param && years.include?(year_param)
-    return years.first if years.any?
-    Date.current.year
-  end
-
-  def contribution_level(count)
-    return 0 if count.zero?
-    return 1 if count < 3
-    return 2 if count < 6
-    return 3 if count < 10
-    4
-  end
-
   def parse_activity_filters
     return ALL_ACTIVITY_FILTERS.dup unless params[:filters].present?
     params[:filters].select { |f| ALL_ACTIVITY_FILTERS.include?(f) }
-  end
-
-  def parse_week_start_day
-    WeekCalculation.parse_week_start(params[:week_start])
-  end
-
-  def parse_activity_date
-    Date.iso8601(params[:date])
-  rescue ArgumentError
-    Date.current
-  end
-
-  def messages_scope_for_date(date)
-    Message.where(sender_person_id: person_ids_for_query, created_at: date.beginning_of_day..date.end_of_day)
-  end
-
-  def messages_scope_for_range(start_date, end_date)
-    Message.where(sender_person_id: person_ids_for_query, created_at: start_date.beginning_of_day..end_date.end_of_day)
   end
 end

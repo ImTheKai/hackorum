@@ -917,4 +917,55 @@ RSpec.describe 'People profile', type: :request do
       )
     end
   end
+
+  describe 'activity tabs' do
+    let(:tab_person) { create(:person) }
+    let!(:tab_alias) do
+      al = create(:alias, person: tab_person, name: 'Tab Person', email: 'tabs@example.com')
+      tab_person.update!(default_alias_id: al.id)
+      al
+    end
+
+    it 'defaults to the email activity tab' do
+      get person_path('tabs@example.com')
+
+      expect(response.body).to include('Email activity')
+      expect(response.body).to include('Commit activity')
+      expect(response.body).to match(/profile-tab[^>]*is-active[^>]*>\s*Email activity/)
+    end
+
+    it 'defers the commit frame until its panel becomes visible' do
+      get person_path('tabs@example.com')
+
+      frame = Nokogiri::HTML(response.body).at_css('turbo-frame#person-commit-activity')
+      expect(frame['loading']).to eq('lazy')
+      expect(frame['src']).to eq(person_commits_path('tabs@example.com'))
+      # an empty body is what proves none of the commit queries ran
+      expect(frame.children.reject { |node| node.text.strip.empty? }).to be_empty
+      expect(response.body).not_to include('commit-activity-table')
+    end
+
+    it 'carries the week start into the commit frame so both calendars agree' do
+      get person_path('tabs@example.com', week_start: 'sun')
+
+      frame = Nokogiri::HTML(response.body).at_css('turbo-frame#person-commit-activity')
+      expect(frame['src']).to eq(person_commits_path('tabs@example.com', week_start: 'sun'))
+    end
+
+    it 'activates the commit tab eagerly with ?tab=commits' do
+      get person_path('tabs@example.com', tab: 'commits')
+
+      doc = Nokogiri::HTML(response.body)
+      expect(doc.at_css('#profile-tab-commits')['aria-selected']).to eq('true')
+      expect(doc.at_css('#profile-tab-messages')['aria-selected']).to eq('false')
+      expect(doc.at_css('turbo-frame#person-commit-activity')['loading']).to be_nil
+    end
+
+    it 'still renders the message activity table' do
+      get person_path('tabs@example.com')
+
+      expect(response.body).to include('id="person-activity"')
+      expect(response.body).to include('activity-filters')
+    end
+  end
 end

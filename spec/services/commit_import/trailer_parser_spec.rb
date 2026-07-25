@@ -125,7 +125,10 @@ RSpec.describe CommitImport::TrailerParser do
       "https://www.postgresql.org/message-id/abc@x" => "abc@x",
       "https://www.postgresql.org/message-id/flat/abc@x" => "abc@x",
       "http://postgre.es/m/abc@x" => "abc@x",
-      "see https://postgr.es/m/abc@x." => "abc@x"
+      "see https://postgr.es/m/abc@x." => "abc@x",
+      "https://postgr.es/m/abc@x#abc@x" => "abc@x",
+      "https://postgr.es/m/abc@x/" => "abc@x",
+      "https://postgr.es/m//abc@x" => "abc@x"
     }.each do |url, expected|
       it "extracts #{expected} from #{url}" do
         expect(parse(subject: "x", body: "Discussion: #{url}\n").message_ids).to eq([ expected ])
@@ -134,6 +137,12 @@ RSpec.describe CommitImport::TrailerParser do
 
     it "deduplicates repeated ids" do
       body = "Discussion: https://postgr.es/m/abc@x\nDiscussion: https://postgr.es/m/abc@x\n"
+      expect(parse(subject: "x", body: body).message_ids).to eq([ "abc@x" ])
+    end
+
+    it "drops attachment links, which are not message ids" do
+      body = "Discussion: https://postgr.es/m/abc@x\n" \
+             "Discussion: https://www.postgresql.org/message-id/attachment/133167/0016-blank.patch\n"
       expect(parse(subject: "x", body: body).message_ids).to eq([ "abc@x" ])
     end
 

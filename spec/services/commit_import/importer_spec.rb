@@ -118,6 +118,32 @@ RSpec.describe CommitImport::Importer do
       expect(Commit.find_by(sha: sha).topics).to eq([ topic ])
     end
 
+    it "keeps a literal + in a message id" do
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "CAN4CZFNka+2q3=-Dit+hr@mail.gmail.com")
+      sha = fixture_repo.commit(
+        subject: "x",
+        body: "Discussion: https://postgr.es/m/CAN4CZFNka+2q3=-Dit+hr@mail.gmail.com\n"
+      )
+
+      importer.run!
+
+      expect(Commit.find_by(sha: sha).topics).to eq([ topic ])
+    end
+
+    it "resolves a message id listed in the overrides" do
+      stub_const("CommitImport::MessageIdOverrides::MAP", { "typo@x" => "real@x" })
+      topic = create(:topic)
+      create(:message, topic: topic, message_id: "real@x")
+      sha = fixture_repo.commit(subject: "x", body: "Discussion: https://postgr.es/m/typo@x\n")
+
+      importer.run!
+
+      commit = Commit.find_by(sha: sha)
+      expect(commit.topics).to eq([ topic ])
+      expect(commit.unresolved_message_ids).to be_empty
+    end
+
     it "records an unresolved message id" do
       sha = fixture_repo.commit(subject: "x", body: "Discussion: https://postgr.es/m/missing@example.com\n")
 

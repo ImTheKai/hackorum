@@ -17,6 +17,9 @@ module CommitImport
       ([^\s>"\]]+)
     }ix
 
+    # /message-id/attachment/<n>/<file> is a patch download, not a message.
+    ATTACHMENT_PREFIX = "attachment/".freeze
+
     CHERRY_PICK_RE = /cherry picked from commit\s+([0-9a-f]{8,40})\b/i
     TRAILER_RE = /\A([A-Za-z][A-Za-z-]*):[ \t]*(.*)\z/
 
@@ -40,7 +43,8 @@ module CommitImport
 
     def message_ids
       text.scan(MSGID_RE).flatten
-          .map { |id| id.sub(%r{\A(?:flat|raw)/}i, "").sub(/[).,;]+\z/, "") }
+          .map { |id| strip_url_noise(id) }
+          .reject { |id| id.empty? || id.start_with?(ATTACHMENT_PREFIX) }
           .uniq
     end
 
@@ -177,6 +181,17 @@ module CommitImport
 
     def bare_email?(entry)
       entry.include?("@") && !entry.include?(" ")
+    end
+
+    # Everything the archive puts around an id but that is not part of it: a
+    # flat/raw view prefix, a "#<id>" anchor the archive appends to its own
+    # links, a doubled or trailing slash, and sentence punctuation from the
+    # surrounding prose.
+    def strip_url_noise(id)
+      id.sub(%r{\A(?:flat|raw)/}i, "")
+        .split("#").first.to_s
+        .sub(/[).,;]+\z/, "")
+        .gsub(%r{\A/+|/+\z}, "")
     end
   end
 end

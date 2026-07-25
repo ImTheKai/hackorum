@@ -246,10 +246,17 @@ module CommitImport
     def message_topic_map(raw_ids)
       return {} if raw_ids.empty?
 
-      normalized = raw_ids.index_with { |raw| MessageIdNormalizer.normalize(CGI.unescape(raw)) }
+      normalized = raw_ids.index_with { |raw| resolve_message_id(raw) }
       found = Message.where(message_id: normalized.values.uniq.reject(&:blank?))
                      .pluck(:message_id, :topic_id).to_h
       normalized.transform_values { |norm| found[norm] }
+    end
+
+    # unescapeURIComponent, not unescape: the id sits in a URL path, where a
+    # "+" is a literal plus. Form decoding turns it into a space, which the
+    # normalizer then strips, and the id never matches.
+    def resolve_message_id(raw)
+      MessageIdOverrides.apply(MessageIdNormalizer.normalize(CGI.unescapeURIComponent(raw)))
     end
 
     def refresh_commit_counts(topic_ids)

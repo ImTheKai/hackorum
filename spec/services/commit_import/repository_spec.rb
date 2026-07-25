@@ -134,6 +134,35 @@ RSpec.describe CommitImport::Repository do
   end
 
   describe "subprocess timeout" do
+    # A killed process nobody reaps stays in the table as a zombie, and kill(0)
+    # keeps succeeding on it. Whether that happens depends on who plays init:
+    # under `task test` rspec itself is pid 1 of the container and never reaps
+    # orphans, so dead has to mean "gone or zombie" here.
+    def zombie?(pid)
+      stat = File.read("/proc/#{pid}/stat")
+      stat[stat.rindex(")") + 2] == "Z"
+    rescue Errno::ENOENT
+      true
+    end
+
+    def dead?(pid)
+      Process.kill(0, pid)
+      zombie?(pid)
+    rescue Errno::ESRCH
+      true
+    end
+
+    # The kill is asynchronous, so give the kernel a moment to tear the process
+    # down before calling it a survivor.
+    def dead_within?(pid, timeout)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      until dead?(pid)
+        return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+        sleep 0.01
+      end
+      true
+    end
+
     it "kills a hung command after the timeout and reaps it, raising CommitImport::Error" do
       repo = described_class.new(path: @tmp)
       pidfile = File.join(@tmp, "pid")
@@ -163,7 +192,8 @@ RSpec.describe CommitImport::Repository do
 
       grandchild_pid = File.read(pidfile).strip.to_i
       expect(grandchild_pid).to be > 0
-      expect { Process.kill(0, grandchild_pid) }.to raise_error(Errno::ESRCH)
+      expect(dead_within?(grandchild_pid, 2)).to be(true),
+        "grandchild #{grandchild_pid} survived the group kill"
     end
   end
 

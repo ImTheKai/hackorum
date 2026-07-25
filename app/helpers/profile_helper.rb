@@ -148,7 +148,44 @@ module ProfileHelper
     days = stats.median_thread_lifetime_days
     return nil if days.nil?
 
-    days < 1 ? "under a day" : pluralize(days.round, "day")
+    profile_duration_label(days)
+  end
+
+  def profile_duration_label(days)
+    return nil if days.nil?
+
+    return "under a day" if days < 1
+    return pluralize(days.round, "day") if days.round < 60
+
+    months = (days / 30.44).round
+    return pluralize(months, "month") if months < 18
+
+    years = (days / 365.25).round(1)
+    "#{years % 1 == 0 ? years.to_i : years} years"
+  end
+
+  # One row per thread, not per superlative: the same thread routinely wins
+  # several, and dropping the duplicates hid whole categories.
+  def profile_thread_showcases(stats)
+    entries = []
+
+    if (topic = stats.longest_running_thread)
+      entries << { topic: topic, key: "longest running", meta: profile_duration_label(stats.longest_running_thread_days) }
+    end
+    if (topic = stats.most_participants_thread)
+      entries << { topic: topic, key: "most participants", meta: pluralize(topic.participant_count, "participant") }
+    end
+    if (topic = stats.most_messages_thread)
+      entries << { topic: topic, key: "most messages", meta: pluralize(topic.message_count, "message") }
+    end
+
+    entries.group_by { |entry| entry[:topic].id }.values.map do |group|
+      {
+        topic: group.first[:topic],
+        label: group.map { |entry| entry[:key] }.join(" + ").upcase_first,
+        meta: group.filter_map { |entry| entry[:meta] }.join(" - ")
+      }
+    end
   end
 
   # Inclusive [start, end] dates for the period currently on screen.

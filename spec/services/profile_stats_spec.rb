@@ -512,6 +512,29 @@ RSpec.describe ProfileStats do
       expect(stats.most_messages_thread.title).to eq("Chatty one")
     end
 
+    it "reports how long the longest running thread ran" do
+      long = create(:topic, creator_alias: person_alias, created_at: Time.utc(2020, 1, 1))
+      create(:message, topic: long, sender: person_alias,
+             created_at: Time.utc(2020, 1, 1), updated_at: Time.utc(2020, 1, 1))
+      create(:message, topic: long, sender: person_alias,
+             created_at: Time.utc(2020, 1, 11), updated_at: Time.utc(2020, 1, 11))
+
+      expect(described_class.new(person.id).longest_running_thread_days).to be_within(0.01).of(10.0)
+    end
+
+    it "has no longest running duration without threads" do
+      expect(described_class.new(person.id).longest_running_thread_days).to be_nil
+    end
+
+    it "falls back to created_at for the duration when last_message_at is null" do
+      topic = create(:topic, creator_alias: person_alias, created_at: Time.utc(2024, 1, 1))
+      create(:message, topic: topic, sender: person_alias,
+             created_at: Time.utc(2024, 1, 1), updated_at: Time.utc(2024, 1, 1))
+      topic.update_columns(last_message_at: nil)
+
+      expect(described_class.new(person.id).longest_running_thread_days).to eq(0.0)
+    end
+
     it "does not let a null last_message_at outrank a genuinely long-running thread" do
       long = create(:topic, creator_alias: person_alias, title: "Genuinely long",
                     created_at: Time.utc(2015, 1, 1))

@@ -44,20 +44,10 @@
           ' median lifetime
           b> = lifetime
         span.notable-meta = "#{number_with_delimiter(stats.threads_without_reply)} of #{number_with_delimiter(stats.threads_started)} have no replies"
-    - if stats.longest_running_thread
+    - profile_thread_showcases(stats).each do |showcase|
       .notable-row
-        span.notable-key Longest running
+        span.notable-key = showcase[:label]
         span.notable-val
-          = link_to stats.longest_running_thread.title, topic_path(stats.longest_running_thread)
-    - if stats.most_participants_thread && stats.most_participants_thread.id != stats.longest_running_thread&.id
-      .notable-row
-        span.notable-key Most participants
-        span.notable-val
-          = link_to stats.most_participants_thread.title, topic_path(stats.most_participants_thread)
-          span.notable-meta = " - #{pluralize(stats.most_participants_thread.participant_count, 'participant')}"
-    - if stats.most_messages_thread && stats.most_messages_thread.id != stats.longest_running_thread&.id && stats.most_messages_thread.id != stats.most_participants_thread&.id
-      .notable-row
-        span.notable-key Most messages
-        span.notable-val
-          = link_to stats.most_messages_thread.title, topic_path(stats.most_messages_thread)
-          span.notable-meta = " - #{pluralize(stats.most_messages_thread.message_count, 'message')}"
+          = link_to showcase[:topic].title, topic_path(showcase[:topic])
+          - if showcase[:meta].present?
+            span.notable-meta = " - #{showcase[:meta]}"

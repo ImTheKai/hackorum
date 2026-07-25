@@ -835,8 +835,7 @@ a.stat-tile:hover {
 
 .notable-key {
   color: var(--color-text-muted);
-  flex: none;
-  min-width: 150px;
+  flex: 0 0 150px;
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;

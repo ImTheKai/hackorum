@@ -128,6 +128,13 @@ class ProfileStats
       .first
   end
 
+  def longest_running_thread_days
+    topic = longest_running_thread
+    return nil unless topic
+
+    ((topic.last_message_at || topic.created_at) - topic.created_at) / 1.day
+  end
+
   def most_participants_thread
     return @most_participants_thread if defined?(@most_participants_thread)
 

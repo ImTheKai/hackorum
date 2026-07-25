@@ -36,6 +36,8 @@
       p.profile-meta
         = pluralize(@members.count, 'member')
 
+  = render "stats"
+
   = turbo_frame_tag "team-activity" do
     = render "activity_filters"
     .profile-section

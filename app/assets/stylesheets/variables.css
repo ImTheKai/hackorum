@@ -23,6 +23,7 @@
   --font-size-2xl: 1.5rem;
   --font-size-3xl: 2rem;
   --font-size-4xl: 2.5rem;
+  --font-size-5xl: 4rem;
 
   --font-family-base: var(--font-sans);
   --font-weight-normal: 400;

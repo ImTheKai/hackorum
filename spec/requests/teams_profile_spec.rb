@@ -106,5 +106,97 @@ RSpec.describe "TeamsProfile", type: :request do
       expect(response.body).to include(person_path("sender@example.com"))
       expect(response.body).to include("Sender activity thread")
     end
+
+    it "renders the all-time stat strip" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "strip-member@example.com")
+      topic = create(:topic, creator_alias: member_alias)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id)
+
+      get team_profile_path("test-team")
+
+      expect(response.body).to include("Messages sent")
+      expect(response.body).to include("Commit credits")
+    end
+
+    it "renders the strip tiles without search links" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "nolink-member@example.com")
+      topic = create(:topic, creator_alias: member_alias)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id)
+
+      get team_profile_path("test-team")
+
+      expect(response.body).not_to match(/<a[^>]+class="stat-tile"/)
+    end
+
+    it "renders the window boxes without any search link, including Started" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "window-member@example.com")
+      topic = create(:topic, creator_alias: member_alias, created_at: 2.days.ago)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id, created_at: 2.days.ago, updated_at: 2.days.ago)
+
+      get team_profile_path("test-team")
+
+      region = response.body[/<div class="activity-summary-groups">.*?<table/m]
+      expect(region).to be_present
+      expect(region.scan('<a ').size).to eq(0)
+    end
+
+    it "aggregates messages sent across multiple team members" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "agg-member@example.com")
+      admin_alias = attach_verified_alias(admin, email: "agg-admin@example.com")
+
+      topic = create(:topic, creator_alias: member_alias)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id)
+      create(:message, topic: topic, sender: admin_alias, sender_person_id: admin.person.id)
+
+      get team_profile_path("test-team")
+
+      expect(response.body).to include('<span class="stat-value">2</span><span class="stat-label">Messages sent</span>')
+    end
+
+    it "renders the stat strip before the activity turbo-frame, not inside it" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "position-member@example.com")
+      topic = create(:topic, creator_alias: member_alias)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id)
+
+      get team_profile_path("test-team")
+
+      expect(response.body.index("profile-stats")).to be < response.body.index("team-activity")
+    end
+
+    it "omits the strip from the team turbo-frame activity response" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "frame-member@example.com")
+      topic = create(:topic, creator_alias: member_alias)
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id)
+
+      get team_contributions_path("test-team", year: Date.current.year)
+
+      expect(response.body).not_to include("credits-hero-value")
+      expect(response.body).to include("team-activity")
+    end
+
+    it "renders the landed ratio band and notable threads for a team" do
+      team.update!(visibility: :visible)
+      member_alias = attach_verified_alias(member, email: "notable-member@example.com")
+
+      topic = create(:topic, creator_alias: member_alias, title: "Team Notable Thread", created_at: Date.new(2020, 1, 1))
+      create(:message, topic: topic, sender: member_alias, sender_person_id: member.person.id, is_patch_submission: true,
+             created_at: Date.new(2020, 1, 1), updated_at: Date.new(2020, 1, 1))
+      commit = create(:commit)
+      create(:commit_topic, commit: commit, topic: topic)
+      CommitPerson.create!(commit: commit, role: "author", person_id: member.person.id)
+
+      get team_profile_path("test-team")
+
+      expect(response.body).to include("Patch threads that landed")
+      expect(response.body).to include("1 / 1")
+      expect(response.body).to include("Team Notable Thread")
+      expect(response.body).to include("Longest running")
+    end
   end
 end

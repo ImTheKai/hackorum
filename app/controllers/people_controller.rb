@@ -4,8 +4,7 @@ class PeopleController < ApplicationController
   before_action :load_person
 
   def show
-    @first_message_at = Message.where(sender_person_id: @person.id).minimum(:created_at)
-    @last_message_at = Message.where(sender_person_id: @person.id).maximum(:created_at)
+    @profile_stats = ProfileStats.new(@person.id)
     @profile_email = profile_email
     load_activity_data
   end

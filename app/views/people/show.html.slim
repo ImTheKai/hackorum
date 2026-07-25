@@ -34,17 +34,12 @@
       h1.profile-name = @person.display_name
       - if @primary_alias
         p.profile-email = @primary_alias.email
-      - if @first_message_at && @last_message_at
-        .activity-span
-          span.activity-span-label First message:
-          span.activity-span-date = l(@first_message_at.to_date, format: :long)
-          span.activity-span-separator ·
-          span.activity-span-label Last message:
-          span.activity-span-date = l(@last_message_at.to_date, format: :long)
       - if @person.contributor_memberships.any?
         - badge = @primary_alias&.contributor_badge || @person.contributor_badge
         - if badge.present?
           span.profile-badge = badge
+
+  = render "stats"
 
   = turbo_frame_tag "person-activity" do
     = render "activity_filters"

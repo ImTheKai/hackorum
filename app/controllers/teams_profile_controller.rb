@@ -5,6 +5,7 @@ class TeamsProfileController < ApplicationController
   before_action :require_team_accessible!
 
   def show
+    @profile_stats = ProfileStats.new(@member_person_ids)
     @members = @team.team_members.includes(user: { person: :default_alias }).order(:role, :created_at)
     load_activity_data
   end

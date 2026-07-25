@@ -24,8 +24,14 @@ module ProfileActivity
     @week_start_day = parse_week_start_day
     @activity_filters = parse_activity_filters
     effective_scope = scope || default_recent_scope
-    @activity_entries = build_activity_entries(scope: effective_scope, filters: @activity_filters)
-    @activity_summary = build_activity_summary(scope: effective_scope, filters: @activity_filters)
+
+    # classify once, derive both the table rows and the summary tally from
+    # the same pass - the summary is unfiltered, so its classification is
+    # byte-identical to the entries' classification before the filter is applied
+    classified_entries = build_activity_entries(scope: effective_scope)
+    @activity_summary = summarize_activity_entries(classified_entries)
+    @activity_entries = filter_activity_entries(classified_entries, @activity_filters)
+
     @activity_period ||= { type: :recent } if scope.nil?
     @contribution_years = contribution_years
     @contribution_year = year || select_contribution_year(@contribution_years)
@@ -35,11 +41,15 @@ module ProfileActivity
 
   def default_recent_scope
     ids = person_ids_for_query
-    start_date = 1.month.ago.beginning_of_day
+    start_date = 30.days.ago.beginning_of_day
     Message.where(sender_person_id: ids, created_at: start_date..)
   end
 
-  def build_activity_entries(scope: nil, filters: nil)
+  # Fully classified, unfiltered entries. Both the table (after filtering,
+  # see filter_activity_entries) and the summary (see summarize_activity_entries)
+  # are derived from this single pass, so a profile load classifies every
+  # message once rather than twice.
+  def build_activity_entries(scope: nil)
     ids = person_ids_for_query
     return [] if ids.blank?
 
@@ -54,9 +64,7 @@ module ProfileActivity
     first_patch_per_topic = Message.where(topic_id: topic_ids, is_patch_submission: true).group(:topic_id).minimum(:id)
     own_topic_ids = Topic.where(id: topic_ids, creator_person_id: ids).pluck(:id).to_set
 
-    filter_symbols = filters&.map(&:to_sym)&.to_set
-
-    entries = messages.filter_map do |message|
+    messages.filter_map do |message|
       topic = message.topic
       next unless topic
 
@@ -75,61 +83,27 @@ module ProfileActivity
         activity_types: activity_types
       }
     end
-
-    if filter_symbols.present?
-      entries = entries.select { |e| (e[:activity_types].to_set & filter_symbols).any? }
-    end
-
-    entries
   end
 
-  def build_activity_summary(scope: nil, filters: nil)
-    ids = person_ids_for_query
-    return empty_activity_summary if ids.blank?
-
-    scope ||= Message.where(sender_person_id: ids)
-    messages = scope.includes(:topic)
-
-    return empty_activity_summary if messages.empty?
-
-    topic_ids = messages.map(&:topic_id).uniq
-    first_message_per_topic = Message.where(topic_id: topic_ids).group(:topic_id).minimum(:id)
-    first_patch_per_topic = Message.where(topic_id: topic_ids, is_patch_submission: true).group(:topic_id).minimum(:id)
-    own_topic_ids = Topic.where(id: topic_ids, creator_person_id: ids).pluck(:id).to_set
-
+  def filter_activity_entries(entries, filters)
     filter_symbols = filters&.map(&:to_sym)&.to_set
+    return entries if filter_symbols.blank?
 
-    summary = {
-      total: 0,
-      started_thread: 0,
-      replied_own_thread: 0,
-      replied_other_thread: 0,
-      replied_other_topics: 0,
-      sent_first_patch: 0,
-      sent_followup_patch: 0
-    }
+    entries.select { |e| (e[:activity_types].to_set & filter_symbols).any? }
+  end
 
+  # Deliberately unfiltered: the boxes are a stable frame of reference for the
+  # period, so "0 started" reads as "none in this window" rather than "none
+  # matching the current filters". The filters still drive the table and the
+  # contributions calendar.
+  def summarize_activity_entries(entries)
+    summary = empty_activity_summary
     replied_other_topic_ids = Set.new
 
-    messages.each do |message|
-      topic = message.topic
-      next unless topic
-
-      activity_types = compute_activity_types(
-        message: message,
-        topic: topic,
-        first_message_per_topic: first_message_per_topic,
-        first_patch_per_topic: first_patch_per_topic,
-        own_topic_ids: own_topic_ids
-      )
-
-      if filter_symbols.blank? || (activity_types.to_set & filter_symbols).any?
-        summary[:total] += 1
-        activity_types.each { |type| summary[type] += 1 }
-        if activity_types.include?(:replied_other_thread)
-          replied_other_topic_ids << topic.id
-        end
-      end
+    entries.each do |entry|
+      summary[:total] += 1
+      entry[:activity_types].each { |type| summary[type] += 1 }
+      replied_other_topic_ids << entry[:topic].id if entry[:activity_types].include?(:replied_other_thread)
     end
 
     summary[:replied_other_topics] = replied_other_topic_ids.size

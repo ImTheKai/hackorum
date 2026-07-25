@@ -13,6 +13,13 @@ class Commit < ApplicationRecord
     joins(:commit_topics).where(commit_topics: { topic_id: topic_id }).order(committed_at: :desc)
   }
 
+  # The commit that actually landed the change, as opposed to a cherry-pick
+  # of it into a stable branch.
+  scope :on_master, -> { where("commits.branches @> ARRAY[?]::varchar[]", MASTER) }
+
+  # A cherry-pick of another (usually master) commit into a stable branch.
+  scope :backports, -> { where.not(cherry_picked_from_sha: nil) }
+
   def released?
     released_in.present?
   end

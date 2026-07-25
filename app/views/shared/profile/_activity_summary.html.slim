@@ -1,0 +1,54 @@
+- total = summary[:total] || 0
+- started = summary[:started_thread] || 0
+- replied_own = summary[:replied_own_thread] || 0
+- replied_other = summary[:replied_other_thread] || 0
+- replied_other_topics = summary[:replied_other_topics] || 0
+- first_patch = summary[:sent_first_patch] || 0
+- followup_patch = summary[:sent_followup_patch] || 0
+- patch_total = first_patch + followup_patch
+- started_query = profile_started_search_query(local_assigns[:search_email], local_assigns[:activity_period])
+
+.activity-summary-groups
+  .summary-group
+    .summary-group-head
+      span.summary-group-title Threads
+      span.summary-group-total
+        b> = number_with_delimiter(total)
+        = 'message'.pluralize(total)
+    .summary-boxes
+      - if started_query
+        a class=["summary-box", ("zero" if started.zero?)] href=search_topics_path(q: started_query)
+          span.summary-box-value = number_with_delimiter(started)
+          span.summary-box-label Started
+      - else
+        div class=["summary-box", ("zero" if started.zero?)]
+          span.summary-box-value = number_with_delimiter(started)
+          span.summary-box-label Started
+      div class=["summary-box", ("zero" if replied_own.zero?)]
+        span.summary-box-value = number_with_delimiter(replied_own)
+        span.summary-box-label Replied in own
+      div class=["summary-box", ("zero" if replied_other.zero?)]
+        span.summary-box-value = number_with_delimiter(replied_other)
+        span.summary-box-label Replied to others
+        - if replied_other_topics.positive?
+          span.summary-box-sub = "in #{pluralize(replied_other_topics, 'thread')}"
+
+  .summary-group
+    .summary-group-head
+      span.summary-group-title Patches
+      span.summary-group-total
+        - if patch_total.positive?
+          ' of which
+          b> = number_with_delimiter(patch_total)
+          | carried a patch
+        - else
+          | none in this period
+    .summary-boxes.summary-boxes--two
+      div class=["summary-box", "patch", ("zero" if first_patch.zero?)]
+        span.summary-box-value = number_with_delimiter(first_patch)
+        span.summary-box-label New patch
+        span.summary-box-sub first in its thread
+      div class=["summary-box", "patch", ("zero" if followup_patch.zero?)]
+        span.summary-box-value = number_with_delimiter(followup_patch)
+        span.summary-box-label Follow-up
+        span.summary-box-sub revision of an earlier one

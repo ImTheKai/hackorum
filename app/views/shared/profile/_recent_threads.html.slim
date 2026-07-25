@@ -12,36 +12,10 @@
   - else
     h2 Recent messages (last 30 days)
 
+  - show_sender = local_assigns.fetch(:show_sender, false)
+  = render "shared/profile/activity_summary", summary: local_assigns[:activity_summary] || {}, search_email: local_assigns[:search_email], activity_period: activity_period
+
   - if activity_entries.any?
-    - show_sender = local_assigns.fetch(:show_sender, false)
-    - summary = local_assigns[:activity_summary] || {}
-    - total = summary[:total] || activity_entries.size
-    - started = summary[:started_thread] || 0
-    - replied_own = summary[:replied_own_thread] || 0
-    - replied_other = summary[:replied_other_thread] || 0
-    - replied_other_topics = summary[:replied_other_topics] || 0
-    - first_patch = summary[:sent_first_patch] || 0
-    - followup_patch = summary[:sent_followup_patch] || 0
-    .activity-summary
-      span.activity-summary-total #{total} messages
-      span.activity-summary-item
-        span.activity-tag.tag-started = started
-        |  started threads
-      span.activity-summary-item
-        span.activity-tag.tag-replied = replied_own
-        |  replied (own)
-      span.activity-summary-item
-        span.activity-tag.tag-replied = replied_other
-        |  replied (other)
-      span.activity-summary-item
-        span.activity-tag.tag-replied = replied_other_topics
-        |  other threads
-      span.activity-summary-item
-        span.activity-tag.tag-patch = first_patch
-        |  first patch
-      span.activity-summary-item
-        span.activity-tag.tag-patch = followup_patch
-        |  follow-up patch
     table.activity-table
       thead
         tr

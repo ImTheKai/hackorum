@@ -73,6 +73,7 @@ class ReportsController < ApplicationController
   def report_cache_key
     [
       "reports",
+      "v2",
       @period_type,
       @year,
       @period_type == "weekly" ? @week : @month,
@@ -143,12 +144,26 @@ class ReportsController < ApplicationController
 
   def load_rankings
     @rankings = {
+      total_messages: ranking_total_messages,
       started_thread: ranking_started_thread,
       replied_own_thread: ranking_replied_own_thread,
       replied_other_thread: ranking_replied_other_thread,
       sent_first_patch: ranking_sent_first_patch,
       sent_followup_patch: ranking_sent_followup_patch
     }
+  end
+
+  def ranking_total_messages
+    scope = Message.where(created_at: @period_range)
+    scope = apply_contributor_filter(scope, :sender_person_id)
+
+    person_ids_with_counts = scope
+      .group(:sender_person_id)
+      .order(Arel.sql("COUNT(*) DESC"))
+      .limit(RANKING_LIMIT)
+      .pluck(:sender_person_id, Arel.sql("COUNT(*)"))
+
+    build_ranking_entries(person_ids_with_counts)
   end
 
   def ranking_started_thread

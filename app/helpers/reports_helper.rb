@@ -105,6 +105,7 @@ module ReportsHelper
 
   def ranking_tabs
     [
+      { key: "total_messages", label: "All Messages" },
       { key: "started_thread", label: "Started Thread" },
       { key: "replied_own_thread", label: "Replied Own" },
       { key: "replied_other_thread", label: "Replied Other" },

@@ -43,8 +43,10 @@ class Topic < ApplicationRecord
     creator_person&.default_alias || creator
   end
 
+  # id tiebreak: same-second messages must keep a stable order, branch names
+  # derived from this index depend on it
   def chronological_index_of(message)
-    ids = messages.order(:created_at).pluck(:id)
+    ids = messages.order(:created_at, :id).pluck(:id)
     ids.index(message.id).to_i + 1
   end
 

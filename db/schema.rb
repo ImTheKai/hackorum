@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_25_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_26_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -450,6 +450,28 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_25_000000) do
     t.index ["created_at"], name: "index_page_load_stats_on_created_at"
   end
 
+  create_table "patch_branches", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.bigint "message_id", null: false
+    t.string "branch_name", null: false
+    t.string "base_sha"
+    t.boolean "on_master", default: false, null: false
+    t.string "status", null: false
+    t.string "failure_stage"
+    t.text "failure_reason"
+    t.string "conflict_files", default: [], null: false, array: true
+    t.string "patch_content_hash"
+    t.datetime "attempted_at"
+    t.datetime "pushed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "base_source"
+    t.index ["branch_name"], name: "index_patch_branches_on_branch_name", unique: true
+    t.index ["message_id"], name: "index_patch_branches_on_message_id", unique: true
+    t.index ["status", "failure_stage"], name: "index_patch_branches_on_status_and_failure_stage"
+    t.index ["topic_id"], name: "index_patch_branches_on_topic_id"
+  end
+
   create_table "patch_submission_files", force: :cascade do |t|
     t.bigint "message_id", null: false
     t.string "path", null: false
@@ -886,6 +908,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_25_000000) do
   add_foreign_key "outgoing_drafts", "messages", column: "sent_message_id"
   add_foreign_key "outgoing_drafts", "topics"
   add_foreign_key "outgoing_drafts", "users"
+  add_foreign_key "patch_branches", "messages"
+  add_foreign_key "patch_branches", "topics"
   add_foreign_key "patch_submission_files", "messages"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "saved_search_preferences", "saved_searches"

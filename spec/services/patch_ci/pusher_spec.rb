@@ -29,11 +29,11 @@ RSpec.describe PatchCi::Pusher do
     described_class.new(repo: repo, worktree: PatchBranches::GitRepo.new(@wt_dir))
   end
 
-  def row_for(branch, base)
+  def row_for(branch, base, **attrs)
     topic = create(:topic)
     message = create(:message, topic: topic, created_at: Time.utc(2026, 5, 1, 12))
     create(:patch_branch, topic: topic, message: message, branch_name: branch,
-                          base_sha: base, status: "applied", on_master: true)
+                          base_sha: base, status: "applied", on_master: true, **attrs)
   end
 
   it "pushes and records the head" do
@@ -73,6 +73,15 @@ RSpec.describe PatchCi::Pusher do
     expect(row.ci_status).to eq("ci_none")
     expect(row.ci_skip_reason).to eq("no era image for pg16")
     expect(row.pushed_at).to be_nil
+  end
+
+  it "skip overwrites to a new reason" do
+    base = setup_branch("t15_1")
+    row = row_for("t15_1", base, ci_status: "ci_none", ci_skip_reason: "no era image for pg13")
+    pshr = pusher
+
+    pshr.skip(row, "branch missing from repo")
+    expect(row.reload.ci_skip_reason).to eq("branch missing from repo")
   end
 
   it "leaves the row unpushed when the remote rejects" do

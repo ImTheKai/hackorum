@@ -110,6 +110,10 @@ Rails.application.routes.draw do
   get "reports/weekly/:year/:week", to: "reports#show", defaults: { period_type: "weekly" }, as: :weekly_report
   get "reports/monthly/:year/:month", to: "reports#show", defaults: { period_type: "monthly" }, as: :monthly_report
 
+  # CI orchestration
+  get "ci", to: "ci#index", as: :ci
+  get "ci/branches", to: "ci#branches", as: :ci_branches
+
   # Help pages
   resources :help, only: [ :index, :show ], param: :slug
 

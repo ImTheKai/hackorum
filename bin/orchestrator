@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# The CI orchestrator: apply, push, ingest, forecast.
+# See GITINTEGRATION and --help.
+
+require "optparse"
+
+# block buffering hides an hour of cycles behind nohup or tee
+$stdout.sync = true
+
+LOCK_KEY = "patch_ci_orchestrator"
+# a daemon must survive a timeout; a broken config must not spin on it forever
+MAX_CONSECUTIVE_FAILURES = 20
+
+options = {
+  repo: File.expand_path("../postgres", __dir__),
+  worktree: File.expand_path("../tmp/patch_ci_worktree", __dir__),
+  remote: "origin",
+  master_ref: "origin/master",
+  github_repo: "hackorum-dev/postgres",
+  interval: 60
+}
+
+OptionParser.new do |o|
+  o.banner = <<~BANNER
+    Usage: bin/orchestrator [options]
+
+    Needs HACKORUM_GITHUB_TOKEN in the environment:
+      export HACKORUM_GITHUB_TOKEN=$(gh auth token)
+
+    Options:
+  BANNER
+  o.on("--once", "run a single cycle and exit") { options[:once] = true }
+  o.on("--dry-run", "compute and print the plan, execute nothing") { options[:dry_run] = true }
+  o.on("--max-pushes N", Integer, "stop pushing after N total (keep ingesting)") { |v| options[:max_pushes] = v }
+  o.on("--budget N", Integer, "max queued+running CI runs (default PatchCi::Config::BUDGET)") { |v| options[:budget] = v }
+  o.on("--interval N", Integer, "seconds between cycles (default 60)") { |v| options[:interval] = v }
+  o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
+  o.on("--github-repo NAME", "owner/name CI runs in (default hackorum-dev/postgres)") { |v| options[:github_repo] = v }
+  o.on("--master-ref REF", "ref that is master truth (default origin/master)") { |v| options[:master_ref] = v }
+end.parse!
+
+require_relative "../config/environment"
+
+# rails is not loaded at optparse time, so the default lands here
+options[:budget] ||= PatchCi::Config::BUDGET
+
+repo = PatchBranches::GitRepo.new(options[:repo])
+
+# a worktree left half-created by a killed process must not read as healthy
+# for the rest of this process's life; see GitRepo#ensure_worktree!
+repo.ensure_worktree!(options[:worktree])
+worktree = PatchBranches::GitRepo.new(options[:worktree])
+
+orchestrator = PatchCi::Orchestrator.new(
+  client: PatchCi::GithubClient.new(repo: options[:github_repo]),
+  pusher: PatchCi::Pusher.new(repo: repo, worktree: worktree, remote: options[:remote]),
+  guard: PatchCi::PushGuard.new(repo),
+  apply_one: PatchBranches::ApplyOne.new(repo: repo, worktree: worktree),
+  result_refs: PatchCi::ResultRefs.new(repo, remote: options[:remote]),
+  pruner: PatchCi::ResultRefPruner.new(repo, remote: options[:remote]),
+  repo: repo,
+  remote: options[:remote],
+  master_ref: options[:master_ref],
+  budget: options[:budget],
+  max_pushes: options[:max_pushes],
+  dry_run: options[:dry_run]
+)
+
+def summary_line(result)
+  ingested = result[:ingested].to_a.map { |status, count| "#{status}:#{count}" }.join(",")
+  rest = result.except(:ingested).map { |k, v| "#{k}=#{v}" }.join(" ")
+  "[#{Time.current.iso8601}] #{rest} ingested=#{ingested.presence || '-'}"
+end
+
+# same key as script/patch_apply.rb: both write branch refs in the same repo
+ran = AdvisoryLock.with_lock(LOCK_KEY) do
+  failures = 0
+  loop do
+    begin
+      # the outer lock lives on one AR session and an auto-reconnect drops it
+      # without a word. The nested try answers the question with teeth - has
+      # somebody else taken over? - for the price of two round trips. It does
+      # not re-take the lock (with_lock releases what it took), so after a
+      # reconnect a competitor can win the race; then this probe fails and the
+      # loser exits, which is the outcome that matters: never two of us pushing.
+      abort "lost the #{LOCK_KEY} lock, another process holds it" unless AdvisoryLock.with_lock(LOCK_KEY) { true }
+
+      # tmp/ is disposable; a worktree deleted under us turns every following
+      # cycle into silent push_failed churn. One rev_parse when it is healthy.
+      repo.ensure_worktree!(options[:worktree])
+
+      result = orchestrator.cycle
+      puts summary_line(result)
+      # a cycle that caught its own error still made no progress, so it feeds
+      # the same counter: an invalid token would otherwise spin here forever,
+      # quietly. Per-item failures (result[:failed]) do not - partial progress
+      # is progress.
+      raise "poll failed, pushed nothing: #{result[:error]}" if result[:error]
+
+      failures = 0
+    rescue StandardError => e
+      # transport timeouts, a dropped DB connection, an unresolvable master:
+      # one of those must not end a 24h backfill. Interrupt is not a
+      # StandardError, so ctrl-c still stops the loop.
+      failures += 1
+      warn "cycle failed (#{failures} in a row): #{e.class}: #{e.message}"
+      raise if options[:once] || failures >= MAX_CONSECUTIVE_FAILURES
+    end
+    break if options[:once]
+    sleep options[:interval]
+  end
+  :done
+end
+abort "#{LOCK_KEY} lock is held, another apply or orchestrator run is active" unless ran == :done

@@ -8,19 +8,18 @@ module PatchCi
 
     def initialize(repo)
       @repo = repo
+      @majors = {}
     end
 
     # 9.6beta1 -> 9, 10beta1 -> 10, 19devel -> 19. Only master is ever read,
     # so the 9.x collapse is safe: no 9.6.24 ever appears here.
+    #
+    # cache keys must be commit shas, never refs: a long-lived detector handed
+    # "master" would keep answering with the pre-fetch tree. Only hits are
+    # cached, so a git show that failed on a busy repo is retried, not pinned.
     def major_for(sha)
-      source = configure_source(sha)
-      return nil unless source
-
-      version = source[AC_INIT, 1]
-      return nil unless version
-
-      major = version[/\A(\d+)/, 1]
-      major&.to_i
+      return nil if sha.blank?
+      @majors[sha] ||= compute_major(sha)
     end
 
     def supported?(major)
@@ -28,6 +27,16 @@ module PatchCi
     end
 
     private
+
+    def compute_major(sha)
+      source = configure_source(sha)
+      return nil unless source
+
+      version = source[AC_INIT, 1]
+      return nil unless version
+
+      version[/\A(\d+)/, 1]&.to_i
+    end
 
     def configure_source(sha)
       CONFIGURE_FILES.each do |path|

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_27_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -356,6 +356,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
     t.index ["sender_person_id"], name: "index_messages_on_sender_person_id"
     t.index ["state"], name: "index_messages_on_state"
     t.index ["topic_id", "created_at", "id"], name: "index_messages_on_topic_id_and_created_at_desc_id_desc", order: { created_at: :desc, id: :desc }
+    t.index ["topic_id", "created_at", "id"], name: "index_messages_patch_submission_latest", order: { created_at: :desc, id: :desc }, where: "(is_patch_submission = true)"
     t.index ["topic_id"], name: "index_messages_on_topic_id"
   end
 
@@ -470,12 +471,32 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
     t.bigint "latest_ci_run_id"
     t.string "ci_status"
     t.string "ci_skip_reason"
+    t.datetime "base_committed_at"
+    t.integer "base_commit_height"
+    t.bigint "superseded_by_id"
+    t.datetime "last_master_apply_at"
+    t.text "master_apply_error"
+    t.integer "pg_major"
+    t.index ["attempted_at"], name: "index_patch_branches_on_attempted_at", order: :desc
     t.index ["branch_name"], name: "index_patch_branches_on_branch_name", unique: true
     t.index ["ci_status"], name: "index_patch_branches_on_ci_status"
     t.index ["latest_ci_run_id"], name: "index_patch_branches_on_latest_ci_run_id"
     t.index ["message_id"], name: "index_patch_branches_on_message_id", unique: true
+    t.index ["pg_major"], name: "index_patch_branches_on_pg_major"
     t.index ["status", "failure_stage"], name: "index_patch_branches_on_status_and_failure_stage"
+    t.index ["superseded_by_id"], name: "index_patch_branches_on_superseded_by_id"
+    t.index ["topic_id"], name: "index_patch_branches_current_topic", where: "(superseded_by_id IS NULL)"
     t.index ["topic_id"], name: "index_patch_branches_on_topic_id"
+    t.index ["updated_at", "id"], name: "index_patch_branches_on_updated_at_and_id", order: :desc
+  end
+
+  create_table "patch_ci_repo_states", force: :cascade do |t|
+    t.string "master_sha", null: false
+    t.datetime "master_committed_at", null: false
+    t.integer "master_commit_height", null: false
+    t.datetime "fetched_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "patch_ci_runs", force: :cascade do |t|
@@ -497,6 +518,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
     t.jsonb "payload"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "tests_total"
+    t.index ["completed_at"], name: "index_patch_ci_runs_on_completed_at", order: :desc
+    t.index ["created_at", "id"], name: "index_patch_ci_runs_on_created_at_and_id", order: :desc
     t.index ["github_run_id", "run_attempt"], name: "index_patch_ci_runs_on_github_run_id_and_run_attempt", unique: true
     t.index ["patch_branch_id"], name: "index_patch_ci_runs_on_patch_branch_id"
   end
@@ -938,6 +962,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
   add_foreign_key "outgoing_drafts", "topics"
   add_foreign_key "outgoing_drafts", "users"
   add_foreign_key "patch_branches", "messages", on_delete: :cascade
+  add_foreign_key "patch_branches", "patch_branches", column: "superseded_by_id", on_delete: :nullify
   add_foreign_key "patch_branches", "patch_ci_runs", column: "latest_ci_run_id", on_delete: :nullify
   add_foreign_key "patch_branches", "topics"
   add_foreign_key "patch_ci_runs", "patch_branches", on_delete: :cascade

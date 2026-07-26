@@ -1,0 +1,33 @@
+/ rows must come from PatchCi::BranchRows: base_tier and health_bucket are
+/ select aliases rather than methods, and latest_run_summary raises unless
+/ BranchRows attached it
+/ query is optional: without one the headers are not sortable
+- sort_query = local_assigns[:query]
+/ the three go together and none is decoration: .ci-table-wrap scrolls
+/ horizontally, tabindex makes it keyboard-scrollable, and a focusable region
+/ needs role + a name to announce. Dropping any one breaks the other two.
+.ci-table-wrap tabindex="0" role="region" aria-label=local_assigns.fetch(:label)
+  table.ci-table
+    tr
+      th Result
+      = ci_sort_header(sort_query, "branch", "Branch")
+      th Topic
+      = ci_sort_header(sort_query, "pg", "PG", numeric: true)
+      = ci_sort_header(sort_query, "base", "Base")
+      th State
+      th.num Tests
+      th.num Timing
+      th Try it
+      = ci_sort_header(sort_query, "updated", "Updated", numeric: true)
+    - rows.each do |row|
+      tr
+        td = ci_result_cell(row)
+        td.mono = link_to row.branch_name, topic_path(row.topic)
+        td.topic = link_to row.topic.title, topic_path(row.topic)
+        td.num = row.pg_major || ci_muted_dash
+        td = ci_base_tier_badge(row, repo_state)
+        td = ci_bucket_badge(row.health_bucket)
+        td.num = ci_tests_cell(row)
+        td.num = ci_timing_cell(row)
+        td = ci_image_cell(row)
+        td.num.muted = "#{time_ago_in_words(row.updated_at)} ago"

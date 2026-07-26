@@ -1,6 +1,3 @@
-require "digest"
-require "tmpdir"
-
 module PatchBranches
   class Runner
     def initialize(repo_path:, worktrees_dir:, concurrency: 8, force: false)
@@ -61,112 +58,27 @@ module PatchBranches
     end
 
     def process(message_id, worktree, master_sha)
-      message = Message.includes(:attachments, :topic).find(message_id)
-      branch_name = "t#{message.topic_id}_#{message.topic.chronological_index_of(message)}"
-      record = PatchBranch.find_or_initialize_by(message_id: message.id)
-
-      Dir.mktmpdir("patchset") do |dir|
-        files = PatchsetExtractor.new(message).extract(dir)
-        content_hash = Digest::SHA256.hexdigest(files.map { |f| File.binread(f) }.join)
-
-        if skippable?(record, content_hash)
-          bump(:skipped)
-          return
-        end
-
-        applier = Applier.new(worktree)
-
-        master_result = applier.apply(master_sha, files, branch_name,
-                                      committed_at: message.created_at)
-        if master_result.success?
-          save(record, message, branch_name, status: "applied",
-               base_sha: master_sha, on_master: true, base_source: "master",
-               content_hash: content_hash)
-          bump(:applied_on_master)
-          return
-        end
-
-        detection = BaseCommitDetector
-          .new(@repo, files, submission_date: message.created_at)
-          .detect
-
-        if detection.nil?
-          save(record, message, branch_name, status: "failed",
-               failure_stage: "base_detection",
-               failure_reason: clip(master_result.output),
-               conflict_files: master_result.conflict_files,
-               content_hash: content_hash)
-          bump(:no_base)
-          return
-        end
-
-        result = detection.sha == master_sha ? master_result
-                                             : applier.apply(detection.sha, files, branch_name,
-                                                             committed_at: message.created_at)
-
-        if result.success?
-          save(record, message, branch_name, status: "applied",
-               base_sha: detection.sha, on_master: false,
-               base_source: detection.source, content_hash: content_hash)
-          bump(:applied_on_base)
-        else
-          save(record, message, branch_name, status: "failed",
-               failure_stage: "apply", base_sha: detection.sha,
-               base_source: detection.source,
-               failure_reason: clip(result.output),
-               conflict_files: result.conflict_files,
-               content_hash: content_hash)
-          bump(:apply_failed)
-        end
-      end
-    rescue PatchsetExtractor::Error => e
-      rescue_save(record, message, branch_name, status: "failed",
-                  failure_stage: "extract", failure_reason: e.message)
-      bump(:extract_failed)
+      apply_one = ApplyOne.new(repo: @repo, worktree: worktree, force: @force)
+      outcome, = apply_one.call(message_id, master_sha: master_sha)
+      bump(outcome)
+      report_save_error(apply_one)
     rescue => e
-      if record && message && branch_name
-        rescue_save(record, message, branch_name, status: "failed", failure_stage: "error",
-                    failure_reason: clip("#{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"))
+      if apply_one
+        apply_one.persist_error(e)
+        report_save_error(apply_one)
       end
       bump(:error)
       @mutex.synchronize { puts "ERROR message #{message_id}: #{e.class}: #{e.message}" }
     end
 
-    # a save on the rescue path (e.g. branch_name unique collision) must not
-    # kill the worker thread
-    def rescue_save(record, message, branch_name, **kwargs)
-      save(record, message, branch_name, **kwargs)
-    rescue => e
+    # a save ApplyOne could not do (e.g. branch_name unique collision) is a
+    # counted outcome, not a dead worker thread
+    def report_save_error(apply_one)
+      error = apply_one.save_error
+      return unless error
+
       bump(:save_failed)
-      @mutex.synchronize { puts "save failed for message #{message&.id}: #{e.class}: #{e.message}" }
-    end
-
-    def skippable?(record, content_hash)
-      !@force && record.persisted? &&
-        record.status == "applied" && record.patch_content_hash == content_hash
-    end
-
-    def save(record, message, branch_name, status:, base_sha: nil, on_master: false,
-             base_source: nil, failure_stage: nil, failure_reason: nil,
-             conflict_files: [], content_hash: nil)
-      record.assign_attributes(
-        topic_id: message.topic_id,
-        branch_name: branch_name,
-        status: status,
-        base_sha: base_sha,
-        on_master: on_master,
-        base_source: base_source,
-        failure_stage: failure_stage,
-        failure_reason: failure_reason,
-        conflict_files: conflict_files || [],
-        patch_content_hash: content_hash,
-        attempted_at: Time.current
-      )
-      record.save!
-    end
-
-    def clip(text)
-      text.to_s.scrub("?").slice(0, 20_000)
+      @mutex.synchronize { puts "save failed for message #{apply_one.message&.id}: #{error.class}: #{error.message}" }
     end
 
     def bump(key)

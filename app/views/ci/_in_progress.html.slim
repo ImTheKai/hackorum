@@ -1,0 +1,4 @@
+- if @in_progress.empty?
+  p.muted nothing running
+- else
+  = render "ci/branch_rows", rows: @in_progress, repo_state: @repo_state, label: "In progress branches"

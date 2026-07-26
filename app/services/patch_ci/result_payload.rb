@@ -2,8 +2,12 @@ module PatchCi
   # result.json is written by a job that ran patch code, so everything here
   # treats it as hostile input: size cap first, then schema, then coercion.
   class ResultPayload
-    MAX_BYTES = 64 * 1024
+    # a realistic full executed list is ~116KB, the producer's tested worst
+    # case ~159KB (collect_results.py caps names at 64 chars and asserts the
+    # fit); 256KB keeps headroom on top of that bound
+    MAX_BYTES = 256 * 1024
     MAX_FAILED = 200
+    MAX_EXECUTED = 2000
     MAX_NAME = 200
     SCHEMA = 1
     INT4_MAX = 2_147_483_647
@@ -44,13 +48,36 @@ module PatchCi
       list.first(MAX_FAILED).map { |name| string(name).slice(0, MAX_NAME) }.reject(&:empty?)
     end
 
+    def executed_tests
+      list = executed_list
+      return [] unless list
+      list.first(MAX_EXECUTED).map { |name| string(name).slice(0, MAX_NAME) }.reject(&:empty?)
+    end
+
+    # nil (not 0) when the payload predates the executed list
+    def tests_total
+      executed_list ? executed_tests.size : nil
+    end
+
     private
 
+    def executed_list
+      list = section("tests")["executed"]
+      list.is_a?(Array) ? list : nil
+    end
+
     def validate(text)
-      return fail!("payload too large") if text.to_s.bytesize > MAX_BYTES
+      text = text.to_s
+      return fail!("payload too large") if text.bytesize > MAX_BYTES
+
+      # postgres jsonb/text cannot store NUL bytes; a patch-controlled test
+      # name carrying one would otherwise sail through validation and only
+      # blow up later as a StatementInvalid on save. strip both the raw byte
+      # and its JSON-escaped form before parsing.
+      text = text.delete("\0").gsub(/\\u0000/i, "")
 
       begin
-        parsed = JSON.parse(text.to_s)
+        parsed = JSON.parse(text)
       rescue JSON::ParserError => e
         return fail!("malformed json: #{e.message.slice(0, 200)}")
       end

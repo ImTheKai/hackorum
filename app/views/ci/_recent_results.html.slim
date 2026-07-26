@@ -1,0 +1,4 @@
+- if @recent.empty?
+  p.muted no branches yet
+- else
+  = render "ci/branch_rows", rows: @recent, repo_state: @repo_state, label: "Recent results"

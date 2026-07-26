@@ -42,4 +42,36 @@ RSpec.describe PatchCi::EraDetector do
     expect(detector.supported?(20)).to be(true)
     expect(detector.supported?(16)).to be(false)
   end
+
+  it "reads a sha's configure only once" do
+    sha = fixture.commit(subject: "modern", files: { "configure.ac" => ac_init("19devel") })
+    expect(detector.major_for(sha)).to eq(19)
+
+    expect(repo).not_to receive(:run)
+    expect(detector.major_for(sha)).to eq(19)
+  end
+
+  it "caches per sha, not per detector" do
+    modern = fixture.commit(subject: "modern", files: { "configure.ac" => ac_init("19devel") })
+    old = fixture.commit(subject: "old", files: { "configure.ac" => ac_init("10beta1") })
+
+    expect(detector.major_for(modern)).to eq(19)
+    expect(detector.major_for(old)).to eq(10)
+    expect(detector.major_for(modern)).to eq(19)
+  end
+
+  it "retries a sha whose configure could not be read" do
+    sha = fixture.commit(subject: "modern", files: { "configure.ac" => ac_init("19devel") })
+    locked = PatchBranches::GitRepo::Result.new("", "fatal: index locked", 128)
+    allow(repo).to receive(:run).and_return(locked)
+    expect(detector.major_for(sha)).to be_nil
+
+    allow(repo).to receive(:run).and_call_original
+    expect(detector.major_for(sha)).to eq(19)
+  end
+
+  it "returns nil for a blank sha without touching git" do
+    expect(repo).not_to receive(:run)
+    expect(detector.major_for(nil)).to be_nil
+  end
 end

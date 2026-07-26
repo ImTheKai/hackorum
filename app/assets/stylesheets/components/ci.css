@@ -1,0 +1,407 @@
+.ci-container {
+  max-width: var(--max-width-container);
+  margin: 0 auto;
+  padding: var(--spacing-6);
+}
+
+.ci-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--spacing-5);
+}
+
+/* status strip */
+.ci-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-8);
+}
+
+.ci-strip .stat {
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-3) var(--spacing-4);
+  min-width: 0;
+}
+
+.ci-strip .k {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.ci-strip .v {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.ci-strip .v.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md);
+}
+
+.ci-strip .d {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ci-up::before,
+.ci-down::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--border-radius-full);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.ci-up::before { background: var(--ci-dot-ok); }
+.ci-down::before { background: var(--ci-dot-stale); }
+.ci-down { font-size: var(--font-size-md); }
+
+/* sections */
+.ci-section {
+  margin-bottom: var(--spacing-8);
+}
+
+.ci-section > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ci-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ci-section > summary::before {
+  content: "\25B8";
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ci-section[open] > summary::before {
+  content: "\25BE";
+}
+
+.ci-section h2 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.ci-section summary .count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ci-section > .more {
+  display: inline-block;
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+/* tables */
+
+/* scrolls sideways at any width, not just the mobile case this used to be
+   gated behind: the branch table's eight nowrap columns need more room than
+   either page reliably has, and without this the two text columns are what
+   give way. Carries the card frame because overflow and border-radius are
+   both inert on a border-collapse table - the corners never rounded. */
+.ci-table-wrap {
+  overflow-x: auto;
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+}
+
+.ci-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ci-table th {
+  text-align: left;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  background: var(--color-bg-table-header);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.ci-table td {
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.ci-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* sortable headers keep the header look; the arrow marks the active column */
+.ci-table th.sortable a {
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ci-table th.sortable a:hover {
+  color: var(--color-text-link);
+}
+
+.ci-table th.sortable.is-active a {
+  color: var(--color-text-primary);
+}
+
+.ci-table .num,
+.ci-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* the text columns state their own floors, so the table's width follows its
+   content and the wrapper scrolls exactly when it has to. Without these the
+   nowrap columns take everything and `overflow-wrap: anywhere` lets these two
+   shrink to one character per line rather than pushing the table wider. */
+.ci-table .mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  min-width: 7rem;
+}
+
+.ci-table .topic {
+  min-width: 16rem;
+}
+
+.ci-table .topic a {
+  font-weight: var(--font-weight-medium);
+}
+
+.ci-container .muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ci-hover {
+  border-bottom: 1px dotted var(--color-text-muted);
+  cursor: help;
+}
+
+.ci-copy {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 2px 8px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ci-copy:hover {
+  border-color: var(--color-border-focus);
+  color: var(--color-text-link);
+}
+
+.ci-copy.copied {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+/* badges */
+.ci-container .badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.ci-container .b-running { background: var(--ci-blue-bg); color: var(--ci-blue-fg); }
+.ci-container .b-queued { background: var(--color-bg-button); color: var(--color-text-secondary); }
+.ci-container .b-success { background: var(--ci-green-bg); color: var(--ci-green-fg); }
+.ci-container .b-testsfail { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
+.ci-container .b-buildfail { background: var(--ci-red-bg); color: var(--ci-red-fg); }
+.ci-container .b-infra { background: var(--ci-purple-bg); color: var(--ci-purple-fg); }
+.ci-container .b-newver { background: var(--color-primary-100); color: var(--color-primary-900); }
+.ci-container .b-rebase { background: var(--ci-amber-bg); color: var(--ci-amber-fg); }
+.ci-container .b-backfill { background: var(--color-bg-button); color: var(--color-text-secondary); }
+
+/* branch search */
+.ci-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.ci-search input[type="search"] {
+  flex: 1 1 18rem;
+  max-width: 28rem;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.ci-search input[type="search"]:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+/* facet chips, one row per facet */
+.ci-facets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.ci-facet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-2);
+}
+
+.ci-facet .k {
+  flex: 0 0 5rem;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.ci-facet a {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--color-bg-button);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+}
+
+.ci-facet a:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.ci-facet a.is-active,
+.ci-facet a.is-active:hover {
+  background: var(--color-primary-500);
+  color: var(--color-bg-card);
+}
+
+/* kaminari pagination */
+.ci-container nav.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.ci-container nav.pagination a {
+  color: var(--color-text-link);
+}
+
+.ci-container nav.pagination .page.current {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+/* branch health */
+.ci-health {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--spacing-3);
+}
+
+.ci-health .bucket {
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-3) var(--spacing-4);
+  min-width: 0;
+}
+
+.ci-health .bucket.edge {
+  border-left: var(--border-width-reply) solid var(--color-primary-500);
+}
+
+/* bucket labels come from one map shared with the badges, which render them
+   lowercase; here they are headings, so case the first letter in css rather
+   than keeping a second set of strings */
+.ci-health .t::first-letter {
+  text-transform: uppercase;
+}
+
+.ci-health .t {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  margin-bottom: 2px;
+}
+
+.ci-health .n {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.ci-health ul {
+  margin: var(--spacing-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.ci-health li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  padding: 1px 0;
+}
+
+@media (max-width: 1000px) {
+  .ci-strip,
+  .ci-health {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .ci-container {
+    padding: var(--spacing-4) var(--spacing-3);
+  }
+
+  .ci-strip,
+  .ci-health {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

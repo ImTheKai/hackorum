@@ -1,0 +1,38 @@
+- content_for :title, "Patch CI"
+- turbo_refreshes_with method: :morph, scroll: :preserve
+= turbo_stream_from PatchCi::DashboardBroadcast::STREAM
+
+- content_for :sidebar do
+  .sidebar
+    = render "sidebar"
+
+.ci-container data-controller="ci-sections"
+  h1.ci-title Patch CI
+  = render "status_strip"
+
+  details#in-progress.ci-section open=true
+    summary
+      h2 In progress
+      - if @in_flight_count.positive?
+        span.count = "#{@in_progress.size} of #{number_with_delimiter(@in_flight_count)} shown, #{PatchCi::Config::BUDGET} slots"
+    = render "in_progress"
+
+  details#up-next.ci-section open=true
+    summary
+      h2 Up next
+      span.count forecast, recomputed every cycle - order can change
+    = link_to "all branches", ci_branches_path, class: "more"
+    = render "up_next"
+
+  details#recent.ci-section open=true
+    summary
+      h2 Recent results
+      span.count newest first
+    = render "recent_results"
+
+  details#health.ci-section open=true
+    summary
+      h2 Branch health
+      span.count = "#{number_with_delimiter(@health_counts.values.sum)} tracked patchsets"
+    = link_to "recent branches", ci_branches_path(base: "recent,stale"), class: "more"
+    = render "branch_health"

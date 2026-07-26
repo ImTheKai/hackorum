@@ -1,0 +1,32 @@
+.ci-strip
+  .stat
+    .k Orchestrator
+    - if @repo_state.nil? || @repo_state.stale?
+      .v.ci-down orchestrator not running
+      .d = @repo_state ? "last cycle #{time_ago_in_words(@repo_state.fetched_at)} ago" : "never ran"
+    - else
+      .v.ci-up running
+      .d = "last cycle #{time_ago_in_words(@repo_state.fetched_at)} ago"
+  .stat
+    .k master
+    - if @repo_state
+      .v.mono = @repo_state.master_sha.first(9)
+      .d = l(@repo_state.master_committed_at, format: :short)
+    - else
+      .v.muted unknown
+      .d no repo state
+  .stat
+    .k In flight
+    .v = "#{@in_flight_count} / #{PatchCi::Config::BUDGET}"
+    .d CI slots in use
+  .stat
+    .k Plan depth
+    .v = number_with_delimiter(@plan_counts.values.sum)
+    .d = @plan_counts.map { |kind, count| "#{kind.to_s.tr('_', ' ')} #{number_with_delimiter(count)}" }.join(" - ")
+  .stat
+    .k Last 24h
+    .v = "#{number_with_delimiter(@last24.values.sum)} runs"
+    - if @last24.any?
+      .d = @last24.sort_by { |_, count| -count }.map { |status, count| "#{count} #{ci_status_label(status)}" }.join(" - ")
+    - else
+      .d no results

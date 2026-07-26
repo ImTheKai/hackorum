@@ -26,10 +26,22 @@ RSpec.describe PatchCi::ResultPayload do
   end
 
   it "rejects an oversized payload without parsing" do
-    result = described_class.parse("x" * 70_000)
+    result = described_class.parse("x" * 300_000)
 
     expect(result).not_to be_valid
     expect(result.error).to eq("payload too large")
+  end
+
+  it "accepts a realistic full-suite executed list within the new byte cap" do
+    many = (1..2000).map { |i| "src/test/regress/expected/pg_upgrade_test_case_%04d.out" % i }
+    json = valid_json(tests: { ok: true, executed: many })
+
+    expect(json.bytesize).to be_between(64 * 1024, 256 * 1024)
+
+    result = described_class.parse(json)
+
+    expect(result).to be_valid
+    expect(result.tests_total).to eq(2000)
   end
 
   it "rejects malformed json" do
@@ -79,6 +91,43 @@ RSpec.describe PatchCi::ResultPayload do
       expect(result).not_to be_valid, "expected #{body} to be rejected"
       expect(result.error).to include("not an object")
     end
+  end
+
+  it "executed_tests parses, caps and sanitizes" do
+    result = described_class.parse(
+      valid_json(tests: { ok: false, executed: [ "regress/a", 5, "", "x" * 999 ] })
+    )
+
+    expect(result.executed_tests).to eq([ "regress/a", "x" * 200 ])
+    expect(result.tests_total).to eq(2)
+  end
+
+  it "caps the executed test list" do
+    many = (1..3000).map { |i| "t#{i}" }
+    result = described_class.parse(valid_json(tests: { ok: false, executed: many }))
+
+    expect(result.executed_tests.size).to eq(2000)
+    expect(result.tests_total).to eq(2000)
+  end
+
+  it "tests_total is nil when executed is absent" do
+    result = described_class.parse(valid_json)
+
+    expect(result.executed_tests).to eq([])
+    expect(result.tests_total).to be_nil
+  end
+
+  it "tests_total is 0 (not nil) when executed is present but empty" do
+    result = described_class.parse(valid_json(tests: { ok: true, executed: [] }))
+
+    expect(result.tests_total).to eq(0)
+  end
+
+  it "strips NUL bytes from a test name so it can still be stored" do
+    result = described_class.parse(valid_json(tests: { ok: true, executed: [ "regress/a\0b" ] }))
+
+    expect(result).to be_valid
+    expect(result.executed_tests).to eq([ "regress/ab" ])
   end
 
   it "drops non-string entries from the failed test list" do

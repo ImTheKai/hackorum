@@ -10,7 +10,10 @@ module PatchCi
       @payloads = payloads
     end
 
+    # -> { resulting status => count }, the cycle's one-line summary of what
+    # github told us
     def ingest(runs)
+      counts = Hash.new(0)
       # ascending id/attempt is only a recency proxy, not a guarantee: it is
       # sound here because at most one run id is ever current for a given
       # head_sha (single push trigger, unchanged-sha push is a no-op ref
@@ -19,14 +22,42 @@ module PatchCi
       # across two run ids would break this silently.
       runs.sort_by { |run| [ run.id.to_i, run.attempt.to_i ] }.each do |run|
         branch = PatchBranch.find_by(branch_name: run.branch)
-        next unless branch
+        if branch.nil?
+          counts["unknown_branch"] += 1
+          next
+        end
 
-        record = upsert(branch, run)
-        promote(branch, record, run)
+        begin
+          record = upsert(branch, run)
+          promote(branch, record, run)
+          counts[record.status] += 1
+        rescue ActiveRecord::StatementInvalid => e
+          # a field that passed our own validation can still be unstorable at
+          # the db layer (encoding, size, etc). one bad run must not kill the
+          # whole ingest cycle.
+          record_unstorable(branch, run, e)
+          counts["infra_error"] += 1
+        end
       end
+      counts
     end
 
     private
+
+    def record_unstorable(branch, run, error)
+      record = PatchCiRun.find_or_initialize_by(github_run_id: run.id, run_attempt: run.attempt)
+      # an already-accepted verdict must not be clobbered by a later failure
+      # in promote's branch update
+      return if already_recorded?(record)
+      record.assign_attributes(
+        patch_branch_id: branch.id,
+        status: "infra_error",
+        payload: { "ingest_error" => "unstorable payload: #{error.message.slice(0, 200)}" }
+      )
+      record.save!
+    rescue StandardError
+      nil
+    end
 
     def upsert(branch, run)
       record = PatchCiRun.find_or_initialize_by(github_run_id: run.id, run_attempt: run.attempt)
@@ -55,6 +86,7 @@ module PatchCi
           build_seconds: payload.build_seconds,
           test_seconds: payload.test_seconds,
           failed_tests: payload.failed_tests,
+          tests_total: payload.tests_total,
           image_ref: payload.image_ref.presence,
           image_digest: payload.image_digest.presence,
           payload: payload.raw

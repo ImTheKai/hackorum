@@ -12,13 +12,15 @@ RSpec.describe PatchCi::Ingestor do
     )
   end
 
-  def payload(status: "success", run_id: 7)
+  def payload(status: "success", run_id: 7, executed: nil)
+    tests = { ok: status == "success", seconds: 200,
+              failed: status == "success" ? [] : [ "regress/foo" ] }
+    tests[:executed] = executed if executed
     {
       schema: 1, branch: "t1_1", run_id: run_id, run_attempt: 1,
       head_sha: "a" * 40, base_sha: "b" * 40, pg_major: 20, status: status,
       build: { ok: true, seconds: 100 },
-      tests: { ok: status == "success", seconds: 200,
-               failed: status == "success" ? [] : [ "regress/foo" ] },
+      tests: tests,
       image: { ref: "ghcr.io/x/postgres-patch:t1", digest: "sha256:d" },
       ccache: { hit: 10, miss: 2 }
     }.to_json
@@ -46,6 +48,25 @@ RSpec.describe PatchCi::Ingestor do
     expect(record.build_seconds).to eq(100)
     expect(branch.reload.ci_status).to eq("tests_failed")
     expect(branch.latest_ci_run_id).to eq(record.id)
+    expect(record.tests_total).to be_nil
+  end
+
+  it "stores tests_total from the payload's executed list" do
+    branch
+    described_class.new(payloads: { 7 => payload(status: "success", executed: %w[regress/a regress/b regress/c]) })
+      .ingest([ run(status: "completed", conclusion: "success") ])
+
+    record = PatchCiRun.find_by(github_run_id: 7)
+    expect(record.tests_total).to eq(3)
+  end
+
+  it "leaves tests_total nil when the payload has no executed list" do
+    branch
+    described_class.new(payloads: { 7 => payload(status: "success") })
+      .ingest([ run(status: "completed", conclusion: "success") ])
+
+    record = PatchCiRun.find_by(github_run_id: 7)
+    expect(record.tests_total).to be_nil
   end
 
   it "marks a completed run with no payload as infra_error" do
@@ -143,6 +164,37 @@ RSpec.describe PatchCi::Ingestor do
     record = PatchCiRun.find_by(github_run_id: 7)
     expect(record.status).to eq("tests_failed")
     expect(record.build_seconds).to eq(100)
+  end
+
+  it "records the failure and keeps going when a payload cannot be stored" do
+    branch
+    calls = 0
+    allow_any_instance_of(PatchCiRun).to receive(:save!) do |instance|
+      calls += 1
+      raise ActiveRecord::StatementInvalid, "test boom" if calls == 1
+      instance.save
+    end
+
+    described_class.new(payloads: { 7 => payload(status: "success") })
+      .ingest([ run(status: "completed", conclusion: "success") ])
+
+    record = PatchCiRun.find_by(github_run_id: 7)
+    expect(record).to be_present
+    expect(record.status).to eq("infra_error")
+    expect(record.payload["ingest_error"]).to match(/unstorable payload/)
+  end
+
+  it "returns a status summary of the cycle" do
+    branch
+    unknown = PatchCi::GithubClient::Run.new(
+      id: 99, attempt: 1, branch: "probe_pg20", status: "completed",
+      conclusion: "success", head_sha: "z" * 40
+    )
+
+    counts = described_class.new(payloads: { 7 => payload(status: "tests_failed") })
+      .ingest([ run(status: "completed", conclusion: "failure"), unknown ])
+
+    expect(counts).to eq("tests_failed" => 1, "unknown_branch" => 1)
   end
 
   it "skips runs for branches it does not know" do

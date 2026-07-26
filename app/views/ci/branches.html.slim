@@ -1,0 +1,54 @@
+- content_for :title, "Patch CI branches"
+
+.ci-container
+  h1.ci-title Patch branches
+  p.muted = link_to "back to CI dashboard", ci_path
+
+  / the frame wraps the whole chrome, not just the table: rendered outside it,
+  / the chips and the form's hidden fields would keep the hrefs of the request
+  / before last, so the second filter click would drop the first.
+  / turbo_action on the frame covers every navigation inside it, including the
+  / pagination links, which carry no data attributes of their own.
+  = turbo_frame_tag "ci-branches", data: { turbo_action: "advance" } do
+    / hidden fields carry the facets and the sort, so searching narrows what is
+    / already on screen instead of replacing it
+    = form_with url: ci_branches_path, method: :get, class: "ci-search",
+                data: { controller: "debounced-submit",
+                        action: "input->debounced-submit#submit" } do |f|
+      - @query.active_params.except(:q).each do |key, value|
+        = hidden_field_tag key, value, id: nil
+      / permanent, so a render mid-typing carries the element over - and with it
+      / the caret and the focus - instead of replacing it under the user
+      = f.search_field :q, value: @query.search, id: "ci-q",
+                       placeholder: "branch name, topic title or id",
+                       aria: { label: "Search branches" },
+                       data: { turbo_permanent: true }
+      / no-js fallback: the stimulus controller submits on input
+      = f.submit "search", name: nil
+
+    .ci-facets
+      - PatchCi::BranchQuery::FACETS.each do |facet|
+        .ci-facet
+          span.k = ci_facet_label(facet)
+          = ci_facet_all_chip(@query, facet)
+          - @query.facet_values(facet).each do |value|
+            / state alone has counts because it can borrow the dashboard's
+            / cached whole-table numbers. Those ignore the active filters, so a
+            / chip can read higher than the count line below it.
+            = ci_facet_chip(@query, facet, value, count: (@query.bucket_counts[value] if facet == :state))
+
+    p.muted
+      = "showing #{number_with_delimiter(@branches.size)} of #{number_with_delimiter(@query.total_count)} branches "
+      - if @query.filtered?
+        / turbo off, not _top: the search box is a permanent element, and drive
+        / renders carry it over just like frame renders do, old text and all.
+        / Only a real browser navigation gives back an empty box.
+        = link_to "clear filters", ci_branches_path, data: { turbo: false }
+
+    - if @branches.empty?
+      p.muted no branches found
+    - else
+      = render "ci/branch_rows", rows: @branches, repo_state: @repo_state,
+                                 query: @query, label: "Branch table"
+
+    = paginate @query.rows, params: @query.active_params

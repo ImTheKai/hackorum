@@ -1,0 +1,20 @@
+- if @up_next.empty?
+  p.muted plan is empty
+- else
+  / tabindex/role/aria-label go with the scroll wrap - see _branch_rows
+  .ci-table-wrap tabindex="0" role="region" aria-label="Up next table"
+    table.ci-table
+      tr
+        th.num #
+        th Topic
+        th Why
+        th Work
+      - @up_next.each_with_index do |item, i|
+        tr
+          td.num = i + 1
+          td.topic = link_to item.topic.title, topic_path(item.topic)
+          td
+            = ci_tier_badge(item.kind)
+            '
+            span.muted = ci_work_reason(item, @repo_state)
+          td.muted = ci_tier_work(item.kind)

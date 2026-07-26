@@ -43,13 +43,50 @@ RSpec.describe PatchBranch do
     expect(PatchBranch.pushed).to contain_exactly(pushed)
   end
 
-  it "awaiting_ci scope returns only pushed_awaiting_ci rows" do
-    awaiting = create(:patch_branch, ci_status: "pushed_awaiting_ci")
-    create(:patch_branch, ci_status: "success")
-    expect(PatchBranch.awaiting_ci).to contain_exactly(awaiting)
+  # the two dashboard sections split the branch statuses between them; anything
+  # outside both never reaches either list, so make that set an explicit choice
+  it "leaves only ci_none and push_failed out of both dashboard scopes" do
+    covered = PatchCiRun::IN_FLIGHT_BRANCH_STATUSES + PatchCiRun::TERMINAL_STATUSES
+    expect(PatchCiRun::STATUSES - covered).to eq(%w[ci_none push_failed])
+  end
+
+  # nil means "no run"; a row that never went through BranchRows must not be
+  # able to render as one
+  it "raises when the run summary was never attached" do
+    row = build(:patch_branch)
+
+    expect { row.latest_run_summary }.to raise_error(/not attached/)
+
+    row.latest_run_summary = nil
+
+    expect(row.latest_run_summary).to be_nil
   end
 
   it "does not require a latest_ci_run" do
     expect(build(:patch_branch, latest_ci_run: nil)).to be_valid
+  end
+
+  describe ".current and behind math" do
+    it "current excludes superseded rows" do
+      old = create(:patch_branch)
+      new_row = create(:patch_branch, topic: old.topic)
+      old.update!(superseded_by: new_row)
+      expect(described_class.current).to include(new_row)
+      expect(described_class.current).not_to include(old)
+    end
+
+    it "behind_commits/behind_days against a repo state" do
+      travel_to Time.current do
+        state = PatchCiRepoState.refresh!(master_sha: "a" * 40,
+                                          master_committed_at: Time.current,
+                                          master_commit_height: 1000)
+        row = create(:patch_branch, base_commit_height: 900,
+                     base_committed_at: 10.days.ago)
+        expect(row.behind_commits(state)).to eq(100)
+        expect(row.behind_days(state)).to eq(10)
+        expect(row.behind_commits(nil)).to be_nil
+        expect(create(:patch_branch).behind_commits(state)).to be_nil
+      end
+    end
   end
 end

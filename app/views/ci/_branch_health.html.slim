@@ -1,0 +1,22 @@
+/ driven off BUCKETS so the panel cannot list a different set than the badges
+/ and the state facet; the sub-lists are the only per-bucket part
+.ci-health
+  - PatchCi::BranchHealth::BUCKETS.each_with_index do |bucket, i|
+    .bucket class=("edge" if i.zero?)
+      .t = ci_bucket_label(bucket)
+      .n = number_with_delimiter(@health_counts[bucket])
+      ul
+        - if bucket == "awaiting_ci"
+          li
+            span not yet pushed
+            span = number_with_delimiter(@awaiting_not_pushed)
+          li
+            span pushed, awaiting verdict
+            span = number_with_delimiter(@awaiting_pushed)
+        - elsif bucket == "wont_retry"
+          - @wont_retry.first(3).each do |reason, count|
+            li
+              span = reason.to_s.truncate(30)
+              span = number_with_delimiter(count)
+        - elsif (blurb = ci_bucket_blurb(bucket))
+          li: span = blurb

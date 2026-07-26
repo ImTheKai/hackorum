@@ -91,6 +91,20 @@
   --color-success-soft: #dcfce7;
   --color-note-soft: #fef9c3;
 
+  /* CI status palette (soft bg + readable fg pairs) */
+  --ci-green-bg: #dcfce7;
+  --ci-green-fg: #166534;
+  --ci-red-bg: #fee2e2;
+  --ci-red-fg: #991b1b;
+  --ci-amber-bg: #fef3c7;
+  --ci-amber-fg: #92400e;
+  --ci-blue-bg: #dbeafe;
+  --ci-blue-fg: #1e40af;
+  --ci-purple-bg: #f3e8ff;
+  --ci-purple-fg: #6b21a8;
+  --ci-dot-ok: #22c55e;
+  --ci-dot-stale: #ef4444;
+
   --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12);
 
   /* Chart colors */
@@ -211,6 +225,20 @@
   --color-success: #22c55e;
   --color-success-soft: #1b2b1e;
   --color-note-soft: #3a3216;
+
+  /* CI status palette: dim bg, bright fg */
+  --ci-green-bg: #1b2b1e;
+  --ci-green-fg: #86efac;
+  --ci-red-bg: #3a1f24;
+  --ci-red-fg: #fca5a5;
+  --ci-amber-bg: #3a2c17;
+  --ci-amber-fg: #fcd34d;
+  --ci-blue-bg: #16263c;
+  --ci-blue-fg: #93c5fd;
+  --ci-purple-bg: #2b2244;
+  --ci-purple-fg: #d8b4fe;
+  --ci-dot-ok: #4ade80;
+  --ci-dot-stale: #f87171;
 
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
 

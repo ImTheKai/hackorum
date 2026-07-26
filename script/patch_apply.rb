@@ -89,6 +89,11 @@ runner = PatchBranches::Runner.new(
   force: options[:force]
 )
 
-counts = runner.run(ids)
-puts "done: #{counts.sort.map { |k, v| "#{k}=#{v}" }.join(' ')}"
-exit 1 if counts[:error].to_i > 0 || counts[:dead_worker].to_i > 0
+# same key as the CI orchestrator: both write branch refs in the same repo
+ran = AdvisoryLock.with_lock("patch_ci_orchestrator") do
+  counts = runner.run(ids)
+  puts "done: #{counts.sort.map { |k, v| "#{k}=#{v}" }.join(' ')}"
+  exit 1 if counts[:error].to_i > 0 || counts[:dead_worker].to_i > 0
+  true
+end
+abort "patch_ci_orchestrator lock is held, another apply or orchestrator run is active" unless ran

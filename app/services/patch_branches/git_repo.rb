@@ -22,14 +22,24 @@ module PatchBranches
     end
 
     # scrub: git output can contain invalid UTF-8 (patch content in errors),
-    # callers run regexes over it
-    def run(*args, env: {})
-      stdout, stderr, status = Open3.capture3(env, "git", *args, chdir: @dir)
-      Result.new(stdout.scrub, stderr.scrub, status.exitstatus)
+    # callers run regexes over it. raw: skips it for callers that parse byte
+    # offsets out of the output, where a scrub substitution would shift them;
+    # the output is tagged binary there so the byte contract enforces itself.
+    def run(*args, env: {}, stdin: nil, raw: false)
+      opts = { chdir: @dir }
+      opts[:stdin_data] = stdin if stdin
+      stdout, stderr, status = Open3.capture3(env, "git", *args, **opts)
+      if raw
+        stdout.force_encoding(Encoding::BINARY)
+        stderr.force_encoding(Encoding::BINARY)
+      else
+        stdout, stderr = stdout.scrub, stderr.scrub
+      end
+      Result.new(stdout, stderr, status.exitstatus)
     end
 
-    def run!(*args, env: {})
-      result = run(*args, env: env)
+    def run!(*args, **opts)
+      result = run(*args, **opts)
       raise Error, "git #{args.join(' ')} failed: #{result.output}" unless result.success?
       result
     end
@@ -56,6 +66,24 @@ module PatchBranches
         _mode, type, sha = meta.split(" ", 3)
         blobs[path] = sha if type == "blob"
       end
+    end
+
+    # committer time of a commit, nil when the sha is unknown
+    def commit_time(sha)
+      result = run("show", "-s", "--format=%cI", "#{sha}^{commit}")
+      return nil unless result.success?
+      Time.zone.parse(result.stdout.strip)
+    rescue ArgumentError
+      nil
+    end
+
+    # ancestry count from root; for master ancestors (the common case, master
+    # is linear) height differences are commit distances. A non-master base
+    # (rare base_line rows landing on a REL_*_STABLE tag) yields an inflated
+    # height that understates staleness - display-only, accepted.
+    def commit_height(sha)
+      result = run("rev-list", "--count", "#{sha}^{commit}")
+      result.success? ? result.stdout.strip.to_i : nil
     end
 
     # File.exist? alone is not enough: a missing .git makes git walk up to

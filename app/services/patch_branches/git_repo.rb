@@ -1,4 +1,5 @@
 require "open3"
+require "fileutils"
 
 module PatchBranches
   class GitRepo
@@ -55,6 +56,25 @@ module PatchBranches
         _mode, type, sha = meta.split(" ", 3)
         blobs[path] = sha if type == "blob"
       end
+    end
+
+    # File.exist? alone is not enough: a missing .git makes git walk up to
+    # the parent repo, so rev_parse alone is not enough either (it would
+    # resolve HEAD there instead of failing). Need both.
+    def healthy_worktree?
+      File.exist?(File.join(@dir, ".git")) && !!rev_parse("HEAD")
+    end
+
+    # (re)create the worktree at path if it is missing or broken; a
+    # worktree killed mid-setup can look present but broken forever otherwise
+    def ensure_worktree!(path, branch: "master")
+      return if GitRepo.new(path).healthy_worktree?
+
+      FileUtils.mkdir_p(File.dirname(path))
+      run("worktree", "remove", "--force", path)
+      FileUtils.rm_rf(path)
+      run("worktree", "prune")
+      run!("worktree", "add", "--quiet", "--detach", path, branch)
     end
   end
 end

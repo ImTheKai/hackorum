@@ -56,23 +56,8 @@ module PatchBranches
     # Serialized: concurrent "git worktree add" calls race on .git internals.
     def prepare_worktree(i)
       path = File.join(@worktrees_dir, "wt#{i}")
-      @mutex.synchronize do
-        unless worktree_healthy?(path)
-          FileUtils.mkdir_p(@worktrees_dir)
-          @repo.run("worktree", "remove", "--force", path)
-          FileUtils.rm_rf(path)
-          @repo.run("worktree", "prune")
-          @repo.run!("worktree", "add", "--quiet", "--detach", path, "master")
-        end
-      end
+      @mutex.synchronize { @repo.ensure_worktree!(path) }
       GitRepo.new(path)
-    end
-
-    # File.exist? alone is not enough: a missing .git makes git walk up to
-    # the parent repo, so rev_parse alone is not enough either (it would
-    # resolve HEAD there instead of failing). Need both.
-    def worktree_healthy?(path)
-      File.exist?(File.join(path, ".git")) && !!GitRepo.new(path).rev_parse("HEAD")
     end
 
     def process(message_id, worktree, master_sha)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_26_001000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_27_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -466,10 +466,39 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_26_001000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "base_source"
+    t.string "pushed_head_sha"
+    t.bigint "latest_ci_run_id"
+    t.string "ci_status"
+    t.string "ci_skip_reason"
     t.index ["branch_name"], name: "index_patch_branches_on_branch_name", unique: true
+    t.index ["ci_status"], name: "index_patch_branches_on_ci_status"
+    t.index ["latest_ci_run_id"], name: "index_patch_branches_on_latest_ci_run_id"
     t.index ["message_id"], name: "index_patch_branches_on_message_id", unique: true
     t.index ["status", "failure_stage"], name: "index_patch_branches_on_status_and_failure_stage"
     t.index ["topic_id"], name: "index_patch_branches_on_topic_id"
+  end
+
+  create_table "patch_ci_runs", force: :cascade do |t|
+    t.bigint "patch_branch_id", null: false
+    t.bigint "github_run_id", null: false
+    t.integer "run_attempt", default: 1, null: false
+    t.string "head_sha"
+    t.integer "pg_major"
+    t.string "status", null: false
+    t.string "conclusion"
+    t.datetime "queued_at"
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.integer "build_seconds"
+    t.integer "test_seconds"
+    t.string "failed_tests", default: [], null: false, array: true
+    t.string "image_ref"
+    t.string "image_digest"
+    t.jsonb "payload"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["github_run_id", "run_attempt"], name: "index_patch_ci_runs_on_github_run_id_and_run_attempt", unique: true
+    t.index ["patch_branch_id"], name: "index_patch_ci_runs_on_patch_branch_id"
   end
 
   create_table "patch_submission_files", force: :cascade do |t|
@@ -908,8 +937,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_26_001000) do
   add_foreign_key "outgoing_drafts", "messages", column: "sent_message_id"
   add_foreign_key "outgoing_drafts", "topics"
   add_foreign_key "outgoing_drafts", "users"
-  add_foreign_key "patch_branches", "messages"
+  add_foreign_key "patch_branches", "messages", on_delete: :cascade
+  add_foreign_key "patch_branches", "patch_ci_runs", column: "latest_ci_run_id", on_delete: :nullify
   add_foreign_key "patch_branches", "topics"
+  add_foreign_key "patch_ci_runs", "patch_branches", on_delete: :cascade
   add_foreign_key "patch_submission_files", "messages"
   add_foreign_key "people", "aliases", column: "default_alias_id"
   add_foreign_key "saved_search_preferences", "saved_searches"

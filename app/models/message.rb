@@ -7,6 +7,7 @@ class Message < ApplicationRecord
   has_many :replies, class_name: "Message", foreign_key: "reply_to_id", inverse_of: :reply_to
   has_many :attachments
   has_many :patch_submission_files, dependent: :delete_all
+  has_one :patch_branch, dependent: :destroy
 
   has_many :mentions
   has_many :mentioned_aliases, through: :mentions, source: :alias

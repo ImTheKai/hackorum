@@ -221,6 +221,36 @@ tasks:
     cmds:
       - '{{.COMPOSE}} exec web bundle exec ruby script/build_stats.rb {{.GRANULARITY | default "all"}}'
 
+  orchestrator:
+    desc: 'Run the CI orchestrator (needs HACKORUM_GITHUB_TOKEN, e.g. export HACKORUM_GITHUB_TOKEN=$(gh auth token), and HACKORUM_SSH_KEY - path to the push deploy key, exported or set in .env.development). Flags after --, e.g. task orchestrator -- --once --dry-run, or -- --max-pushes 5'
+    interactive: true
+    dotenv: ['.env.development']
+    preconditions:
+      - sh: '[ -n "$HACKORUM_GITHUB_TOKEN" ]'
+        msg: 'HACKORUM_GITHUB_TOKEN is not set - export HACKORUM_GITHUB_TOKEN=$(gh auth token)'
+      - sh: test -d ./postgres/.git
+        msg: 'postgres checkout not found at ./postgres'
+      - sh: '[ -n "$HACKORUM_SSH_KEY" ]'
+        msg: 'HACKORUM_SSH_KEY is not set - path to the deploy key for hackorum-dev/postgres (export it or set it in .env.development)'
+      - sh: test -f "$HACKORUM_SSH_KEY"
+        msg: 'HACKORUM_SSH_KEY does not point to a file'
+    cmds:
+      # run --rm rather than exec: the daemon must not share the web
+      # container's fate (restarts, OOM). The checkout lives inside the /app
+      # mount at /app/postgres, which is bin/orchestrator's default. Only the
+      # deploy key is mounted (to a staging path) and copied into place, so
+      # ssh sees root-owned 600 perms whatever the host uid/mode is;
+      # accept-new stands in for the host known_hosts we no longer mount.
+      # safe.directory is needed because the container runs as root over a
+      # host-owned checkout, and root's git config is ephemeral in a --rm
+      # container. A second concurrent invocation aborts on the advisory lock.
+      - '{{.COMPOSE}} run --rm
+          -e HACKORUM_GITHUB_TOKEN
+          -e RAILS_LOG_LEVEL=${RAILS_LOG_LEVEL:-warn}
+          -e GIT_SSH_COMMAND="ssh -i /root/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          -v "$HACKORUM_SSH_KEY":/run/hackorum_deploy_key:ro,z
+          web bash -c "mkdir -p /root/.ssh && install -m 600 /run/hackorum_deploy_key /root/.ssh/deploy_key && git config --global --add safe.directory \"*\" && bin/orchestrator {{.CLI_ARGS}}"'
+
   psql:
     desc: Open psql against the dev DB
     interactive: true

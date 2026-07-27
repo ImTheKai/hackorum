@@ -96,14 +96,16 @@ RSpec.describe PatchCi::PushGuard do
     expect(guard.check(row)).to eq("row superseded")
   end
 
+  # 8.x predates every era image and no family covers it - a handful of corpus
+  # branches really do sit on pre-9.6 bases, so this is the live case
   it "rejects an unsupported era with a reason" do
     base = fixture.commit(subject: "base",
-                          files: { "configure.in" => "AC_INIT([PostgreSQL], [16beta1])\n" })
+                          files: { "configure.in" => "AC_INIT([PostgreSQL], [8.4devel])\n" })
     fixture.commit(subject: "patch", files: { "a.c" => "v2\n" })
     fixture.create_branch("t7_1")
     fixture.checkout("master")
     row = record("t7_1", base)
 
-    expect(guard.check(row)).to eq("no era image for pg16")
+    expect(guard.check(row)).to eq("no era image for pg8")
   end
 end

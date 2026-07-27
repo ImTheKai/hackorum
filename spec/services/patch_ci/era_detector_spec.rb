@@ -40,7 +40,14 @@ RSpec.describe PatchCi::EraDetector do
 
   it "only calls majors with a built era image supported" do
     expect(detector.supported?(20)).to be(true)
-    expect(detector.supported?(16)).to be(false)
+    expect(detector.supported?(16)).to be(true)
+  end
+
+  # no family covers these, so there is nothing to enable: an 8.x tree predates
+  # the oldest era image, and the next major has no family until one is added
+  it "does not support a major no family serves" do
+    expect(detector.supported?(8)).to be(false)
+    expect(detector.supported?(21)).to be(false)
   end
 
   it "reads a sha's configure only once" do

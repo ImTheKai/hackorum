@@ -24,21 +24,43 @@ RSpec.describe PatchCi::Eras do
     expect(described_class.name_for(7)).to be_nil
   end
 
-  it "reports a disabled family's majors as not enabled" do
-    expect(described_class.enabled?(12)).to be(false)
-    expect(described_class.enabled?(16)).to be(false)
-  end
-
   it "reports an enabled family's majors as enabled" do
     expect(described_class.enabled?(20)).to be(true)
   end
 
-  # the drift guard: this fails if eras.yml and SUPPORTED_MAJORS disagree, which
-  # is the whole reason this class reads the file instead of duplicating it
-  it "maps every supported major to exactly one family" do
-    PatchCi::EraDetector::SUPPORTED_MAJORS.each do |major|
-      matches = described_class.families.select { |family| family.majors.include?(major) }
-      expect(matches.size).to eq(1), "major #{major} maps to #{matches.map(&:name).inspect}"
+  # every family in eras.yml is enabled today, so the disabled path has no
+  # subject left in real data - stub the file rather than lose the coverage,
+  # because the next family added starts life as a disabled stub
+  it "reports a disabled family's majors as not enabled" do
+    allow(YAML).to receive(:safe_load_file).and_return(
+      "families" => {
+        "jessie" => { "enabled" => false, "majors" => { 8 => nil } },
+        "trixie" => { "enabled" => true, "majors" => { 20 => "abc123" } }
+      })
+
+    expect(described_class.enabled?(8)).to be(false)
+    expect(described_class.enabled?(20)).to be(true)
+  end
+
+  # a family with no reference commits is still parsed: a stub has to be
+  # readable before it can be filled in
+  it "parses a family whose majors have no reference commits" do
+    allow(YAML).to receive(:safe_load_file).and_return(
+      "families" => { "jessie" => { "enabled" => false, "majors" => { 8 => nil, 9 => nil } } })
+
+    expect(described_class.family_for(8).majors).to eq([ 8, 9 ])
+  end
+
+  # supported? has no list of its own to drift from eras.yml - it reads this
+  # class. Assert the two agree for every major the file names, so a family
+  # enabled here is one the pusher will actually push.
+  it "supports exactly the majors of enabled families" do
+    detector = PatchCi::EraDetector.new(nil)
+    described_class.families.each do |family|
+      family.majors.each do |major|
+        expect(detector.supported?(major)).to be(family.enabled),
+          "pg#{major} (#{family.name}): enabled=#{family.enabled} supported=#{detector.supported?(major)}"
+      end
     end
   end
 

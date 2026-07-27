@@ -1,8 +1,5 @@
 module PatchCi
   class EraDetector
-    # bumped as era images land; majors outside this get ci_status ci_none
-    SUPPORTED_MAJORS = [ 9, 10, 11, 14, 15, 18, 19, 20 ].freeze
-
     CONFIGURE_FILES = %w[configure.ac configure.in].freeze
     AC_INIT = /AC_INIT\(\[PostgreSQL\],\s*\[([^\]]+)\]/
 
@@ -22,8 +19,13 @@ module PatchCi
       @majors[sha] ||= compute_major(sha)
     end
 
+    # eras.yml's enabled flag is the only switch: a family is enabled once its
+    # image is built and pushed. A hand-kept list here was a second copy of the
+    # same fact, free to drift from it - which is how pg12/13/16/17 stayed in
+    # ci_none. Majors no family serves (pre-9.6 trees, a new major before its
+    # image exists) are unsupported too.
     def supported?(major)
-      SUPPORTED_MAJORS.include?(major)
+      Eras.enabled?(major)
     end
 
     private

@@ -302,7 +302,11 @@ RSpec.describe PatchCi::CorpusStats do
       expect(entry[:era_enabled]).to be(true)
     end
 
+    # every family in eras.yml is enabled now, so there is no real stub left to
+    # point at - stub the flag instead of dropping the case, because the next
+    # family added starts life as a disabled stub and still has to render
     it "keeps a major whose era image is a disabled stub, flagged" do
+      allow(PatchCi::Eras).to receive(:enabled?).with(16).and_return(false)
       branch(base_age_days: 1, pg_major: 16)
 
       entry = stats.per_major.find { |candidate| candidate[:pg_major] == 16 }

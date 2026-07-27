@@ -18,6 +18,18 @@ module PatchCi
     AGGREGATE_TTL = 1.minute
     WORK_FROM = Time.zone.parse("2017-01-01").freeze # commit status floor, same as backfill
 
+    # /ci/stats only. A bucket below this many terminal runs gets its rate drawn
+    # hollow: a success rate over four runs is noise, not a trend.
+    SPARSE_BUCKET_RUNS = 5
+    # push lag = run.queued_at - message.created_at. Upper bound in days, nil is
+    # the open-ended tail; order is the display order.
+    PUSH_LAG_BUCKETS = [ [ "same day", 1 ], [ "days", 7 ], [ "weeks", 30 ],
+                         [ "months", 365 ], [ "older", nil ] ].freeze
+    # base age = master_committed_at - base_committed_at, same shape
+    BASE_AGE_BUCKETS = [ [ "<1d", 1 ], [ "1-7d", 7 ], [ "7-30d", 30 ],
+                         [ "30-90d", 90 ], [ "90d-1y", 365 ], [ "1-2y", 730 ],
+                         [ "2-5y", 1825 ], [ ">5y", nil ] ].freeze
+
     # the fork CI pushes to. Views build github.com URLs off this;
     # bin/orchestrator takes it as its default.
     GITHUB_REPO = "hackorum-dev/postgres"

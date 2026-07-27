@@ -1,0 +1,185 @@
+- active_labels = { "all" => "all", "active" => "active only" }
+
+.ci-stats-controls
+  div
+    span.k discussions
+    - PatchCi::StatsParams::ACTIVE.each do |value|
+      = link_to active_labels.fetch(value), ci_stats_path(@params_object.active_params.merge(active: value)), class: ("is-active" if @params_object.active == value)
+
+- c = @corpus[:headline]
+= render "stats_tiles", tiles: [ \
+  { k: "Tracked patchsets", v: ci_stat_count(c[:patchsets]), d: "current, not superseded, all patchsets" },
+  { k: "Median base age", v: c[:median_base_age_days] ? "#{c[:median_base_age_days].round} days" : ci_muted_dash, d: "behind master, all patchsets" },
+  { k: "On recent master", v: ci_percent(c[:recent_rate]), d: "base 30 days or newer, all patchsets" },
+  { k: "Has a verdict", v: ci_percent(c[:verdict_rate]), d: "terminal CI status, all patchsets" },
+  { k: "Has a runnable image", v: ci_percent(c[:image_rate]), d: "counted by digest, all patchsets" } ]
+
+- tiers = @corpus[:freshness_tiers]
+= render "stats_tiles", tiles: tiers.map { |tier, count| { k: tier, v: ci_stat_count(count), d: "base age tier, all patchsets" } }
+
+/ both series side by side, not behind the toggle: the gap between the bars is
+/ the point - stale-and-abandoned against stale-and-still-being-discussed
+- by_band = @corpus[:base_age_distribution].index_by { |row| [ row[:band], row[:series] ] }
+- band_rows = PatchCi::CorpusStats::BANDS.map { |band| { band: band, all: by_band[[ band, "all" ]]&.dig(:count) || 0, active: by_band[[ band, "active" ]]&.dig(:count) || 0 } }
+= render "stats_chart",
+  id: "base-age",
+  title: "Base age distribution",
+  note: "all current patchsets against those in active discussions",
+  spec: ci_grouped_bar_spec(@corpus[:base_age_distribution].map { |row| { "band" => row[:band], "series" => row[:series], "count" => row[:count] } },
+                            x: "band", x_title: "base age", y_title: "patchsets",
+                            series_field: "series", series: %w[all active], sort: PatchCi::CorpusStats::BANDS),
+  rows: band_rows.map { |row| { band: row[:band], all: number_with_delimiter(row[:all]), active: number_with_delimiter(row[:active]) } },
+  columns: [ { key: :band, label: "Base age" }, { key: :all, label: "All", num: true }, { key: :active, label: "Active discussions", num: true } ]
+
+/ outcome_labels/outcome_colors defined here, above their first use - Task 16 reuses both
+- outcome_labels = { "success" => "success", "cancelled" => "cancelled", "tests_failed" => "tests failed", "build_failed" => "build failed", "infra_error" => "infra error", "no_verdict" => "no verdict", "never_applied" => "never applied" }
+- outcome_colors = { "success" => "var(--ci-chart-success)", "cancelled" => "var(--ci-chart-cancelled)", "tests_failed" => "var(--ci-chart-testsfail)", "build_failed" => "var(--ci-chart-buildfail)", "infra_error" => "var(--ci-chart-infra)", "no_verdict" => "var(--ci-chart-slot4)", "never_applied" => "var(--ci-chart-slot3)" }
+= render "stats_chart",
+  id: "outcome-by-year",
+  title: "Outcome by base commit year",
+  note: "current patchsets, by the year of the master commit they apply to",
+  spec: ci_stacked_bar_spec(@corpus[:outcome_by_base_year].map { |row| { "year" => (row[:year]&.to_s || "unknown"), "band" => row[:band], "count" => row[:count] } },
+                            x: "year", x_title: "base year", y_title: "patchsets",
+                            band_field: "band", bands: outcome_labels.keys, colors: outcome_colors,
+                            temporal: false),
+  rows: @corpus[:outcome_by_base_year].map { |row| { year: row[:year] || "unknown", band: outcome_labels.fetch(row[:band], row[:band]), count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :year, label: "Base year", num: true }, { key: :band, label: "Outcome" }, { key: :count, label: "Patchsets", num: true } ]
+
+= render "stats_chart",
+  id: "success-by-year",
+  title: "Success rate by base commit year",
+  note: "of patchsets carrying a verdict",
+  spec: ci_grouped_bar_spec(@corpus[:success_rate_by_base_year].map { |row| { "year" => (row[:year]&.to_s || "unknown"), "series" => "success rate", "count" => (row[:rate] * 100).round(1) } },
+                            x: "year", x_title: "base year", y_title: "success rate %",
+                            series_field: "series", series: [ "success rate" ]),
+  rows: @corpus[:success_rate_by_base_year].map { |row| { year: row[:year] || "unknown", rate: ci_percent(row[:rate]), verdicts: number_with_delimiter(row[:verdicts]) } },
+  columns: [ { key: :year, label: "Base year", num: true }, { key: :rate, label: "Success rate", num: true }, { key: :verdicts, label: "With a verdict", num: true } ]
+
+- apply_points = @corpus[:apply_failures_by_base_year].flat_map { |row| row[:stages].map { |stage, count| { "year" => (row[:year]&.to_s || "unknown"), "band" => stage, "count" => count } } }
+- apply_colors = PatchBranch::FAILURE_STAGES.each_with_index.to_h { |stage, i| [ stage, CiStatsHelper::SLOTS[i] ] }
+= render "stats_chart",
+  id: "apply-failures",
+  title: "Apply failures by base commit year",
+  note: "patchsets that would not apply even to their own detected base - a patch-extraction / base-detection signal, not a staleness measure; the rate is in the table",
+  spec: ci_stacked_bar_spec(apply_points, x: "year", x_title: "base year",
+                            y_title: "patchsets", band_field: "band",
+                            bands: PatchBranch::FAILURE_STAGES, colors: apply_colors,
+                            temporal: false),
+  rows: @corpus[:apply_failures_by_base_year].map { |row| { year: row[:year] || "unknown", total: number_with_delimiter(row[:total]), failed: number_with_delimiter(row[:stages].values.sum), rate: ci_percent(row[:total].positive? ? row[:stages].values.sum.to_f / row[:total] : nil) } },
+  columns: [ { key: :year, label: "Base year", num: true }, { key: :total, label: "Patchsets", num: true }, { key: :failed, label: "Failed to apply", num: true }, { key: :rate, label: "Failure rate", num: true } ]
+
+/ two blocks, not one chart: seconds and suite counts are different units, and
+/ one plot carrying both would be a dual axis
+/ brace form, not do..end: Slim forbids an explicit "- end" in a view
+- cost_points = @corpus[:build_cost_by_base_year].flat_map { |row| [ { "year" => (row[:year]&.to_s || "unknown"), "measure" => "build", "count" => row[:build_median]&.round }, { "year" => (row[:year]&.to_s || "unknown"), "measure" => "test", "count" => row[:test_median]&.round } ] }.select { |point| point["count"] }
+= render "stats_chart",
+  id: "build-cost",
+  title: "Build and test time over PostgreSQL history",
+  note: "median seconds of successful runs, by the base commit's year",
+  spec: ci_grouped_bar_spec(cost_points, x: "year", x_title: "base year",
+                            y_title: "seconds", series_field: "measure",
+                            series: %w[build test]),
+  rows: @corpus[:build_cost_by_base_year].map { |row| { year: row[:year] || "unknown", build: ci_duration(row[:build_median]&.round), test: ci_duration(row[:test_median]&.round) } },
+  columns: [ { key: :year, label: "Base year", num: true }, { key: :build, label: "Build median", num: true }, { key: :test, label: "Test median", num: true } ]
+
+= render "stats_chart",
+  id: "suite-count",
+  title: "Test suites over PostgreSQL history",
+  note: "median executed suites of successful runs, by the base commit's year",
+  spec: ci_grouped_bar_spec(@corpus[:build_cost_by_base_year].select { |row| row[:tests_median] }.map { |row| { "year" => (row[:year]&.to_s || "unknown"), "series" => "suites", "count" => row[:tests_median].round } },
+                            x: "year", x_title: "base year", y_title: "suites",
+                            series_field: "series", series: [ "suites" ]),
+  rows: @corpus[:build_cost_by_base_year].map { |row| { year: row[:year] || "unknown", suites: row[:tests_median]&.round || ci_muted_dash } },
+  columns: [ { key: :year, label: "Base year", num: true }, { key: :suites, label: "Suites median", num: true } ]
+
+section.ci-stats-block#per-major
+  h3 Per PostgreSQL major
+  p.muted A major whose era image is still a disabled stub is marked - those patchsets sit in won't-retry until the image exists.
+  / header-only table reads as broken, so say why it is empty. pg_major is only
+  / set once a branch has been routed to an era
+  - if @corpus[:per_major].blank?
+    p.muted no patchset carries a major yet
+  - else
+    .ci-table-wrap tabindex="0" role="region" aria-label="Per major breakdown"
+      table.ci-table
+        tr
+          th.num PG
+          th Era
+          th.num Patchsets
+          th.num Runs
+          th.num Success
+          th.num Build median
+          th.num Test median
+          th.num Suites
+          th.num Images
+        - @corpus[:per_major].each do |row|
+          tr
+            td.num = row[:pg_major]
+            td
+              = row[:era] || ci_muted_dash
+              - unless row[:era_enabled]
+                span.badge.b-infra title="no era image built yet" stub
+            td.num = number_with_delimiter(row[:patchsets])
+            td.num = number_with_delimiter(row[:runs])
+            td.num = ci_percent(row[:success_rate])
+            td.num = ci_duration(row[:build_median]&.round)
+            td.num = ci_duration(row[:test_median]&.round)
+            td.num = row[:tests_median]&.round || ci_muted_dash
+            td.num = number_with_delimiter(row[:images])
+
+= render "stats_bars",
+  id: "conflict-files",
+  title: "Files the corpus conflicts on",
+  note: "from apply-stage failures; in brackets the number of distinct patchsets",
+  rows: @corpus[:top_conflict_files].map { |row| { label: row[:name], value: row[:conflicts], extra: "#{row[:branches]} branches" } }
+
+- coverage_points = @corpus[:coverage_by_era].flat_map { |row| [ { "era" => row[:era], "band" => "with verdict", "count" => row[:with_verdict] }, { "era" => row[:era], "band" => "no verdict", "count" => row[:without_verdict] } ] }
+= render "stats_chart",
+  id: "coverage",
+  title: "Verdict coverage in active discussions",
+  note: "patchsets in threads with a message in the last #{PatchCi::Config::ACTIVE_THREAD_DAYS} days",
+  spec: ci_stacked_bar_spec(coverage_points, x: "era", x_title: "era",
+                            y_title: "patchsets", band_field: "band",
+                            bands: [ "with verdict", "no verdict" ],
+                            colors: { "with verdict" => "var(--ci-chart-success)", "no verdict" => "var(--ci-chart-cancelled)" },
+                            temporal: false),
+  rows: @corpus[:coverage_by_era].map { |row| { era: row[:era], with: number_with_delimiter(row[:with_verdict]), without: number_with_delimiter(row[:without_verdict]) } },
+  columns: [ { key: :era, label: "Era" }, { key: :with, label: "With a verdict", num: true }, { key: :without, label: "No verdict", num: true } ]
+
+- size_order = PatchCi::CorpusStats::SIZE_BUCKETS.map(&:first) + [ "unknown" ]
+= render "stats_chart",
+  id: "size-vs-outcome",
+  title: "Patch size against outcome",
+  note: "files touched per patchset, from the recorded submission paths",
+  spec: ci_stacked_bar_spec(@corpus[:size_vs_outcome].map { |row| { "bucket" => row[:bucket], "band" => row[:band], "count" => row[:count] } },
+                            x: "bucket", x_title: "files touched", y_title: "patchsets",
+                            band_field: "band", bands: outcome_labels.keys, colors: outcome_colors,
+                            temporal: false, sort: size_order),
+  rows: @corpus[:size_vs_outcome].map { |row| { bucket: row[:bucket], band: outcome_labels.fetch(row[:band], row[:band]), count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :bucket, label: "Files touched" }, { key: :band, label: "Outcome" }, { key: :count, label: "Patchsets", num: true } ]
+
+/ sort domain passed in for the same reason as failure-concentration: a count
+/ rendered as a nominal label orders as text unless told otherwise
+= render "stats_chart",
+  id: "versions-per-topic",
+  title: "Patchset versions per topic",
+  note: "every version, superseded included; split by whether the topic was committed",
+  spec: ci_grouped_bar_spec(@corpus[:patchsets_per_topic].map { |row| { "versions" => row[:versions].to_s, "series" => row[:series], "count" => row[:count] } },
+                            x: "versions", x_title: "versions", y_title: "topics",
+                            series_field: "series", series: [ "committed", "not committed" ],
+                            sort: @corpus[:patchsets_per_topic].map { |row| row[:versions].to_s }.uniq),
+  rows: @corpus[:patchsets_per_topic].map { |row| { versions: row[:versions], series: row[:series], count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :versions, label: "Versions", num: true }, { key: :series, label: "Topic" }, { key: :count, label: "Topics", num: true } ]
+
+section.ci-stats-block#wont-retry
+  h3 Why the orchestrator won't retry
+  p.muted The dashboard shows the top three of this same breakdown.
+  .ci-table-wrap tabindex="0" role="region" aria-label="Won't retry reasons"
+    table.ci-table
+      tr
+        th Reason
+        th.num Patchsets
+      - @corpus[:wont_retry_reasons].each do |reason, count|
+        tr
+          td = reason
+          td.num = number_with_delimiter(count)

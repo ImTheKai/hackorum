@@ -1,0 +1,7 @@
+.ci-stats-tiles
+  - tiles.each do |tile|
+    .ci-stats-tile
+      .k = tile[:k]
+      .v = tile[:v]
+      - if tile[:d].present?
+        .d = tile[:d]

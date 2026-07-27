@@ -24,6 +24,16 @@ module PatchCi
       relation.where("#{tier_sql} IN (?)", tiers)
     end
 
+    # one grouped count instead of one query per tier. No repo state means
+    # every row is 'unknown' (see tier_sql) - handled before grouping, since a
+    # bare string constant in GROUP BY is an ordinal reference to Postgres,
+    # not a literal.
+    def counts(relation)
+      return TIERS.index_with { 0 }.merge("unknown" => relation.count) unless @repo_state
+      found = relation.group(Arel.sql(tier_sql)).count.transform_keys(&:to_s)
+      TIERS.index_with { |tier| found.fetch(tier, 0) }
+    end
+
     private
 
     def tier_sql

@@ -1,0 +1,19 @@
+section.ci-stats-block id=id
+  h3 = title
+  - if local_assigns[:note].present?
+    p.muted = note
+  - if rows.blank?
+    p.muted no data in this range
+  - else
+    .ci-chart data-controller="ci-chart" data-ci-chart-spec-value=spec.to_json
+    details.ci-chart-data
+      summary Show data
+      .ci-table-wrap tabindex="0" role="region" aria-label="#{title} data"
+        table.ci-table
+          tr
+            - columns.each do |column|
+              th class=("num" if column[:num]) = column[:label]
+          - rows.each do |row|
+            tr
+              - columns.each do |column|
+                td class=("num" if column[:num]) = row[column[:key]]

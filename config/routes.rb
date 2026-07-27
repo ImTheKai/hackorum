@@ -114,6 +114,7 @@ Rails.application.routes.draw do
   get "ci", to: "ci#index", as: :ci
   get "ci/branches", to: "ci#branches", as: :ci_branches
   get "ci/topics/:id", to: "ci#topic", as: :ci_topic
+  get "ci/stats", to: "ci#stats", as: :ci_stats
 
   # Help pages
   resources :help, only: [ :index, :show ], param: :slug

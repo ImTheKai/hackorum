@@ -1,0 +1,28 @@
+- content_for :title, "Patch CI statistics"
+
+/ vega-lite is the addition here - /stats loads only vega + vega-embed
+/ because its specs are raw vega, this page's specs are vega-lite
+- content_for :head do
+  script src="https://cdn.jsdelivr.net/npm/vega@5.25.0"
+  script src="https://cdn.jsdelivr.net/npm/vega-lite@5.16.3"
+  script src="https://cdn.jsdelivr.net/npm/vega-embed@6.22.2"
+
+- content_for :sidebar do
+  .sidebar
+    = render "sidebar"
+
+- panels = [ { id: "pipeline", partial: "stats_pipeline", label: "Pipeline" },
+             { id: "corpus", partial: "stats_corpus", label: "Corpus" } ]
+
+.ci-container
+  h1.ci-title Patch CI statistics
+  p.muted Pipeline reads CI wall-clock time. Corpus reads today's patchsets laid out over PostgreSQL's history.
+
+  div data-controller="tabs tabs-morph"
+    nav.ci-tablist role="tablist"
+      - panels.each_with_index do |panel, i|
+        button.ci-tab type="button" role="tab" id="ci-stats-tab-#{panel[:id]}" aria-controls=panel[:id] data-tabs-target="tab" data-action="click->tabs#select" data-index=i aria-selected=(i.zero? ? "true" : "false") class=("is-active" if i.zero?)
+          = panel[:label]
+    - panels.each_with_index do |panel, i|
+      .ci-tab-panel id=panel[:id] role="tabpanel" aria-labelledby="ci-stats-tab-#{panel[:id]}" data-tabs-target="panel" class=("is-active" if i.zero?)
+        = render panel[:partial]

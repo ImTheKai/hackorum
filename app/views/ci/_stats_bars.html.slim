@@ -1,0 +1,17 @@
+section.ci-stats-block id=id
+  h3 = title
+  - if local_assigns[:note].present?
+    p.muted = note
+  - if rows.blank?
+    p.muted no data in this range
+  - else
+    - max = rows.map { |row| row[:value].to_i }.max.to_f
+    .ci-stats-bars
+      - rows.each do |row|
+        .ci-stats-bar
+          .label title=row[:label] = row[:label]
+          .track
+            .fill style="width: #{max.positive? ? (row[:value].to_i / max * 100).round(1) : 0}%"
+          / to_i here too: a nil value draws a 0% bar, so a blank count beside it
+          / would read as a broken cell rather than as zero
+          .n = row[:extra].present? ? "#{number_with_delimiter(row[:value].to_i)} (#{row[:extra]})" : number_with_delimiter(row[:value].to_i)

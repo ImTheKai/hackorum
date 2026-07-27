@@ -942,4 +942,112 @@ RSpec.describe "CI dashboard", type: :request do
       expect(response.body).not_to include("postgres-patch@sha256:bbb")
     end
   end
+
+  describe "GET /ci/stats" do
+    it "renders for guests with an empty database" do
+      get "/ci/stats"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Patch CI statistics")
+      expect(response.body).to include("Pipeline")
+      expect(response.body).to include("Corpus")
+    end
+
+    it "renders without a repo state" do
+      create(:patch_branch)
+
+      get "/ci/stats"
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "marks the selected range control active and keeps the other params" do
+      get "/ci/stats?range=30d&active=active"
+
+      body = Nokogiri::HTML(response.body)
+      active = body.css(".ci-stats-controls a.is-active").map { |a| a[:href] }
+      expect(active).to include(a_string_matching(/range=30d/))
+      expect(active).to include(a_string_matching(/active=active/))
+    end
+
+    it "links to the stats page from the dashboard sidebar" do
+      get "/ci"
+
+      expect(response.body).to include(%(href="/ci/stats"))
+    end
+
+    it "renders the run volume and success rate blocks with a table twin" do
+      branch = create(:patch_branch)
+      create(:patch_ci_run, patch_branch: branch, status: "success",
+                            completed_at: 2.hours.ago)
+
+      get "/ci/stats"
+
+      body = Nokogiri::HTML(response.body)
+      expect(body.at_css("#runs-by-status .ci-chart")["data-ci-chart-spec-value"]).to include("vega-lite")
+      expect(body.at_css("#runs-by-status table.ci-table").text).to include("success")
+      expect(body.at_css("#success-rate table.ci-table").text).to include("100")
+    end
+
+    it "renders the no-data note for a window with no runs" do
+      get "/ci/stats?range=24h"
+
+      expect(Nokogiri::HTML(response.body).at_css("#runs-by-status").text)
+        .to include("no data in this range")
+    end
+
+    it "renders the corpus panel with both base age series" do
+      create(:patch_ci_repo_state)
+      create(:patch_branch, base_committed_at: 2.days.ago)
+
+      get "/ci/stats"
+
+      table = Nokogiri::HTML(response.body).at_css("#base-age table.ci-table")
+      expect(table.text).to include("Active discussions")
+
+      # the branch's topic gets a message 1 week ago by factory default, so it
+      # counts in both series - a bare label check would pass even at zero rows
+      row = table.css("tr").find { |tr| tr.text.include?("1-7d") }
+      expect(row.css("td").map(&:text)).to eq([ "1-7d", "1", "1" ])
+    end
+
+    it "renders the pipeline tiles and the infra health table" do
+      get "/ci/stats"
+
+      expect(response.body).to include("Median queue wait")
+      expect(Nokogiri::HTML(response.body).at_css("#infra-health").text).to include("built but pushed no image")
+    end
+
+    # the axis field is a count rendered as a nominal label, so without an
+    # explicit domain vega orders it as text and 10 lands before 2
+    it "orders the suites-failed axis numerically" do
+      [ 1, 2, 10 ].each do |count|
+        branch_with_run({}, { status: "tests_failed", completed_at: 1.hour.ago,
+                              failed_tests: Array.new(count) { |i| "regress/t#{i}" } })
+      end
+
+      get "/ci/stats"
+
+      spec = Nokogiri::HTML(response.body)
+                     .at_css("#failure-concentration .ci-chart")["data-ci-chart-spec-value"]
+      expect(JSON.parse(spec).dig("encoding", "x", "sort")).to eq(%w[1 2 10])
+    end
+
+    it "does not issue a query per rendered block" do
+      create(:patch_ci_repo_state)
+      3.times do
+        branch_with_run({ base_committed_at: 10.days.ago, pg_major: 20 },
+                        { status: "success", completed_at: 2.hours.ago, build_seconds: 100,
+                          test_seconds: 200, tests_total: 900 })
+      end
+
+      # a generous ceiling: the point is to catch a per-row or per-block query,
+      # not to pin the exact count. Raise it deliberately if you add aggregates.
+      # 45 as of this commit
+      queries = captured_queries { get "/ci/stats" }
+
+      expect(response).to have_http_status(:ok)
+      expect(queries.size).to be < 80
+    end
+  end
 end

@@ -1,0 +1,129 @@
+.ci-stats-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.ci-stats-controls .k {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin-right: var(--spacing-2);
+}
+
+.ci-stats-controls a {
+  font-size: var(--font-size-sm);
+  margin-right: var(--spacing-2);
+}
+
+.ci-stats-controls a.is-active {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.ci-stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-5);
+}
+
+/* same card treatment as .ci-strip .stat, so the two pages read as one feature */
+.ci-stats-tile {
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  min-width: 0;
+  padding: var(--spacing-3) var(--spacing-4);
+}
+
+.ci-stats-tile .v {
+  /* proportional figures: tabular-nums makes a standalone number read loose */
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: normal;
+}
+
+.ci-stats-tile .k,
+.ci-stats-tile .d {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.ci-stats-tile .k {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ci-stats-block {
+  margin-bottom: var(--spacing-6);
+}
+
+.ci-stats-block h3 {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--spacing-1);
+}
+
+/* height grows with content: a fixed height clips the x-axis band and the card
+   grows its own nested scrollbar around the tick labels */
+.ci-chart {
+  background: var(--color-bg-card);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  min-height: 15rem;
+  padding: var(--spacing-2);
+  width: 100%;
+}
+
+.ci-chart.muted {
+  color: var(--color-text-muted);
+}
+
+.ci-chart-data summary {
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.ci-chart-data .ci-table {
+  font-variant-numeric: tabular-nums;
+}
+
+.ci-stats-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.ci-stats-bar {
+  align-items: center;
+  display: grid;
+  gap: var(--spacing-2);
+  grid-template-columns: minmax(8rem, 18rem) 1fr auto;
+}
+
+.ci-stats-bar .label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ci-stats-bar .track {
+  background: var(--color-bg-button);
+  border-radius: 4px;
+  height: 0.6rem;
+}
+
+.ci-stats-bar .fill {
+  background: var(--ci-chart-slot1);
+  border-radius: 4px;
+  height: 100%;
+}
+
+.ci-stats-bar .n {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}

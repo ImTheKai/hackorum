@@ -34,6 +34,13 @@ class CiController < ApplicationController
     @history = PatchCi::TopicHistory.new(topic: @topic, repo_state: @repo_state)
   end
 
+  def stats
+    @repo_state = PatchCiRepoState.current
+    @params_object = PatchCi::StatsParams.new(params: params)
+    load_pipeline_stats
+    load_corpus_stats
+  end
+
   private
 
   # every subscriber re-GETs this page on the same broadcast, so the
@@ -64,5 +71,22 @@ class CiController < ApplicationController
     @awaiting_not_pushed = agg[:awaiting_not_pushed]
     @awaiting_pushed = agg[:awaiting_pushed]
     @last24 = agg[:last24]
+  end
+
+  # one cache entry per section per param triple, keyed on the repo state's
+  # fetched_at like load_aggregates - every reader of a broadcast-refreshed page
+  # would otherwise recompute the same whole-table scans
+  def load_pipeline_stats
+    @pipeline = Rails.cache.fetch([ "ci-stats-pipeline", @repo_state&.fetched_at, @params_object.signature ],
+                                  expires_in: PatchCi::Config::AGGREGATE_TTL) do
+      PatchCi::RunStats.new(since: @params_object.since, gran: @params_object.gran, now: Time.current).all
+    end
+  end
+
+  def load_corpus_stats
+    @corpus = Rails.cache.fetch([ "ci-stats-corpus", @repo_state&.fetched_at, @params_object.signature ],
+                                expires_in: PatchCi::Config::AGGREGATE_TTL) do
+      PatchCi::CorpusStats.new(repo_state: @repo_state, active_only: @params_object.active_only?).all
+    end
   end
 end

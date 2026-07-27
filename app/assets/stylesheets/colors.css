@@ -132,6 +132,24 @@
   --color-chart-steel-blue: #9ecae1;
   --color-chart-dark-gray: #636363;
   --color-chart-medium-blue: #3182bd;
+
+  /* CI stats chart fills. Validated (dataviz validate_palette.js) against the
+     #ffffff surface: status set passes band/contrast, the neutral is gray by
+     intent, and the stack order below is what makes the adjacent CVD pair pass. */
+  --ci-chart-success: #0ca30c;
+  --ci-chart-cancelled: #636363;
+  --ci-chart-testsfail: #b8860b;
+  --ci-chart-buildfail: #c0392b;
+  --ci-chart-infra: #7c3aed;
+  --ci-chart-slot1: #1f77b4;
+  --ci-chart-slot2: #ff7f0e;
+  --ci-chart-slot3: #9467bd;
+  --ci-chart-slot4: #0d9488;
+  --ci-chart-ord1: #7dabf0;
+  --ci-chart-ord2: #4f8fe8;
+  --ci-chart-ord3: #2563eb;
+  --ci-chart-ord4: #1b3fa8;
+  --ci-chart-ord5: #152a63;
 }
 
 :root[data-theme="dark"] {
@@ -246,4 +264,22 @@
   --color-chart-text: #e2e8f0;
   --color-chart-bg: #111827;
   --color-chart-border: #1f2937;
+  /* light-theme #636363 on this bg is ~3:1, below 4.5:1 for label text */
+  --color-chart-dark-gray: #9ca3af;
+
+  /* selected for the #111827 surface, not flipped: same validator, --mode dark */
+  --ci-chart-success: #16a34a;
+  --ci-chart-cancelled: #6b7280;
+  --ci-chart-testsfail: #ca8a04;
+  --ci-chart-buildfail: #dc2626;
+  --ci-chart-infra: #8b5cf6;
+  --ci-chart-slot1: #3b82f6;
+  --ci-chart-slot2: #d97706;
+  --ci-chart-slot3: #8b5cf6;
+  --ci-chart-slot4: #0d9488;
+  --ci-chart-ord1: #2563eb;
+  --ci-chart-ord2: #3b82f6;
+  --ci-chart-ord3: #60a5fa;
+  --ci-chart-ord4: #93c5fd;
+  --ci-chart-ord5: #bfdbfe;
 }

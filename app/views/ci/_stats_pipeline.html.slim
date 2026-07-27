@@ -1,0 +1,178 @@
+/ one control row per panel, above everything it scopes - never inside a block
+.ci-stats-controls
+  div
+    span.k range
+    / gran nilled, not carried from active_params: a range switch must let
+    / StatsParams re-derive DEFAULT_GRAN, or the link would keep a stale
+    / granularity (e.g. stay on "hour" after switching to "90d")
+    - PatchCi::StatsParams::RANGES.each_key do |value|
+      = link_to value, ci_stats_path(@params_object.active_params.merge(range: value, gran: nil).compact), class: ("is-active" if @params_object.range == value)
+  div
+    span.k granularity
+    - PatchCi::StatsParams::GRANS.each do |value|
+      = link_to value, ci_stats_path(@params_object.active_params.merge(gran: value)), class: ("is-active" if @params_object.gran == value)
+
+- h = @pipeline[:headline]
+= render "stats_tiles", tiles: [ \
+  { k: "Runs", v: ci_stat_count(h[:runs]), d: "terminal, in range" },
+  { k: "Success rate", v: ci_percent(h[:success_rate]), d: "#{ci_stat_count(h[:successes])} of #{ci_stat_count(h[:runs])}" },
+  { k: "Median build", v: ci_duration(h[:build_median]&.round), d: "successful and failed alike" },
+  { k: "Median test", v: ci_duration(h[:test_median]&.round), d: "successful and failed alike" },
+  { k: "Median queue wait", v: ci_duration(h[:queue_median]&.round), d: "queued to started" },
+  { k: "Infra errors", v: ci_percent(h[:infra_rate]), d: "#{ci_stat_count(h[:infra])} runs" },
+  { k: "GitHub re-attempts", v: ci_stat_count(h[:retries]), d: "attempt > 1 on one run id" } ]
+
+/ blocks 1 and 2 share one x scale and sit one above the other on purpose: a
+/ rate line drawn over the volume bars would be a second y axis, and the
+/ alignment between two y scales is arbitrary - it invents correlation
+= render "stats_chart",
+  id: "runs-by-status",
+  title: "Runs by result",
+  note: "terminal runs only; timeouts fold into their failure band",
+  spec: ci_stacked_bar_spec(@pipeline[:volume_by_status].map { |row| { "bucket" => row[:bucket].iso8601, "band" => row[:band], "count" => row[:count] } },
+                            x: "bucket", x_title: "completed", y_title: "runs",
+                            band_field: "band", bands: CiStatsHelper::STATUS_BANDS,
+                            colors: CiStatsHelper::STATUS_COLORS),
+  rows: @pipeline[:volume_by_status].map { |row| { when: l(row[:bucket], format: :short), band: ci_status_label(row[:band]), count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :when, label: "When" }, { key: :band, label: "Result" }, { key: :count, label: "Runs", num: true } ]
+
+= render "stats_chart",
+  id: "success-rate",
+  title: "Success rate",
+  note: "hollow points sit below #{PatchCi::Config::SPARSE_BUCKET_RUNS} terminal runs in the bucket",
+  spec: ci_line_spec(ci_bucket_points(@pipeline[:success_rate], :rate),
+                     x: "bucket", x_title: "completed", y_title: "success rate", y_format: ".0%"),
+  rows: @pipeline[:success_rate].map { |row| { when: l(row[:bucket], format: :short), rate: ci_percent(row[:rate]), total: number_with_delimiter(row[:total]) } },
+  columns: [ { key: :when, label: "When" }, { key: :rate, label: "Success rate", num: true }, { key: :total, label: "Terminal runs", num: true } ]
+
+/ faceted by era, not one plot with six lines: pg20 tests run ~311s against
+/ pg10's ~220s, so an unfaceted median mostly tracks which majors ran that hour
+/ one physical line on purpose: slim only continues a "-" line that ends in a
+/ comma or a backslash, so a block split across lines is parsed as fresh ruby
+- duration_points = @pipeline[:durations_by_era].flat_map { |row| [ { "bucket" => row[:bucket].iso8601, "era" => row[:era], "measure" => "build", "value" => row[:build_median] }, { "bucket" => row[:bucket].iso8601, "era" => row[:era], "measure" => "test", "value" => row[:test_median] } ] }
+= render "stats_chart",
+  id: "durations",
+  title: "Build and test duration by era",
+  note: "median seconds; successful runs only",
+  spec: ci_faceted_line_spec(duration_points, x: "bucket", x_title: "completed",
+                             y_title: "seconds", facet_field: "era",
+                             series_field: "measure", series: %w[build test]),
+  rows: @pipeline[:durations_by_era].map { |row| { when: l(row[:bucket], format: :short), era: row[:era], build: ci_duration(row[:build_median]&.round), test: ci_duration(row[:test_median]&.round), spread: "#{ci_duration(row[:build_p25]&.round)} - #{ci_duration(row[:build_p75]&.round)}" } },
+  columns: [ { key: :when, label: "When" }, { key: :era, label: "Era" }, { key: :build, label: "Build median", num: true }, { key: :test, label: "Test median", num: true }, { key: :spread, label: "Build p25-p75", num: true } ]
+
+= render "stats_chart",
+  id: "ccache",
+  title: "ccache hit rate",
+  note: "median per bucket; the image's warm cache was baked against one reference commit, so a patch on a different base misses most of it",
+  spec: ci_line_spec(@pipeline[:ccache_hit_rate].map { |row| { "bucket" => row[:bucket].iso8601, "value" => row[:rate] } },
+                     x: "bucket", x_title: "completed", y_title: "hit rate", y_format: ".1%"),
+  rows: @pipeline[:ccache_hit_rate].map { |row| { when: l(row[:bucket], format: :short), rate: ci_percent(row[:rate]), runs: number_with_delimiter(row[:runs]) } },
+  columns: [ { key: :when, label: "When" }, { key: :rate, label: "Hit rate", num: true }, { key: :runs, label: "Runs", num: true } ]
+
+/ the chart gets every point, the table twin caps at 50 - a scatter of ~1900
+/ points has no useful table, so the rest are deliberately dropped here, not
+/ in the query object (it returns primitives and knows nothing about charts)
+- ccache_scatter_note = "one point per successful run" + (@pipeline[:build_vs_ccache].size > 50 ? "; table shows the first 50" : "")
+= render "stats_chart",
+  id: "build-vs-ccache",
+  title: "Build time against ccache hit rate",
+  note: ccache_scatter_note,
+  spec: ci_scatter_spec(@pipeline[:build_vs_ccache].map { |row| { "rate" => row[:rate], "build_seconds" => row[:build_seconds] } },
+                        x: "rate", x_title: "hit rate", y: "build_seconds", y_title: "build seconds"),
+  rows: @pipeline[:build_vs_ccache].first(50).map { |row| { rate: ci_percent(row[:rate]), build: ci_duration(row[:build_seconds]) } },
+  columns: [ { key: :rate, label: "Hit rate", num: true }, { key: :build, label: "Build", num: true } ]
+
+/ brace form, not do..end: Slim forbids an explicit "- end" in a view
+- latency_points = @pipeline[:queue_latency].flat_map { |row| [ { "bucket" => row[:bucket].iso8601, "measure" => "push to queued", "value" => row[:queue_median] }, { "bucket" => row[:bucket].iso8601, "measure" => "queued to started", "value" => row[:start_median] } ] }.select { |point| point["value"] }
+= render "stats_chart",
+  id: "queue-latency",
+  title: "Queue latency",
+  note: "median seconds",
+  spec: ci_line_spec(latency_points, x: "bucket", x_title: "completed", y_title: "seconds",
+                     series_field: "measure", series: [ "push to queued", "queued to started" ]),
+  rows: @pipeline[:queue_latency].map { |row| { when: l(row[:bucket], format: :short), push: ci_duration(row[:queue_median]&.round), start: ci_duration(row[:start_median]&.round) } },
+  columns: [ { key: :when, label: "When" }, { key: :push, label: "Push to queued", num: true }, { key: :start, label: "Queued to started", num: true } ]
+
+= render "stats_chart",
+  id: "concurrency",
+  title: "Average concurrency",
+  note: "time-weighted average of runs in flight per bucket, against the #{PatchCi::Config::BUDGET}-slot budget",
+  spec: ci_line_spec(@pipeline[:average_concurrency].map { |row| { "bucket" => row[:bucket].iso8601, "value" => row[:concurrency] } },
+                     x: "bucket", x_title: "bucket", y_title: "concurrent runs",
+                     rule: { value: PatchCi::Config::BUDGET, label: "budget #{PatchCi::Config::BUDGET}" }),
+  rows: @pipeline[:average_concurrency].map { |row| { when: l(row[:bucket], format: :short), concurrency: number_with_precision(row[:concurrency], precision: 1) } },
+  columns: [ { key: :when, label: "When" }, { key: :concurrency, label: "Avg concurrency", num: true } ]
+
+/ ordered bands (same day < days < weeks < months < older < unknown) get the
+/ single-hue ordinal ramp - categorical hues would throw away that order
+- lag_bands = PatchCi::Config::PUSH_LAG_BUCKETS.map(&:first) + [ "unknown" ]
+- lag_colors = ci_ordinal_colors(lag_bands)
+= render "stats_chart",
+  id: "push-lag",
+  title: "Push lag",
+  note: "time from the patch being posted to CI queueing it",
+  spec: ci_stacked_bar_spec(@pipeline[:push_lag].map { |row| row.merge(bucket: row[:bucket].iso8601) },
+                            x: "bucket", x_title: "completed", y_title: "runs",
+                            band_field: "band", bands: lag_bands, colors: lag_colors),
+  rows: @pipeline[:push_lag].map { |row| { when: l(row[:bucket], format: :short), band: row[:band], count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :when, label: "When" }, { key: :band, label: "Lag" }, { key: :count, label: "Runs", num: true } ]
+
+/ unordered categories - first push, rebase, retry - so categorical slots,
+/ not the ordinal ramp push-lag uses above
+- kind_labels = { "first_push" => "first push", "rebase" => "rebase re-push", "retry" => "retry" }
+- kind_colors = kind_labels.keys.each_with_index.to_h { |kind, i| [ kind, CiStatsHelper::SLOTS[i] ] }
+= render "stats_chart",
+  id: "push-kind",
+  title: "Push kind",
+  note: "first push, a re-push on a newer master, or a retry of the same head",
+  spec: ci_stacked_bar_spec(@pipeline[:push_kind].map { |row| { "bucket" => row[:bucket].iso8601, "band" => row[:kind], "count" => row[:count] } },
+                            x: "bucket", x_title: "completed", y_title: "runs",
+                            band_field: "band", bands: kind_labels.keys, colors: kind_colors),
+  rows: @pipeline[:push_kind].map { |row| { when: l(row[:bucket], format: :short), kind: kind_labels.fetch(row[:kind], row[:kind]), count: number_with_delimiter(row[:count]) } },
+  columns: [ { key: :when, label: "When" }, { key: :kind, label: "Kind" }, { key: :count, label: "Runs", num: true } ]
+
+/ separate from the ranked list below on purpose: one suite failed is usually
+/ a patch bug, dozens is usually one crash cascading - mixing them into one
+/ measure hides that distinction
+/ the counts are strings on a nominal axis, so the sort domain has to be passed
+/ in - left to vega they order as text and 100 lands between 10 and 11
+= render "stats_chart",
+  id: "failure-concentration",
+  title: "Suites failed per failing run",
+  note: "one suite is usually a patch bug; dozens is usually one crash cascading",
+  spec: ci_grouped_bar_spec(@pipeline[:failure_concentration].map { |row| { "failures" => row[:failures].to_s, "series" => "runs", "count" => row[:runs] } },
+                            x: "failures", x_title: "suites failed", y_title: "runs",
+                            series_field: "series", series: [ "runs" ],
+                            sort: @pipeline[:failure_concentration].map { |row| row[:failures].to_s }),
+  rows: @pipeline[:failure_concentration].map { |row| { failures: row[:failures], runs: number_with_delimiter(row[:runs]) } },
+  columns: [ { key: :failures, label: "Suites failed", num: true }, { key: :runs, label: "Runs", num: true } ]
+
+/ a low failures-to-patchsets ratio is not automatically flakiness:
+/ 002_pg_upgrade and 027_stream_regress rerun the regression suite in another
+/ context, so they fail as collateral whenever anything under them does
+= render "stats_bars",
+  id: "top-failing-tests",
+  title: "Top failing suites",
+  note: "total failures, and in brackets the number of distinct patchsets - many failures on few patchsets means one broken patch retried; roughly one per patchset means either a flaky suite or a suite that reruns others and inherits their failures",
+  rows: @pipeline[:top_failing_tests].map { |row| { label: row[:name], value: row[:failures], extra: "#{row[:branches]} branches" } }
+
+- health_labels = { infra_error: "infra errors", stuck: "in flight past #{PatchCi::Config::STUCK_RUN_HOURS}h", push_failed: "branches with a failed push", ingest_error: "payloads we could not parse", no_payload: "runs with no payload", no_image: "built but pushed no image" }
+section.ci-stats-block#infra-health
+  h3 Infra health
+  p.muted Everything here should be zero. Non-zero is worth a look, not a panic.
+  .ci-table-wrap tabindex="0" role="region" aria-label="Infra health"
+    table.ci-table
+      tr
+        th Condition
+        th.num Count
+      - health_labels.each do |key, label|
+        tr
+          td = label
+          td.num = number_with_delimiter(@pipeline[:infra_health][key])
+
+/ meaningless until retries exist in quantity: about 10 today, so this pair
+/ states its own denominator rather than pretend a single figure is a trend
+- agreement = @pipeline[:rerun_agreement]
+= render "stats_tiles", tiles: [ \
+  { k: "Retried heads", v: ci_stat_count(agreement[:pairs]), d: "same head_sha pushed again, new run id" },
+  { k: "Verdict changed", v: ci_percent(agreement[:pairs].positive? ? agreement[:changed].to_f / agreement[:pairs] : nil), d: "#{ci_stat_count(agreement[:changed])} of #{ci_stat_count(agreement[:pairs])} - meaningless until this denominator grows" } ]

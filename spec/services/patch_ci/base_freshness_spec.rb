@@ -114,4 +114,23 @@ RSpec.describe PatchCi::BaseFreshness do
       expect(blind.filter(PatchBranch.all, [ "unknown" ]).pluck(:id)).to eq([ row.id ])
     end
   end
+
+  describe "#counts" do
+    it "groups every tier in one query" do
+      branch_based(1)
+      branch_based(400)
+      branch_based(nil)
+
+      counts = freshness.counts(PatchBranch.all)
+      expect(counts).to eq("recent" => 1, "stale" => 0, "ancient" => 1, "unknown" => 1)
+    end
+
+    it "puts everything under unknown without a repo state" do
+      branch_based(1)
+      branch_based(nil)
+
+      counts = described_class.new(repo_state: nil).counts(PatchBranch.all)
+      expect(counts).to eq("recent" => 0, "stale" => 0, "ancient" => 0, "unknown" => 2)
+    end
+  end
 end

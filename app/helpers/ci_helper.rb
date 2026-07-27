@@ -155,6 +155,15 @@ module CiHelper
     "#{seconds / 60}m #{format('%02d', seconds % 60)}s"
   end
 
+  def ci_percent(value, precision: 1)
+    return ci_muted_dash if value.nil?
+    number_to_percentage(value * 100, precision: precision)
+  end
+
+  def ci_stat_count(value)
+    number_with_delimiter(value.to_i)
+  end
+
   def ci_short_sha(sha)
     sha.to_s.first(SHORT_SHA_CHARS).presence
   end

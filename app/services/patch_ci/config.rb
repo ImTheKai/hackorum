@@ -17,5 +17,9 @@ module PatchCi
     # repo state's fetched_at, so a live orchestrator turns them over sooner
     AGGREGATE_TTL = 1.minute
     WORK_FROM = Time.zone.parse("2017-01-01").freeze # commit status floor, same as backfill
+
+    # the fork CI pushes to. Views build github.com URLs off this;
+    # bin/orchestrator takes it as its default.
+    GITHUB_REPO = "hackorum-dev/postgres"
   end
 end

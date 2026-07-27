@@ -21,8 +21,14 @@
       = ci_sort_header(sort_query, "updated", "Updated", numeric: true)
     - rows.each do |row|
       tr
-        td = ci_result_cell(row)
-        td.mono = link_to row.branch_name, topic_path(row.topic)
+        td = link_to ci_result_cell(row), ci_topic_path(row.topic_id), title: "CI history",
+                     aria: { label: "CI history for #{row.branch_name}" },
+                     class: "ci-result-link", data: { turbo_frame: "_top" }
+        td.mono
+          - if row.pushed_at
+            = link_to row.branch_name, ci_github_branch_url(row.branch_name), target: "_blank", rel: "noopener"
+          - else
+            = row.branch_name
         td.topic = link_to row.topic.title, topic_path(row.topic)
         td.num = row.pg_major || ci_muted_dash
         td = ci_base_tier_badge(row, repo_state)
@@ -30,4 +36,4 @@
         td.num = ci_tests_cell(row)
         td.num = ci_timing_cell(row)
         td = ci_image_cell(row)
-        td.num.muted = "#{time_ago_in_words(row.updated_at)} ago"
+        td.num.muted = smart_time_display(row.updated_at)

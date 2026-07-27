@@ -1,0 +1,19 @@
+- content_for :title, "Patch CI - #{@topic.title}"
+
+.ci-container
+  h1.ci-title = link_to @topic.title, topic_path(@topic)
+  p.muted
+    = link_to "back to CI dashboard", ci_path
+
+  - if @history.patchsets.empty?
+    p.muted no patchsets tracked for this topic
+  - else
+    p.ci-summary
+      = "#{pluralize(@history.patchsets.size, 'patchset')} tracked"
+      - if (row = @history.current)
+        = " - current "
+        span.mono = row.branch_name
+
+    - @history.patchsets.each do |row|
+      = render "ci/patchset_section", row: row, history: @history,
+                                      repo_state: @repo_state, topic: @topic

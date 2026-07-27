@@ -18,7 +18,6 @@ options = {
   worktree: File.expand_path("../tmp/patch_ci_worktree", __dir__),
   remote: "origin",
   master_ref: "origin/master",
-  github_repo: "hackorum-dev/postgres",
   interval: 60
 }
 
@@ -37,7 +36,7 @@ OptionParser.new do |o|
   o.on("--budget N", Integer, "max queued+running CI runs (default PatchCi::Config::BUDGET)") { |v| options[:budget] = v }
   o.on("--interval N", Integer, "seconds between cycles (default 60)") { |v| options[:interval] = v }
   o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
-  o.on("--github-repo NAME", "owner/name CI runs in (default hackorum-dev/postgres)") { |v| options[:github_repo] = v }
+  o.on("--github-repo NAME", "owner/name CI runs in (default from PatchCi::Config)") { |v| options[:github_repo] = v }
   o.on("--master-ref REF", "ref that is master truth (default origin/master)") { |v| options[:master_ref] = v }
 end.parse!
 
@@ -45,6 +44,7 @@ require_relative "../config/environment"
 
 # rails is not loaded at optparse time, so the default lands here
 options[:budget] ||= PatchCi::Config::BUDGET
+options[:github_repo] ||= PatchCi::Config::GITHUB_REPO
 
 repo = PatchBranches::GitRepo.new(options[:repo])
 

@@ -1,0 +1,19 @@
+/ nothing pushed, nothing run and nothing skipped means there is nothing behind
+/ the fold, so the row stays one line and says what became of it inline. A
+/ skipped row is not quiet - the skip reason is the only place it is recorded.
+- runs = history.runs_for(row)
+- quiet = runs.empty? && row.pushed_at.nil? && row.ci_skip_reason.blank?
+- current = row.id == history.current&.id
+
+- if quiet
+  .ci-patchset.quiet
+    = render "ci/patchset_head", row: row, repo_state: repo_state, current: current
+    - if (outcome = ci_patchset_outcome(row))
+      span.muted class=("ci-hover" if row.failure_reason.present?) title=truncate(row.failure_reason, length: 300) = outcome
+- else
+  details.ci-patchset open=current
+    summary
+      = render "ci/patchset_head", row: row, repo_state: repo_state, current: current
+    = render "ci/patchset_facts", row: row, repo_state: repo_state, topic: topic
+    - if runs.any?
+      = render "ci/run_rows", row: row, runs: runs, history: history

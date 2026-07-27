@@ -28,6 +28,12 @@ class CiController < ApplicationController
     @branches = @query.rows
   end
 
+  def topic
+    @topic = Topic.find(params[:id])
+    @repo_state = PatchCiRepoState.current
+    @history = PatchCi::TopicHistory.new(topic: @topic, repo_state: @repo_state)
+  end
+
   private
 
   # every subscriber re-GETs this page on the same broadcast, so the

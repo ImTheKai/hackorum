@@ -467,6 +467,11 @@
   font-weight: 500;
 }
 
+.sidebar .patchsets-ci {
+  margin: 0 0 var(--spacing-2);
+  font-size: var(--font-size-sm);
+}
+
 .sidebar .patchsets-list {
   list-style: none;
   padding-left: 0;

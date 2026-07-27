@@ -1,0 +1,46 @@
+/ same scroll-region treatment as the branch table: the wrap scrolls, tabindex
+/ makes it keyboard-scrollable, and a focusable region needs a name
+.ci-runs
+  .ci-table-wrap tabindex="0" role="region" aria-label="Runs for #{row.branch_name}"
+    table.ci-table
+      tr
+        th Result
+        th.num Att
+        th.num PG
+        th.num Tests
+        th.num Build / test
+        th Image
+        th.num When
+      - runs.each do |run|
+        tr
+          td = ci_status_badge(run.status)
+          td.num = run.run_attempt
+          td.num = run.pg_major || ci_muted_dash
+          td.num = ci_tests_figure(run, hover: false)
+          td.num = ci_run_timing_cell(run)
+          td = ci_image_command_cell(run, live: run.id == history.live_image_run_id)
+          td.num.muted = ci_run_when(run)
+        tr.ci-run-more
+          td colspan="7"
+            details
+              summary = "run #{run.github_run_id}"
+              .ci-run-detail
+                - if run.failed_tests.any?
+                  .failed = "failed: #{run.failed_tests.join(', ')}"
+                / a rejected payload is our parser choking, not a broken patch
+                - if run.ingest_error.present?
+                  .ingest-error = run.ingest_error
+                .muted
+                  - if run.tests_total
+                    = "executed #{run.tests_total} - "
+                  - if (ccache = ci_ccache_line(run))
+                    = "#{ccache} - "
+                  - if run.head_sha.present?
+                    = "head #{ci_short_sha(run.head_sha)} - "
+                  / the Image cell's copyable command carries the full digest
+                  - if run.image_digest.present?
+                    = "digest #{truncate(run.image_digest, length: 24)} - "
+                  = link_to "run #{run.github_run_id}", ci_github_run_url(run), class: "ci-artifact",
+                            target: "_blank", rel: "noopener"
+                  - if run.run_attempt > 1
+                    = " (attempt #{run.run_attempt})"

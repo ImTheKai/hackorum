@@ -113,6 +113,7 @@ Rails.application.routes.draw do
   # CI orchestration
   get "ci", to: "ci#index", as: :ci
   get "ci/branches", to: "ci#branches", as: :ci_branches
+  get "ci/topics/:id", to: "ci#topic", as: :ci_topic
 
   # Help pages
   resources :help, only: [ :index, :show ], param: :slug

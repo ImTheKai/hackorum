@@ -66,6 +66,10 @@ module CiHelper
   SORT_ARROWS = { "desc" => 0x25BE.chr("UTF-8"), "asc" => 0x25B4.chr("UTF-8") }.freeze
   ARIA_SORT = { "desc" => "descending", "asc" => "ascending" }.freeze
 
+  GITHUB_URL = "https://github.com".freeze
+  SHORT_SHA_CHARS = 9
+  DIGEST_LABEL_CHARS = 14
+
   def ci_status_label(status)
     ci_badge_for(status).last
   end
@@ -151,6 +155,53 @@ module CiHelper
     "#{seconds / 60}m #{format('%02d', seconds % 60)}s"
   end
 
+  def ci_short_sha(sha)
+    sha.to_s.first(SHORT_SHA_CHARS).presence
+  end
+
+  # t<topic>_<index>: the index is the patchset number the site already shows,
+  # so read it back rather than recomputing it - same as Pusher#message_index.
+  # nil rather than garbage if a branch name ever stops matching the format.
+  def ci_patchset_index(row)
+    row.branch_name.to_s[/_(\d+)\z/, 1]
+  end
+
+  # the four stages ApplyOne can fail at, in words. "error" is its catch-all
+  # for an exception, which "failed at error" would not convey.
+  FAILURE_STAGE_PHRASES = {
+    "extract" => "patch extract failed",
+    "base_detection" => "no usable base commit",
+    "apply" => "apply failed",
+    "error" => "apply crashed"
+  }.freeze
+
+  # the one-phrase "what became of this patchset", for a row with nothing to
+  # expand. A row that reached CI says it in badges instead.
+  def ci_patchset_outcome(row)
+    return FAILURE_STAGE_PHRASES.fetch(row.failure_stage, "apply failed") if row.status == "failed"
+    return "applied, never pushed" if row.pushed_at.nil?
+    nil
+  end
+
+  def ci_github_branch_url(branch_name)
+    "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}/tree/#{branch_name}"
+  end
+
+  def ci_github_commit_url(sha)
+    "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}/commit/#{sha}"
+  end
+
+  def ci_github_compare_url(base_sha, head_sha)
+    "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}/compare/#{base_sha}...#{head_sha}"
+  end
+
+  # attempt 1 has no /attempts page worth linking - the run URL already lands
+  # on it, and the suffix would just be noise on every first-try run
+  def ci_github_run_url(run)
+    url = "#{GITHUB_URL}/#{PatchCi::Config::GITHUB_REPO}/actions/runs/#{run.github_run_id}"
+    run.run_attempt > 1 ? "#{url}/attempts/#{run.run_attempt}" : url
+  end
+
   # the one "nothing to show here" mark, so a table cannot grow a second one
   def ci_muted_dash
     tag.span("-", class: "muted")
@@ -169,14 +220,31 @@ module CiHelper
       return ci_muted_dash if row.pushed_at.nil?
       tag.span("#{ci_elapsed_minutes(row.pushed_at)} elapsed", class: "muted")
     elsif (run = row.latest_run_summary)
-      tag.span("#{ci_duration(run.build_seconds)} / #{ci_duration(run.test_seconds)}")
+      ci_duration_pair(run)
     else
       ci_muted_dash
     end
   end
 
+  # a run still out there has no durations yet, so the same cell carries how
+  # long it has been going - same trade as ci_timing_cell makes for a branch
+  def ci_run_timing_cell(run)
+    unless run.terminal?
+      since = run.started_at || run.queued_at
+      return since ? tag.span("#{ci_elapsed_minutes(since)} elapsed", class: "muted") : ci_muted_dash
+    end
+    ci_duration_pair(run)
+  end
+
   def ci_image_cell(row)
-    ref = row.latest_run_summary&.image_ref
+    ci_image_command_cell(row.latest_run_summary, live: true)
+  end
+
+  # ghcr tag is :t<topic_id> - one tag for the whole topic, overwritten by
+  # every run in it. Only the newest run that built one can still offer the
+  # tag; the rest offer the digest they recorded, which nothing overwrites.
+  def ci_image_command_cell(run, live:)
+    ref = live ? (run&.image_ref).presence : ci_digest_ref(run)
     return ci_muted_dash if ref.blank?
     cmd = ci_docker_command(ref)
     tag.code(ci_docker_label(ref), class: "ci-copy", title: cmd,
@@ -185,12 +253,17 @@ module CiHelper
   end
 
   def ci_tests_cell(row)
-    run = row.latest_run_summary
+    ci_tests_figure(row.latest_run_summary)
+  end
+
+  # hover: false where the failure list is already on the page - the run table
+  # folds it out, and the same 200 names twice in one row is not a hint
+  def ci_tests_figure(run, hover: true)
     return ci_muted_dash if run.nil? || run.tests_total.blank?
     # a partial payload can report more failures than it reports tests
     passed = [ run.tests_total - run.failed_tests.size, 0 ].max
     text = "#{passed} / #{run.tests_total}"
-    return tag.span(text) if run.failed_tests.empty?
+    return tag.span(text) if !hover || run.failed_tests.empty?
     tag.span(text, class: "ci-hover", title: "Failed: #{run.failed_tests.join(', ')}")
   end
 
@@ -198,13 +271,37 @@ module CiHelper
     "docker run --rm -p 5432:5432 #{image_ref}"
   end
 
+  # rpartition, not split: a registry host may carry a port, and only the
+  # trailing :tag is the tag
+  def ci_digest_ref(run)
+    return nil if run.nil? || run.image_ref.blank? || run.image_digest.blank?
+    repo = run.image_ref.rpartition(":").first.presence || run.image_ref
+    "#{repo}@#{run.image_digest}"
+  end
+
   def ci_docker_label(image_ref)
-    "docker run ... :#{image_ref.split(':').last}"
+    return "docker run ... :#{image_ref.split(':').last}" unless image_ref.include?("@")
+    "docker run ... @#{image_ref.split('@').last.slice(0, DIGEST_LABEL_CHARS)}..."
   end
 
   def ci_elapsed_minutes(since)
     return "-" unless since
     "#{((Time.current - since) / 60).floor}m"
+  end
+
+  # a run is dated by the last thing that happened to it; an unclaimed push
+  # has none of the three
+  def ci_run_when(run)
+    stamp = run.completed_at || run.started_at || run.queued_at
+    return "-" unless stamp
+    smart_time_display(stamp)
+  end
+
+  # the aliases are raw json text out of a hostile payload, so a nested object
+  # would otherwise render as json on the page
+  def ci_ccache_line(run)
+    return nil unless run.ccache_hit.to_s.match?(/\A\d+\z/) && run.ccache_miss.to_s.match?(/\A\d+\z/)
+    "ccache #{run.ccache_hit} hit / #{run.ccache_miss} miss"
   end
 
   def ci_facet_label(facet)
@@ -248,6 +345,13 @@ module CiHelper
   end
 
   private
+
+  # the one "build / test" pair, so a table cannot grow a second one with a
+  # different blank case
+  def ci_duration_pair(run)
+    return ci_muted_dash if run.build_seconds.blank? && run.test_seconds.blank?
+    tag.span("#{ci_duration(run.build_seconds)} / #{ci_duration(run.test_seconds)}")
+  end
 
   # a chip reading "ci none" over a badge reading "no CI" is the same row
   # disagreeing with itself, so both facets whose values the table also renders

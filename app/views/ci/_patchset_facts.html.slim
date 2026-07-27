@@ -1,0 +1,72 @@
+.ci-facts
+  .ci-fact
+    span.k base
+    span.v
+      - if row.base_sha.present?
+        / commit_web_url is the app's existing upstream-commit link (github
+        / mirror, because gitweb 502s) - do not add a CI-local twin of it
+        = link_to ci_short_sha(row.base_sha), commit_web_url(row.base_sha), class: "mono",
+                  target: "_blank", rel: "noopener"
+      - if row.base_committed_at
+        = " #{smart_time_display(row.base_committed_at)}"
+      / on_master already implies base_source master and a 0/0 behind figure -
+      / three ways of saying the same thing
+      - if row.on_master
+        span.muted = " on master"
+      - else
+        - if row.base_sha.present?
+          = " - "
+        = ci_behind_title(row, repo_state)
+        - if row.base_source.present?
+          span.muted = " (from #{row.base_source.tr('_', ' ')})"
+
+  .ci-fact
+    span.k apply
+    span.v
+      - if row.status == "applied"
+        = "applied"
+      - else
+        = ci_patchset_outcome(row)
+      - if row.attempted_at
+        = " #{smart_time_display(row.attempted_at)}"
+      / clipped at 20_000 chars by ApplyOne, and rows do hit that ceiling -
+      / the whole conflict dump belongs in a console, not in a page
+      - if row.failure_reason.present?
+        pre.ci-output = truncate(row.failure_reason, length: 2_000)
+      - if row.conflict_files.any?
+        .muted = "conflicts: #{row.conflict_files.join(', ')}"
+
+  - if row.last_master_apply_at || row.master_apply_error.present?
+    .ci-fact
+      span.k rebase
+      span.v
+        - if row.last_master_apply_at
+          = "last tried #{smart_time_display(row.last_master_apply_at)}"
+        - if row.master_apply_error.present?
+          pre.ci-output = row.master_apply_error
+
+  - if row.pushed_at
+    .ci-fact
+      span.k push
+      span.v
+        = smart_time_display(row.pushed_at)
+        - if row.pushed_head_sha.present?
+          = " -> "
+          = link_to ci_short_sha(row.pushed_head_sha), ci_github_commit_url(row.pushed_head_sha), class: "mono",
+                    target: "_blank", rel: "noopener"
+        = link_to "branch", ci_github_branch_url(row.branch_name), class: "ci-artifact",
+                  target: "_blank", rel: "noopener"
+        - if row.base_sha.present? && row.pushed_head_sha.present?
+          = link_to "diff vs base", ci_github_compare_url(row.base_sha, row.pushed_head_sha),
+                    class: "ci-artifact", target: "_blank", rel: "noopener"
+
+  - if row.ci_skip_reason.present?
+    .ci-fact
+      span.k skipped
+      span.v = row.ci_skip_reason
+
+  .ci-fact
+    span.k patchset
+    span.v
+      = link_to "download", message_patchset_path(row.message_id), class: "ci-artifact"
+      = link_to "in thread", topic_path(topic, anchor: message_dom_id(row.message)), class: "ci-artifact"

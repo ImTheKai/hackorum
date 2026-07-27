@@ -787,5 +787,30 @@ RSpec.describe 'Topics show — drafts sidebar', type: :request do
         expect(response.body).to include("No patchsets in this thread")
       end
     end
+
+    context "when the topic has patch branches" do
+      let!(:msg) { create(:message, topic: topic, sender: creator) }
+      let!(:branch) { create(:patch_branch, topic: topic, message: msg) }
+
+      it "links the CI history page" do
+        get patchsets_sidebar_topic_path(topic)
+
+        expect(response.body).to include(ci_topic_path(topic))
+        expect(response.body).to include("CI history")
+        # inside a lazily-loaded frame a plain link fetches the page into the
+        # frame, finds no matching frame and silently discards it
+        expect(response.body).to include('data-turbo-frame="_top"')
+      end
+    end
+
+    context "when the topic has no patch branches" do
+      let!(:msg) { create(:message, topic: topic, sender: creator) }
+
+      it "offers no CI history link" do
+        get patchsets_sidebar_topic_path(topic)
+
+        expect(response.body).not_to include("CI history")
+      end
+    end
   end
 end

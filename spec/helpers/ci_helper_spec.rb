@@ -340,4 +340,208 @@ RSpec.describe CiHelper, type: :helper do
       expect(helper.ci_behind_label(365)).to eq("1y")
     end
   end
+
+  describe "github urls" do
+    it "builds a branch url on the CI fork" do
+      expect(helper.ci_github_branch_url("t42603_1"))
+        .to eq("https://github.com/hackorum-dev/postgres/tree/t42603_1")
+    end
+
+    it "builds a commit url on the CI fork" do
+      expect(helper.ci_github_commit_url("9de17ab"))
+        .to eq("https://github.com/hackorum-dev/postgres/commit/9de17ab")
+    end
+
+    it "builds a compare url from base to head" do
+      expect(helper.ci_github_compare_url("aaa111", "bbb222"))
+        .to eq("https://github.com/hackorum-dev/postgres/compare/aaa111...bbb222")
+    end
+
+    it "links the run itself on a first attempt" do
+      run = build(:patch_ci_run, github_run_id: 18_273_641_923, run_attempt: 1)
+
+      expect(helper.ci_github_run_url(run))
+        .to eq("https://github.com/hackorum-dev/postgres/actions/runs/18273641923")
+    end
+
+    it "links the attempt on a rerun" do
+      run = build(:patch_ci_run, github_run_id: 18_273_641_923, run_attempt: 3)
+
+      expect(helper.ci_github_run_url(run)).to end_with("/actions/runs/18273641923/attempts/3")
+    end
+
+    # the boundary itself: a stray "> 2" would still pass the attempt-3 example
+    it "links the attempt from the second one on" do
+      run = build(:patch_ci_run, github_run_id: 18_273_641_923, run_attempt: 2)
+
+      expect(helper.ci_github_run_url(run)).to end_with("/attempts/2")
+    end
+
+    it "shortens a sha to nine characters" do
+      expect(helper.ci_short_sha("bf12ac9de" + "0" * 31)).to eq("bf12ac9de")
+    end
+
+    it "has nothing to shorten for a missing sha" do
+      expect(helper.ci_short_sha(nil)).to be_nil
+    end
+
+    it "has nothing to shorten for an empty sha" do
+      expect(helper.ci_short_sha("")).to be_nil
+    end
+  end
+
+  describe "#ci_tests_figure" do
+    it "has nothing to show without a run" do
+      expect(helper.ci_tests_figure(nil)).to include("-")
+    end
+
+    it "has nothing to show for a run that reported no total" do
+      expect(helper.ci_tests_figure(build(:patch_ci_run, tests_total: nil))).to include("-")
+    end
+
+    it "counts passed against total and names the failures" do
+      run = build(:patch_ci_run, tests_total: 229, failed_tests: [ "regress/self_contradictory" ])
+
+      html = helper.ci_tests_figure(run)
+
+      expect(html).to include("228 / 229")
+      expect(html).to include("Failed: regress/self_contradictory")
+    end
+  end
+
+  describe "#ci_image_command_cell" do
+    def image_run(digest: "sha256:1f9c" + "0" * 60)
+      build(:patch_ci_run, image_ref: "ghcr.io/hackorum-dev/postgres-patch:t42603",
+            image_digest: digest)
+    end
+
+    it "offers the tag for the run that still owns it" do
+      html = helper.ci_image_command_cell(image_run, live: true)
+
+      expect(html).to include("docker run ... :t42603")
+      expect(html).to include("ghcr.io/hackorum-dev/postgres-patch:t42603")
+    end
+
+    # the tag is per topic and every later run overwrites it, so an older run
+    # offering it would hand out somebody else's image
+    it "pins the digest for a run whose tag was overwritten" do
+      html = helper.ci_image_command_cell(image_run, live: false)
+
+      expect(html).to include("ghcr.io/hackorum-dev/postgres-patch@sha256:1f9c")
+      expect(html).not_to include(":t42603")
+    end
+
+    it "has nothing to offer when an older run recorded no digest" do
+      html = helper.ci_image_command_cell(image_run(digest: nil), live: false)
+
+      expect(html).to include("-")
+      expect(html).not_to include("docker run")
+    end
+
+    it "has nothing to offer without a run at all" do
+      expect(helper.ci_image_command_cell(nil, live: true)).to include("-")
+    end
+
+    # image_ref comes out of the job's result.json - an untagged ref is not
+    # ours to rule out
+    it "digests a ref that carries no tag" do
+      run = build(:patch_ci_run, image_ref: "ghcr.io/hackorum-dev/postgres-patch",
+                  image_digest: "sha256:1f9c" + "0" * 60)
+
+      expect(helper.ci_image_command_cell(run, live: false))
+        .to include("ghcr.io/hackorum-dev/postgres-patch@sha256:1f9c")
+    end
+  end
+
+  describe "#ci_patchset_index" do
+    it "reads the patchset number off the branch name" do
+      expect(helper.ci_patchset_index(build(:patch_branch, branch_name: "t40413_113")))
+        .to eq("113")
+    end
+
+    it "has no number for a branch name that does not carry one" do
+      expect(helper.ci_patchset_index(build(:patch_branch, branch_name: "legacy"))).to be_nil
+    end
+  end
+
+  describe "#ci_patchset_outcome" do
+    it "names the stage an apply failed at" do
+      row = build(:patch_branch, status: "failed", failure_stage: "extract")
+
+      expect(helper.ci_patchset_outcome(row)).to eq("patch extract failed")
+    end
+
+    it "says an apply crashed rather than naming the catch-all stage" do
+      row = build(:patch_branch, status: "failed", failure_stage: "error")
+
+      expect(helper.ci_patchset_outcome(row)).to eq("apply crashed")
+    end
+
+    it "says an applied row was never pushed" do
+      row = build(:patch_branch, status: "applied", pushed_at: nil)
+
+      expect(helper.ci_patchset_outcome(row)).to eq("applied, never pushed")
+    end
+
+    # a pushed row says what became of it in badges instead
+    it "has no phrase for a pushed row" do
+      row = build(:patch_branch, status: "applied", pushed_at: 1.hour.ago)
+
+      expect(helper.ci_patchset_outcome(row)).to be_nil
+    end
+  end
+
+  describe "#ci_run_when" do
+    it "dates a run by when it finished" do
+      run = build(:patch_ci_run, completed_at: 2.hours.ago, queued_at: 3.hours.ago)
+
+      expect(helper.ci_run_when(run)).to eq("about 2 hours ago")
+    end
+
+    it "falls back to the queue time for a run still out there" do
+      run = build(:patch_ci_run, completed_at: nil, started_at: nil, queued_at: 20.minutes.ago)
+
+      expect(helper.ci_run_when(run)).to eq("20 minutes ago")
+    end
+
+    it "says nothing for a run with no timestamps at all" do
+      run = build(:patch_ci_run, completed_at: nil, started_at: nil, queued_at: nil)
+
+      expect(helper.ci_run_when(run)).to eq("-")
+    end
+
+    it "dates an old run absolutely, like the rest of the page" do
+      run = build(:patch_ci_run, completed_at: Time.zone.local(2022, 7, 27, 14, 0))
+
+      expect(helper.ci_run_when(run)).to eq("Jul 27, 2022")
+    end
+  end
+
+  describe "#ci_ccache_line" do
+    # ccache_hit/miss are payload select aliases rather than columns, so a
+    # built run cannot carry them as attributes
+    def ccache_run(hit, miss)
+      run = build(:patch_ci_run)
+      run.define_singleton_method(:ccache_hit) { hit }
+      run.define_singleton_method(:ccache_miss) { miss }
+      run
+    end
+
+    it "spells out both counters off the payload aliases" do
+      expect(helper.ci_ccache_line(ccache_run("8412", "213"))).to eq("ccache 8412 hit / 213 miss")
+    end
+
+    it "has nothing when the payload carried no ccache at all" do
+      expect(helper.ci_ccache_line(ccache_run(nil, nil))).to be_nil
+    end
+
+    it "has nothing when only one of the two counters is there" do
+      expect(helper.ci_ccache_line(ccache_run("8412", nil))).to be_nil
+    end
+
+    # the alias is raw json text out of a payload nobody validated
+    it "refuses an object-valued counter rather than letting json onto the page" do
+      expect(helper.ci_ccache_line(ccache_run(%({"a": 1}), "213"))).to be_nil
+    end
+  end
 end

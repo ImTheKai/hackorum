@@ -1,4 +1,6 @@
 = turbo_frame_tag "patchsets-sidebar-list" do
+  - if @has_patch_branches
+    p.patchsets-ci = link_to "CI history", ci_topic_path(@topic), data: { turbo_frame: "_top" }
   - if @patchset_messages.any?
     ul.patchsets-list
       - @patchset_messages.each do |msg|

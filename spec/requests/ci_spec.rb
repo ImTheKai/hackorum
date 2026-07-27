@@ -585,5 +585,361 @@ RSpec.describe "CI dashboard", type: :request do
       end
       expect(row_selects.size).to eq(1)
     end
+
+    it "sends the branch cell to github and the result cell to the history page" do
+      create(:patch_ci_repo_state)
+      row, = branch_with_run({ ci_status: "success", pushed_at: 1.hour.ago })
+
+      get "/ci/branches"
+      headers, cells = first_table_row(response.body)
+
+      branch_cell = cells[headers.index("Branch")]
+      expect(branch_cell.at_css("a")["href"])
+        .to eq("https://github.com/hackorum-dev/postgres/tree/#{row.branch_name}")
+      expect(cells[headers.index("Result")].at_css("a")["href"])
+        .to eq(ci_topic_path(row.topic_id))
+      # the topic cell keeps pointing at the thread
+      expect(cells[headers.index("Topic")].at_css("a")["href"]).to eq(topic_path(row.topic_id))
+      # inside a turbo frame a plain link renders the topic page INTO the frame,
+      # which has no matching frame in it - the whole table would blank out
+      expect(cells[headers.index("Result")].at_css("a")["data-turbo-frame"]).to eq("_top")
+    end
+
+    # the branch only exists in the local clone until it is pushed, so a link
+    # would be a guaranteed 404
+    it "does not link a branch that was never pushed" do
+      create(:patch_ci_repo_state)
+      create(:patch_branch, pushed_at: nil)
+
+      get "/ci/branches"
+      headers, cells = first_table_row(response.body)
+
+      expect(cells[headers.index("Branch")].at_css("a")).to be_nil
+      expect(response.body).not_to include("/hackorum-dev/postgres/tree/")
+    end
+
+    # a row with no CI result is exactly the row whose apply failure you want
+    it "links the history page even with no result to show" do
+      create(:patch_ci_repo_state)
+      row = create(:patch_branch, ci_status: nil)
+
+      get "/ci/branches"
+      headers, cells = first_table_row(response.body)
+
+      expect(cells[headers.index("Result")].at_css("a")["href"]).to eq(ci_topic_path(row.topic_id))
+    end
+  end
+
+  describe "GET /ci/topics/:id" do
+    # a topic with two patchsets: v1 superseded by v2, v2 pushed with a verdict
+    def two_patchsets
+      create(:patch_ci_repo_state, master_committed_at: Time.current)
+      topic = create(:topic, last_message_at: Time.current)
+      m1 = create(:message, topic: topic, created_at: 3.days.ago, is_patch_submission: true)
+      m2 = create(:message, topic: topic, created_at: 1.hour.ago, is_patch_submission: true)
+      v1 = create(:patch_branch, topic: topic, message: m1, branch_name: "t#{topic.id}_1")
+      v2 = create(:patch_branch, topic: topic, message: m2, branch_name: "t#{topic.id}_2",
+                  pushed_at: 30.minutes.ago, ci_status: "tests_failed",
+                  base_committed_at: 2.days.ago, base_commit_height: 10)
+      v1.update!(superseded_by: v2)
+      [ topic, v1, v2 ]
+    end
+
+    def pushed_patchset(**attrs)
+      # one clock for both ends of the gap: behind_days floors, so two
+      # Time.current calls milliseconds apart would read as 11 days, not 12
+      now = Time.current
+      create(:patch_ci_repo_state, master_committed_at: now, master_commit_height: 1_000)
+      topic = create(:topic, last_message_at: now)
+      message = create(:message, topic: topic, created_at: 1.hour.ago, is_patch_submission: true)
+      row = create(:patch_branch, topic: topic, message: message,
+                   branch_name: "t#{topic.id}_1", on_master: false,
+                   base_sha: "f4a2c91" + "0" * 33, base_source: "submission_head",
+                   base_committed_at: now - 12.days, base_commit_height: 904,
+                   pushed_at: 30.minutes.ago, pushed_head_sha: "9de17ab" + "0" * 33,
+                   ci_status: "tests_failed", **attrs)
+      [ topic, message, row ]
+    end
+
+    it "renders for guests" do
+      topic, = two_patchsets
+
+      get ci_topic_path(topic)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(topic.title)
+    end
+
+    it "404s for a topic that does not exist" do
+      get "/ci/topics/0"
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "says so for a topic with no patchsets" do
+      get ci_topic_path(create(:topic))
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("no patchsets tracked for this topic")
+    end
+
+    it "heads the page with the count and the current branch" do
+      _topic, _v1, v2 = two_patchsets
+
+      get ci_topic_path(v2.topic)
+
+      expect(response.body).to include("2 patchsets tracked")
+      expect(response.body).to include(v2.branch_name)
+      expect(response.body).to include("tests failed")
+    end
+
+    it "opens the current patchset" do
+      topic, _v1, _v2 = two_patchsets
+
+      get ci_topic_path(topic)
+      sections = Nokogiri::HTML(response.body).css("details.ci-patchset")
+
+      # only v2 is a fold: v1 never ran and never pushed, so it stays one line
+      expect(sections.size).to eq(1)
+      expect(sections.first.attribute("open")).to be_present
+    end
+
+    it "folds a superseded patchset that has something behind the fold" do
+      topic, v1, = two_patchsets
+      v1.update!(pushed_at: 4.days.ago, ci_status: "success")
+
+      get ci_topic_path(topic)
+      sections = Nokogiri::HTML(response.body).css("details.ci-patchset")
+
+      expect(sections.size).to eq(2)
+      expect(sections.first.attribute("open")).to be_present
+      expect(sections.last.attribute("open")).to be_nil
+    end
+
+    # supersede fires only on a successful push, so two unpushed patchsets are
+    # both "not superseded" - only the newest is current
+    it "opens only the newest of two patchsets that were never pushed" do
+      create(:patch_ci_repo_state)
+      topic = create(:topic, last_message_at: Time.current)
+      [ [ 1, 3.days.ago ], [ 2, 1.hour.ago ] ].each do |index, posted|
+        message = create(:message, topic: topic, created_at: posted, is_patch_submission: true)
+        create(:patch_branch, topic: topic, message: message,
+               branch_name: "t#{topic.id}_#{index}", ci_status: "success", pushed_at: posted)
+      end
+
+      get ci_topic_path(topic)
+      sections = Nokogiri::HTML(response.body).css("details.ci-patchset")
+
+      expect(sections.size).to eq(2)
+      expect(sections.first.attribute("open")).to be_present
+      expect(sections.last.attribute("open")).to be_nil
+    end
+
+    # v1 was never pushed and never ran: there is nothing to expand, so it is
+    # one line rather than an empty accordion
+    it "reduces a patchset that never ran to a single line" do
+      topic, v1, = two_patchsets
+
+      get ci_topic_path(topic)
+      quiet = Nokogiri::HTML(response.body).at_css(".ci-patchset.quiet")
+
+      expect(quiet.text).to include(v1.branch_name)
+      expect(quiet.text).to include("applied, never pushed")
+      expect(quiet.text).to include("superseded")
+    end
+
+    it "names the failing stage of a patchset that never applied" do
+      create(:patch_ci_repo_state)
+      topic = create(:topic, last_message_at: Time.current)
+      create(:patch_branch, topic: topic, status: "failed", failure_stage: "apply",
+             failure_reason: "conflict in src/bin/pg_dump/t/002_pg_dump.pl")
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("apply failed")
+      expect(response.body).to include("conflict in src/bin/pg_dump")
+    end
+
+    it "numbers each patchset from its branch name" do
+      topic, = two_patchsets
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("v2")
+      expect(response.body).to include("v1")
+    end
+
+    it "links the base sha at upstream and says how far behind it is" do
+      topic, _message, row = pushed_patchset
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("https://github.com/postgres/postgres/commit/#{row.base_sha}")
+      expect(response.body).to include("f4a2c9100")
+      expect(response.body).to include("12 days / 96 commits behind master")
+      expect(response.body).to include("(from submission head)")
+    end
+
+    # on_master implies base_source master and a 0/0 behind figure; saying all
+    # three is how 1300+ real rows would read
+    it "says a master-based patchset is on master and leaves it at that" do
+      create(:patch_ci_repo_state, master_committed_at: Time.current)
+      topic = create(:topic, last_message_at: Time.current)
+      create(:patch_branch, topic: topic, on_master: true, base_source: "master",
+             base_sha: "e395fbd" + "0" * 33, pushed_at: 1.hour.ago, ci_status: "success")
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("on master")
+      expect(response.body).not_to include("(from master)")
+      expect(response.body).not_to include("0 commits behind")
+    end
+
+    it "links the branch, the pushed commit and the diff against the base" do
+      topic, _message, row = pushed_patchset
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("/hackorum-dev/postgres/tree/#{row.branch_name}")
+      expect(response.body).to include("/hackorum-dev/postgres/commit/#{row.pushed_head_sha}")
+      expect(response.body)
+        .to include("/hackorum-dev/postgres/compare/#{row.base_sha}...#{row.pushed_head_sha}")
+    end
+
+    it "offers no diff link when the row was never pushed" do
+      create(:patch_ci_repo_state)
+      topic = create(:topic, last_message_at: Time.current)
+      create(:patch_branch, topic: topic, base_sha: "aaa111", ci_status: "ci_none",
+             ci_skip_reason: "thread inactive")
+
+      get ci_topic_path(topic)
+
+      expect(response.body).not_to include("/compare/")
+      expect(response.body).to include("thread inactive")
+    end
+
+    it "spells out an apply failure with its conflicts" do
+      create(:patch_ci_repo_state)
+      topic = create(:topic, last_message_at: Time.current)
+      create(:patch_branch, topic: topic, status: "failed", failure_stage: "apply",
+             failure_reason: "patch does not apply",
+             conflict_files: [ "src/backend/parser/gram.y" ], pushed_at: 1.hour.ago)
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("apply failed")
+      expect(response.body).to include("patch does not apply")
+      expect(response.body).to include("src/backend/parser/gram.y")
+    end
+
+    it "reports a master re-apply that is failing" do
+      topic, _message, = pushed_patchset(master_apply_error: "conflict in gram.y",
+                                         last_master_apply_at: 2.hours.ago)
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("conflict in gram.y")
+    end
+
+    it "leaves the rebase row out when master re-apply never ran" do
+      topic, = pushed_patchset
+
+      get ci_topic_path(topic)
+      facts = Nokogiri::HTML(response.body).css(".ci-fact .k").map(&:text)
+
+      expect(facts).to include("base", "apply", "push", "patchset")
+      expect(facts).not_to include("rebase")
+    end
+
+    it "links the patchset download and the message in the thread" do
+      topic, message, = pushed_patchset
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include(message_patchset_path(message))
+      expect(response.body).to include("#{topic_path(topic)}#message-#{message.id}")
+    end
+
+    it "tables the runs of a patchset, newest first" do
+      topic, _message, row = pushed_patchset
+      # both finished: the table sorts on finish time, and a run still out
+      # there tops the list rather than sorting by run id
+      old = create(:patch_ci_run, patch_branch: row, github_run_id: 100,
+                   status: "build_failed", build_seconds: 182, completed_at: 1.day.ago)
+      new = create(:patch_ci_run, patch_branch: row, github_run_id: 200,
+                   status: "tests_failed", pg_major: 11, tests_total: 440,
+                   failed_tests: [ "pg_dump/002_pg_dump.pl" ],
+                   build_seconds: 371, test_seconds: 663, completed_at: 2.hours.ago)
+
+      get ci_topic_path(topic)
+      table = Nokogiri::HTML(response.body).at_css(".ci-runs table.ci-table")
+      headers = table.css("th").map { |th| th.text.strip }
+      first_row = table.css("tr")[1].css("td").map { |td| td.text.strip }
+
+      expect(headers).to eq([ "Result", "Att", "PG", "Tests", "Build / test", "Image", "When" ])
+      expect(first_row[headers.index("Result")]).to eq("tests failed")
+      expect(first_row[headers.index("Tests")]).to eq("439 / 440")
+      expect(first_row[headers.index("Build / test")]).to eq("6m 11s / 11m 03s")
+      expect(table.at_css("tr.ci-run-more td")["colspan"].to_i).to eq(table.css("th").size)
+      # by run link, not by bare id: "100" also appears in durations and heights
+      expect(response.body.index("/actions/runs/#{new.github_run_id}"))
+        .to be < response.body.index("/actions/runs/#{old.github_run_id}")
+    end
+
+    it "has no runs table for a patchset that never ran" do
+      topic, = pushed_patchset
+
+      get ci_topic_path(topic)
+
+      expect(Nokogiri::HTML(response.body).at_css(".ci-runs")).to be_nil
+    end
+
+    it "expands a run into its failures, counters and links" do
+      topic, _message, row = pushed_patchset
+      create(:patch_ci_run, patch_branch: row, github_run_id: 18_273_641_923, run_attempt: 2,
+             status: "tests_failed", tests_total: 440, failed_tests: [ "pg_dump/002_pg_dump.pl" ],
+             head_sha: "9de17ab" + "0" * 33, completed_at: 2.hours.ago,
+             image_digest: "sha256:1f9c" + "0" * 60,
+             payload: { "ccache" => { "hit" => 8412, "miss" => 213 } })
+
+      get ci_topic_path(topic)
+      detail = Nokogiri::HTML(response.body).at_css(".ci-run-detail").text
+
+      expect(detail).to include("pg_dump/002_pg_dump.pl")
+      expect(detail).to include("executed 440")
+      expect(detail).to include("ccache 8412 hit / 213 miss")
+      expect(detail).to include("9de17ab00")
+      expect(detail).to include("sha256:1f9c")
+      expect(response.body)
+        .to include("/actions/runs/18273641923/attempts/2")
+    end
+
+    it "shows why a payload was rejected" do
+      topic, _message, row = pushed_patchset
+      create(:patch_ci_run, patch_branch: row, status: "infra_error",
+             payload: { "ingest_error" => "malformed json: unexpected token" })
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("malformed json: unexpected token")
+    end
+
+    # one tag per topic: the newest run holding an image owns it, everything
+    # older can only be pulled by digest
+    it "offers the tag to the newest image and digests to the rest" do
+      topic, _message, row = pushed_patchset
+      create(:patch_ci_run, patch_branch: row, github_run_id: 100,
+             image_ref: "ghcr.io/hackorum-dev/postgres-patch:t#{topic.id}",
+             image_digest: "sha256:aaa" + "0" * 61)
+      create(:patch_ci_run, patch_branch: row, github_run_id: 200,
+             image_ref: "ghcr.io/hackorum-dev/postgres-patch:t#{topic.id}",
+             image_digest: "sha256:bbb" + "0" * 61)
+
+      get ci_topic_path(topic)
+
+      expect(response.body).to include("postgres-patch:t#{topic.id}")
+      expect(response.body).to include("postgres-patch@sha256:aaa")
+      expect(response.body).not_to include("postgres-patch@sha256:bbb")
+    end
   end
 end

@@ -1,0 +1,15 @@
+/ rows must come from PatchCi::TopicHistory: base_tier and health_bucket are
+/ select aliases rather than methods
+- if (index = ci_patchset_index(row))
+  span.v = "v#{index}"
+span.mono = row.branch_name
+span.muted = "posted #{smart_time_display(row.message.created_at)}"
+- if row.ci_status.present?
+  = ci_status_badge(row.ci_status, title: ci_skip_reason_for(row))
+- if current
+  = ci_bucket_badge(row.health_bucket)
+- else
+  span.badge.b-queued superseded
+= ci_base_tier_badge(row, repo_state)
+- if row.pg_major
+  span.badge.b-queued = "pg #{row.pg_major}"

@@ -167,6 +167,7 @@ class TopicsController < ApplicationController
       .select(&:is_patch_submission)
       .sort_by(&:created_at)
       .reverse
+    @has_patch_branches = PatchBranch.where(topic_id: @topic.id).exists?
 
     render layout: false
   end

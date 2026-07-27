@@ -25,7 +25,10 @@ module PatchBranches
 
     # Writes the message's patch attachments into dir, returns sorted paths.
     def extract(dir)
-      patches = @message.attachments.select(&:patch_submission_candidate?)
+      # sort_by id, not the association's default: it has none, so postgres is
+      # free to hand back colliding filenames in either order, and the collision
+      # renaming below would then pick a different winner between runs
+      patches = @message.attachments.sort_by(&:id).select(&:patch_submission_candidate?)
       raise Error, "no patch attachments on message #{@message.id}" if patches.empty?
 
       patches = select_series(patches)

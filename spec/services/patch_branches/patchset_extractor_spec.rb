@@ -73,6 +73,20 @@ RSpec.describe PatchBranches::PatchsetExtractor do
     expect(result.to_h["1-a.patch"]).to eq("two")
   end
 
+  # has_many :attachments carries no order, so postgres may hand back colliding
+  # names either way round and the renaming would pick a different winner
+  it "renames collisions by attachment id, whatever order the rows arrive in" do
+    add_attachment("a.patch", "one")
+    add_attachment("a.patch", "two")
+    reversed = message.reload.attachments.to_a.reverse
+    allow_any_instance_of(Message).to receive(:attachments).and_return(reversed)
+
+    result = extract
+
+    expect(result.to_h["a.patch"]).to eq("one")
+    expect(result.to_h["1-a.patch"]).to eq("two")
+  end
+
   it "keeps only the highest version when a message carries two series versions" do
     add_attachment("0001-a.patch", "old one")
     add_attachment("0002-b.patch", "old two")

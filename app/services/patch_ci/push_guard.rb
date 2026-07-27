@@ -1,6 +1,11 @@
 module PatchCi
   # The last line of defense before a push. Refuses when it cannot verify.
   class PushGuard
+    # EraSkipReset matches stored skip reasons against this, so the wording
+    # lives in one place - two copies of the string would silently stop
+    # matching the moment either side was reworded
+    def self.no_era_image_reason(major) = "no era image for pg#{major}"
+
     def initialize(repo)
       @repo = repo
       @detector = EraDetector.new(repo)
@@ -25,7 +30,7 @@ module PatchCi
 
       major = @detector.major_for(row.base_sha)
       return "cannot determine pg major of base" unless major
-      return "no era image for pg#{major}" unless @detector.supported?(major)
+      return self.class.no_era_image_reason(major) unless @detector.supported?(major)
 
       nil
     end

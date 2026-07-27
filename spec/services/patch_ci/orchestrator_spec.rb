@@ -233,6 +233,25 @@ RSpec.describe PatchCi::Orchestrator do
     expect(orchestrator.cycle[:pruned]).to eq(4)
   end
 
+  it "clears stranded era skips and reports the count" do
+    reset = instance_double(PatchCi::EraSkipReset, call: 7)
+    allow(PatchCi::EraSkipReset).to receive(:new).and_return(reset)
+
+    expect(orchestrator.cycle[:era_skips_cleared]).to eq(7)
+  end
+
+  # an era image landing has to unstrand its rows even while the API is down,
+  # so this runs ahead of anything that can raise GithubClient::Error
+  it "clears stranded era skips even when the github fetch fails" do
+    reset = instance_double(PatchCi::EraSkipReset, call: 3)
+    allow(PatchCi::EraSkipReset).to receive(:new).and_return(reset)
+    allow(client).to receive(:runs).and_raise(PatchCi::GithubClient::Error, "boom")
+
+    result = orchestrator.cycle
+    expect(result[:error]).to eq("boom")
+    expect(result[:era_skips_cleared]).to eq(3)
+  end
+
   it "broadcasts once per cycle" do
     expect(PatchCi::DashboardBroadcast).to receive(:refresh!).once
 
@@ -452,6 +471,7 @@ RSpec.describe PatchCi::Orchestrator do
       expect(pusher).not_to receive(:skip)
       expect(pruner).not_to receive(:prune!)
       expect(PatchCi::StuckRunMarker).not_to receive(:new)
+      expect(PatchCi::EraSkipReset).not_to receive(:new)
       expect(PatchCi::DashboardBroadcast).not_to receive(:refresh!)
 
       result = nil

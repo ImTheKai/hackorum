@@ -27,6 +27,9 @@ module PatchCi
     def cycle
       @failed = 0
       @first_error = nil
+      # before anything that can fail on the network: an era image landing must
+      # unstrand its rows even on a cycle where GitHub is down
+      @era_skips_cleared = @dry_run ? 0 : EraSkipReset.new.call
       state = refresh_repo_state!
       runs = unrecorded(@client.runs)
       refs_ok = @result_refs.fetch!.success?
@@ -69,14 +72,15 @@ module PatchCi
       DashboardBroadcast.refresh! unless @dry_run
 
       { in_flight: in_flight, free_slots: free, pushed: pushed, failed: @failed,
-        pruned: pruned, ingested: ingested, refs_stale: !refs_ok,
-        fetch_failed: @fetch_failed, error: nil }
+        pruned: pruned, era_skips_cleared: @era_skips_cleared, ingested: ingested,
+        refs_stale: !refs_ok, fetch_failed: @fetch_failed, error: nil }
     rescue GithubClient::Error => e
       # not knowing what is in flight must never be read as "nothing is".
       # the counters read zero even when the fetch and ingest above already
       # happened: the error path reports the cycle as a loss, on purpose
       { in_flight: nil, free_slots: 0, pushed: 0, failed: 0, pruned: 0,
-        ingested: {}, refs_stale: true, fetch_failed: @fetch_failed, error: e.message }
+        era_skips_cleared: @era_skips_cleared, ingested: {}, refs_stale: true,
+        fetch_failed: @fetch_failed, error: e.message }
     end
 
     private

@@ -71,28 +71,12 @@
   margin-bottom: var(--spacing-8);
 }
 
-.ci-section > summary {
+.ci-section-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: var(--spacing-3);
-  margin-bottom: var(--spacing-2);
-  cursor: pointer;
-  list-style: none;
-}
-
-.ci-section > summary::-webkit-details-marker {
-  display: none;
-}
-
-.ci-section > summary::before {
-  content: "\25B8";
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
-.ci-section[open] > summary::before {
-  content: "\25BE";
+  margin-bottom: var(--spacing-3);
 }
 
 .ci-section h2 {
@@ -101,15 +85,69 @@
   margin: 0;
 }
 
-.ci-section summary .count {
+.ci-section-head .count {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
-.ci-section > .more {
-  display: inline-block;
-  margin-bottom: var(--spacing-3);
+.ci-section-head .more {
+  margin-left: auto;
   font-size: var(--font-size-sm);
+}
+
+/* tabs */
+.ci-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+  margin-bottom: var(--spacing-4);
+}
+
+.ci-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.ci-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.ci-tab.is-active {
+  color: var(--color-text-link);
+  font-weight: var(--font-weight-semibold);
+  border-bottom: 2px solid var(--color-text-link);
+  margin-bottom: -1px;
+}
+
+.ci-tab .count {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-bg-button);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ci-tab-panel {
+  display: none;
+}
+
+.ci-tab-panel.is-active {
+  display: block;
+}
+
+.ci-tab-panel > .muted {
+  margin: 0 0 var(--spacing-3);
 }
 
 /* tables */

@@ -3,11 +3,11 @@
 require "rails_helper"
 
 RSpec.describe "CI dashboard", type: :request do
-  # the dashboard sections are sibling <details>, so this stops at the section's
-  # own closing tag - lets an example assert a plain string lands in the right
-  # section instead of anywhere on the page
+  # lets an example assert a plain string lands in the right section instead of
+  # anywhere on the page. Parsed, not sliced: the tab panels are divs, so there
+  # is no closing tag a regex could stop at
   def section(id)
-    response.body[/id="#{id}".*?<\/details>/m]
+    Nokogiri::HTML(response.body).at_css("##{id}").to_html
   end
 
   # th texts with any sort link and direction arrow stripped, so the dashboard's
@@ -108,10 +108,33 @@ RSpec.describe "CI dashboard", type: :request do
 
     # the labels have to match where they land: "all branches" under a filtered
     # preset, or "full plan" over a page Planner has no say in, both lie
-    it "sends up next to the unfiltered branch table" do
+    it "sends the sidebar nav to the unfiltered branch table" do
       get "/ci"
 
-      expect(section("up-next")).to match(%r{href="/ci/branches"[^>]*>all branches<})
+      nav = Nokogiri::HTML(response.body).at_css(".layout-sidebar").to_html
+      expect(nav).to match(%r{href="/ci/branches"[^>]*>All branches<})
+    end
+
+    it "renders the three lists as tabs, the first one selected" do
+      get "/ci"
+      doc = Nokogiri::HTML(response.body)
+
+      tabs = doc.css(".ci-tab")
+      expect(tabs.map { |tab| tab.text.strip }).to eq([ "In progress", "Up next", "Recent results" ])
+      expect(tabs.map { |tab| tab["aria-selected"] }).to eq([ "true", "false", "false" ])
+      # every tab points at a panel that is on the page
+      panels = doc.css(".ci-tab-panel").map { |panel| panel["id"] }
+      expect(tabs.map { |tab| tab["aria-controls"] }).to eq(panels)
+      expect(panels).to eq([ "in-progress", "up-next", "recent" ])
+      expect(doc.css(".ci-tab-panel.is-active").size).to eq(1)
+    end
+
+    # a broadcast refresh morphs the page, and the server always marks the first
+    # tab active - without the controller the reader is thrown back to it
+    it "wires the tabs for morph refreshes" do
+      get "/ci"
+
+      expect(response.body).to include(%(data-controller="tabs tabs-morph"))
     end
 
     it "sends branch health to the recent-ish preset" do

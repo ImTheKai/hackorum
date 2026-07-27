@@ -6,33 +6,33 @@
   .sidebar
     = render "sidebar"
 
-.ci-container data-controller="ci-sections"
+- in_progress_note = "#{@in_progress.size} of #{number_with_delimiter(@in_flight_count)} shown, #{PatchCi::Config::BUDGET} slots" if @in_flight_count.positive?
+- panels = [ { id: "in-progress", partial: "in_progress", label: "In progress", note: in_progress_note, count: (@in_flight_count if @in_flight_count.positive?) },
+             { id: "up-next", partial: "up_next", label: "Up next", note: "forecast, recomputed every cycle - order can change" },
+             { id: "recent", partial: "recent_results", label: "Recent results", note: "newest first" } ]
+
+.ci-container
   h1.ci-title Patch CI
   = render "status_strip"
 
-  details#in-progress.ci-section open=true
-    summary
-      h2 In progress
-      - if @in_flight_count.positive?
-        span.count = "#{@in_progress.size} of #{number_with_delimiter(@in_flight_count)} shown, #{PatchCi::Config::BUDGET} slots"
-    = render "in_progress"
-
-  details#up-next.ci-section open=true
-    summary
-      h2 Up next
-      span.count forecast, recomputed every cycle - order can change
-    = link_to "all branches", ci_branches_path, class: "more"
-    = render "up_next"
-
-  details#recent.ci-section open=true
-    summary
-      h2 Recent results
-      span.count newest first
-    = render "recent_results"
-
-  details#health.ci-section open=true
-    summary
+  section#health.ci-section
+    .ci-section-head
       h2 Branch health
       span.count = "#{number_with_delimiter(@health_counts.values.sum)} tracked patchsets"
-    = link_to "recent branches", ci_branches_path(base: "recent,stale"), class: "more"
+      = link_to "recent branches", ci_branches_path(base: "recent,stale"), class: "more"
     = render "branch_health"
+
+  / tabs-morph keeps the selected tab: the server always renders the first one
+  / active, so a broadcast refresh would drop the reader back to it
+  div data-controller="tabs tabs-morph"
+    nav.ci-tablist role="tablist"
+      - panels.each_with_index do |panel, i|
+        button.ci-tab type="button" role="tab" id="ci-tab-#{panel[:id]}" aria-controls=panel[:id] data-tabs-target="tab" data-action="click->tabs#select" data-index=i aria-selected=(i.zero? ? "true" : "false") class=("is-active" if i.zero?)
+          = panel[:label]
+          - if panel[:count]
+            span.count = number_with_delimiter(panel[:count])
+    - panels.each_with_index do |panel, i|
+      .ci-tab-panel id=panel[:id] role="tabpanel" aria-labelledby="ci-tab-#{panel[:id]}" data-tabs-target="panel" class=("is-active" if i.zero?)
+        - if panel[:note]
+          p.muted = panel[:note]
+        = render panel[:partial]

@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 
-// keeps details/summary open state across morph refreshes - server always
-// renders open, so without this every broadcast would re-expand collapsed
-// sections. content underneath still morphs normally.
+// keeps the selected tab across morph refreshes - the server renders a fixed
+// tab active, so without this every broadcast would jump back to it. Panel
+// content underneath still morphs normally.
 export default class extends Controller {
   connect() {
     this.onBeforeMorphElement = this.handleBeforeMorphElement.bind(this)
@@ -15,8 +15,12 @@ export default class extends Controller {
 
   handleBeforeMorphElement(event) {
     const current = event.target
+    if (!current.hasAttribute("data-tabs-target")) return
+
     const incoming = event.detail.newElement
-    if (current.tagName !== "DETAILS" || incoming.tagName !== "DETAILS") return
-    incoming.open = current.open
+    incoming.classList.toggle("is-active", current.classList.contains("is-active"))
+    if (current.hasAttribute("aria-selected")) {
+      incoming.setAttribute("aria-selected", current.getAttribute("aria-selected"))
+    }
   }
 }

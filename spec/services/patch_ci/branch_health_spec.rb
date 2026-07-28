@@ -12,7 +12,10 @@ RSpec.describe PatchCi::BranchHealth do
     repo_state.master_committed_at - 1.day
   end
 
+  # base_sha defaults to the current master, the way on_master defaults to true:
+  # both say "this row applied on master", and the applies arm reads both
   def branch(status: "applied", **attrs)
+    attrs = { base_sha: repo_state.master_sha }.merge(attrs)
     create(:patch_branch, topic: create(:topic), status: status, **attrs)
   end
 
@@ -117,6 +120,23 @@ RSpec.describe PatchCi::BranchHealth do
                     base_committed_at: fresh_time, on_master: true)
       expect(health.bucket_for(row)).to eq("applies")
     end
+
+    # master moves several times a day, so a base that is not the tip is the
+    # normal state of a healthy row and says nothing about whether the patch
+    # still applies. Only a failed attempt is a verdict.
+    it "pushed on a base master has moved past is still applies" do
+      row = branch(pushed_at: Time.current, ci_status: "success",
+                    base_committed_at: fresh_time, on_master: true, base_sha: "f" * 40)
+      expect(health.bucket_for(row)).to eq("applies")
+    end
+
+    it "needs_rebase once an attempt on master has actually failed" do
+      row = branch(pushed_at: Time.current, ci_status: "success",
+                    base_committed_at: fresh_time, on_master: true, base_sha: "f" * 40,
+                    master_apply_sha: repo_state.master_sha,
+                    master_apply_error: "CONFLICT (content): Merge conflict in a.c")
+      expect(health.bucket_for(row)).to eq("needs_rebase")
+    end
   end
 
   describe "#counts" do
@@ -139,6 +159,28 @@ RSpec.describe PatchCi::BranchHealth do
         "never_applied" => 2
       )
       expect(health.counts.values.sum).to eq(PatchBranch.current.count)
+    end
+  end
+
+  describe "#failing_on_current_master" do
+    # a failure is only news if it was reached against the master we have: the
+    # same row failing against last week's master is a stale answer, which is
+    # what the rebase tier is for
+    it "keeps the rows whose failure was against this master" do
+      fresh = branch(pushed_at: Time.current, ci_status: "success",
+                     base_committed_at: fresh_time, base_sha: "f" * 40,
+                     master_apply_sha: repo_state.master_sha,
+                     master_apply_error: "CONFLICT (content): a.c")
+      branch(pushed_at: Time.current, ci_status: "success",
+             base_committed_at: fresh_time, base_sha: "e" * 40,
+             master_apply_sha: "0" * 40, master_apply_error: "CONFLICT (content): a.c")
+      # never reached master at all: no sha, so nothing to trust
+      branch(pushed_at: Time.current, ci_status: "success",
+             base_committed_at: fresh_time, base_sha: "d" * 40, on_master: false)
+
+      ids = health.failing_on_current_master(health.scope_for("needs_rebase")).pluck(:id)
+
+      expect(ids).to contain_exactly(fresh.id)
     end
   end
 

@@ -8,11 +8,13 @@ RSpec.describe PatchCi::BranchQuery do
                         repo_state: repo_state)
   end
 
+  # base_sha defaults to the current master so an applied row reads as applying,
+  # the same way the factory defaults on_master to true
   def branch(title: "some patch", days_behind: 1, **attrs)
     topic = create(:topic, title: title, last_message_at: Time.current)
     create(:patch_branch, topic: topic,
            base_committed_at: days_behind && repo_state.master_committed_at - days_behind.days,
-           base_commit_height: 10, **attrs)
+           base_commit_height: 10, **{ base_sha: repo_state.master_sha }.merge(attrs))
   end
 
   def names(q)

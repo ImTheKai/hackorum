@@ -343,6 +343,19 @@ RSpec.describe PatchCi::Orchestrator do
       expect(orchestrator.cycle[:pushed]).to eq(1)
     end
 
+    # an infra failure writes nothing to the row, so the cycle line is the only
+    # place it can show up - and a worktree that has stopped applying anything
+    # must not look like a quiet cycle
+    it "counts an infra failure as a failed item and names it" do
+      allow(apply_one).to receive(:call).and_return([ :infra_failed, row ])
+      expect(pusher).not_to receive(:push)
+
+      result = nil
+      expect { result = orchestrator.cycle }.to output(/infra failure/).to_stderr
+
+      expect(result).to include(pushed: 0, failed: 1)
+    end
+
     it "pushes nothing when the master probe fails" do
       allow(apply_one).to receive(:call).and_return([ :master_apply_failed, row ])
       expect(pusher).not_to receive(:push)

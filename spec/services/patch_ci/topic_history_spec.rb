@@ -24,7 +24,8 @@ RSpec.describe PatchCi::TopicHistory do
 
   it "decorates every row with the health bucket and the base tier" do
     patchset(1, created_at: 1.hour.ago, pushed_at: 1.hour.ago, ci_status: "success",
-             base_committed_at: 1.day.ago, base_commit_height: 10)
+             base_committed_at: 1.day.ago, base_commit_height: 10,
+             base_sha: repo_state.master_sha)
 
     row = history.patchsets.first
 

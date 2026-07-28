@@ -54,6 +54,17 @@ module PatchCi
       relation.joins(:topic).where("#{bucket_sql} IN (?)", buckets)
     end
 
+    # Narrows a relation - needs_rebase in practice - to the rows whose failure
+    # was reached against the master we have now. master_apply_sha is what makes
+    # that answerable at all: the same error against last week's master is a
+    # stale answer waiting for its re-probe, and master moves several times a
+    # day, so most of the bucket is that. Rows that never reached master carry no
+    # sha and are excluded, which is the point.
+    def failing_on_current_master(relation)
+      return relation.none unless @repo_state
+      relation.where(master_apply_sha: @repo_state.master_sha)
+    end
+
     def wont_retry_breakdown
       scope_for("wont_retry")
         .group(Arel.sql(wont_retry_reason_sql)).count
@@ -81,10 +92,20 @@ module PatchCi
         # reads retired. BaseFreshness falls back to 'unknown' instead; both
         # are deliberate and spec-pinned.
         stale_cutoff = @repo_state ? @repo_state.master_committed_at - Config::REBASE_AFTER_DAYS.days : Config::WORK_FROM
-        # on_master, not master_apply_error, is the conflict signal: ApplyOne
-        # only reaches the detected-base path after master has already failed,
-        # so an applied row off master conflicted even when the error column
-        # (added later) is null. Never branch on master_apply_error alone.
+        # The bucket is the last master attempt's answer, and only an attempt
+        # counts as one. Comparing base_sha against the master tip is not it:
+        # master moves several times a day, so a row whose base is not the tip is
+        # the normal state of a healthy patchset, not a verdict on it.
+        #
+        # Both columns are needed. on_master carries the rows from before
+        # master_apply_error existed - ApplyOne only reaches the detected-base
+        # path after master has already failed, so an applied row off master
+        # conflicted whatever the error column says. And master_apply_error
+        # carries the rows that applied once and have failed since: nothing moves
+        # on_master back, so reading it alone was how a row that stopped applying
+        # weeks ago kept claiming it still does. ApplyOne keeps the column clean
+        # for this - an infra failure or a crash writes no verdict there - so a
+        # set error always means "we tried master and could not get there".
         #
         # The arms are ordered and the order is the rule. Retirement outranks
         # outcome, so an on_master row whose base has aged out reads wont_retry
@@ -112,6 +133,7 @@ module PatchCi
             -- stays retryable rather than claiming to apply. Do not collapse
             -- the two into one shape.
             WHEN patch_branches.on_master
+              AND patch_branches.master_apply_error IS NULL
               AND patch_branches.base_committed_at IS NOT NULL THEN 'applies'
             ELSE 'needs_rebase'
           END

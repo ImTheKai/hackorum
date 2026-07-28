@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_27_050000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_stat_statements"
@@ -477,6 +477,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_27_050000) do
     t.datetime "last_master_apply_at"
     t.text "master_apply_error"
     t.integer "pg_major"
+    t.string "master_apply_sha"
+    t.string "master_conflict_files", default: [], null: false, array: true
     t.index ["attempted_at"], name: "index_patch_branches_on_attempted_at", order: :desc
     t.index ["branch_name"], name: "index_patch_branches_on_branch_name", unique: true
     t.index ["ci_status"], name: "index_patch_branches_on_ci_status"

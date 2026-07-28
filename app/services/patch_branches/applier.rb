@@ -1,3 +1,5 @@
+require "fileutils"
+
 module PatchBranches
   class Applier
     IDENTITY = [ "-c", "user.name=hackorum", "-c", "user.email=git@hackorum.dev",
@@ -5,11 +7,35 @@ module PatchBranches
 
     CANDIDATE_PREFIXES = %w[src doc contrib].freeze
 
-    Result = Struct.new(:success, :output, :conflict_files, :failed_patch, keyword_init: true) do
+    # git refusing to run at all, as opposed to a patch that does not apply.
+    # Deliberately one narrow signature rather than a taxonomy: this is the one
+    # that cost us 38 hours of false conflicts, and a pattern loose enough to
+    # catch an unknown infra error would eventually swallow a real one.
+    INFRA_PATTERNS = [ /previous rebase directory .* still exists/ ].freeze
+
+    Result = Struct.new(:success, :output, :conflict_files, :failed_patch, :infra, :empty,
+                        keyword_init: true) do
       def success?
         success
       end
+
+      # true when the failure says nothing about the patch, so no caller may
+      # store it as a verdict on one
+      def infra?
+        !!infra
+      end
+
+      # applied without changing anything - terminal, unlike a conflict: no
+      # later master makes an unreadable patch readable or an upstreamed one new
+      def empty_result?
+        !!empty
+      end
     end
+
+    # what an empty result means, told apart by what git made of the hunks
+    NO_DIFF_CONTENT = "series produced no commits (nothing git could read as a diff)".freeze
+    UNSUPPORTED_FORMAT = "unsupported patch format (git read no hunks, e.g. a context diff)".freeze
+    ALREADY_IN_BASE = "patch applies but changes nothing - already in the base".freeze
 
     def initialize(worktree)
       @wt = worktree
@@ -33,13 +59,16 @@ module PatchBranches
         return result
       end
 
-      # every file skipped (empty/unsupported) means nothing was applied;
-      # a branch identical to its base must not count as applied
-      if @wt.rev_parse("HEAD") == @wt.rev_parse(base_sha)
+      # Content, not commit shas. git reports "Applied patch cleanly" both for a
+      # format it cannot read and for a patch already present in the base, and
+      # the bare-diff path commits that nothing with --allow-empty. The commit
+      # sha differs from the base either way, so a sha comparison called it
+      # applied and the branch went out carrying an empty commit - which CI then
+      # reports as a pass for a patchset it never tested.
+      if @wt.run("diff", "--quiet", base_sha, "HEAD").success?
         @wt.run("branch", "-D", branch_name)
-        return Result.new(success: false,
-                          output: "series produced no commits (all files empty or unsupported)",
-                          conflict_files: [])
+        return Result.new(success: false, empty: true, conflict_files: [],
+                          output: empty_reason(patch_files))
       end
 
       @wt.run!("branch", "-f", branch_name, "HEAD")
@@ -47,6 +76,23 @@ module PatchBranches
     end
 
     private
+
+    # numstat is git's own reading of the patch, so the three ways to change
+    # nothing tell themselves apart: nothing parsed at all (a cover letter or
+    # junk attachment), a header with no hunks git understands (a context diff -
+    # that gap is ours), or real hunks whose result is already in the base (what
+    # an old patchset looks like once it has been committed upstream).
+    def empty_reason(patch_files)
+      stats = patch_files.map { |file| @wt.run("apply", "--numstat", file) }.select(&:success?)
+      return NO_DIFF_CONTENT if stats.empty?
+      return UNSUPPORTED_FORMAT if stats.all? { |result| zero_lines?(result) }
+      ALREADY_IN_BASE
+    end
+
+    def zero_lines?(result)
+      lines = result.stdout.lines
+      lines.any? && lines.all? { |line| line.start_with?("0\t0\t") }
+    end
 
     def apply_series(base_sha, patch_files, directory: nil)
       reset_to(base_sha)
@@ -61,7 +107,11 @@ module PatchBranches
           success: false,
           output: output,
           conflict_files: parse_conflict_files(output),
-          failed_patch: File.basename(file)
+          failed_patch: File.basename(file),
+          infra: INFRA_PATTERNS.any? { |pattern| pattern.match?(output) },
+          # terminal like an empty result, and for the same reason: no later
+          # master makes a format we cannot read readable
+          empty: output.include?(UNSUPPORTED_FORMAT)
         )
       end
 
@@ -119,8 +169,23 @@ module PatchBranches
 
     def cleanup
       @wt.run("am", "--abort")
+      # the abort is not enough on its own: an unparseable abort-safety kills it
+      # outright, and older git gives up once HEAD has moved. Either way the
+      # state directory survives, and git then refuses every later mbox apply
+      # with "previous rebase directory ... still exists" - one killed apply
+      # wedges the shared worktree for good. Nothing in there is worth keeping.
+      dir = am_state_dir
+      FileUtils.rm_rf(dir) if dir
       @wt.run("reset", "--hard", "--quiet")
       @wt.run("clean", "-fdxq")
+    end
+
+    # asked of git rather than built by hand: in a linked worktree the state
+    # lives under the main repo's .git/worktrees/<name>, not in the worktree
+    def am_state_dir
+      result = @wt.run("rev-parse", "--git-path", "rebase-apply")
+      return nil unless result.success?
+      File.expand_path(result.stdout.strip, @wt.dir)
     end
 
     def commit_date_env(committed_at)
@@ -133,6 +198,14 @@ module PatchBranches
     end
 
     def apply_one(file, directory: nil)
+      # Rejected before git sees it, because git does not reject it. It cannot
+      # apply a context diff at all, but it does read the git-style headers a
+      # patch like this carries, so it "applies cleanly" and materialises the
+      # files they declare: unchanged where the base has them, empty where it
+      # does not. The second shape changes the tree, so no after-the-fact check
+      # on the result catches it - the format is the thing to refuse.
+      return unsupported_format_result(file) if context_diff?(file)
+
       dir_args = directory ? [ "--directory=#{directory}" ] : []
       if mbox?(file)
         @wt.run(*IDENTITY, "am", "--3way", "--empty=drop", *dir_args, file, env: @stamp_env)
@@ -153,6 +226,18 @@ module PatchBranches
         @wt.run(*IDENTITY, "commit", "-q", "--allow-empty",
                 "-m", "Apply #{File.basename(file)}", env: @stamp_env)
       end
+    end
+
+    # context hunks and no unified ones. Both markers present means a unified
+    # diff quoting something that looks like a context header, and git reads
+    # those hunks fine.
+    def context_diff?(file)
+      content = File.read(file, encoding: "BINARY").scrub
+      content.match?(/^\*{15}/) && !content.match?(/^@@ -/)
+    end
+
+    def unsupported_format_result(file)
+      GitRepo::Result.new("", "#{UNSUPPORTED_FORMAT}: #{File.basename(file)}", 1)
     end
 
     def no_valid_patches?(result)

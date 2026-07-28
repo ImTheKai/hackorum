@@ -161,7 +161,8 @@ module PatchCi
     end
 
     def new_version(item, master_sha)
-      _outcome, row = apply(item.message.id, master_sha: master_sha)
+      outcome, row = apply(item.message.id, master_sha: master_sha)
+      return count_infra_failure(item.kind) if outcome == :infra_failed
       return false unless row&.persisted? && row.status == "applied"
       guard_and_push(row)
     end
@@ -170,8 +171,19 @@ module PatchCi
       # master_only bypasses skippable? by design (a rebase input always looks
       # skippable), so one force: false ApplyOne serves both call shapes
       outcome, _row = apply(row.message_id, master_sha: master_sha, master_only: true)
+      return count_infra_failure(:rebase) if outcome == :infra_failed
       return false unless outcome == :applied_on_master
       guard_and_push(row)
+    end
+
+    # An infra failure writes nothing to the row on purpose, so the cycle line is
+    # the only place it can surface. Counted with the exceptions: a worktree that
+    # has stopped applying anything must not read as a quiet cycle - unnoticed is
+    # how one wedges for days.
+    def count_infra_failure(kind)
+      @failed += 1
+      @first_error ||= "#{kind}: infra failure, nothing recorded on the row"
+      false
     end
 
     # the [:error] seam: an exception out of an apply belongs on the row, and

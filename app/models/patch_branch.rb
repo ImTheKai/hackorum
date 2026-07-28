@@ -1,6 +1,8 @@
 class PatchBranch < ApplicationRecord
   STATUSES = %w[applied failed].freeze
-  FAILURE_STAGES = %w[extract base_detection apply error].freeze
+  # empty is terminal like extract: the apply worked and produced nothing, so no
+  # later master makes it produce something. Kept out of the retry tiers.
+  FAILURE_STAGES = %w[extract base_detection apply error empty].freeze
 
   belongs_to :topic
   belongs_to :message

@@ -6,7 +6,7 @@ RSpec.describe PatchCi::BranchRows do
 
   def with_run(**run_attrs)
     branch = create(:patch_branch, base_committed_at: 1.day.ago, base_commit_height: 10,
-                    pushed_at: 1.hour.ago, ci_status: "success")
+                    base_sha: repo_state.master_sha, pushed_at: 1.hour.ago, ci_status: "success")
     run = create(:patch_ci_run, patch_branch: branch, **run_attrs)
     branch.update_columns(latest_ci_run_id: run.id)
     [ branch, run ]

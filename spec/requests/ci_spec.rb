@@ -330,9 +330,11 @@ RSpec.describe "CI dashboard", type: :request do
     it "counts patchsets applying on the current master and checked against it" do
       state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_sha: state.master_sha,
              base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
       # applies, but the last check predates this master
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_sha: state.master_sha,
              base_committed_at: state.master_committed_at, last_master_apply_at: 3.days.ago)
       # checked against this master, but conflicts
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: false,
@@ -343,28 +345,51 @@ RSpec.describe "CI dashboard", type: :request do
       expect(stat_tile("Verified on master").at_css(".v").text.strip).to eq("1")
     end
 
-    # the applies bucket's own sub-line: of the rows that applied, how many the
-    # rebase tier would re-probe now. Not the bucket total - a row checked
-    # against this master is not waiting for anything.
-    it "counts the applying rows still waiting for a rebase" do
+    # the needs_rebase bucket's own sub-line: of the rows that failed on master,
+    # the ones whose failure was against the master we have. The rest failed
+    # against an older one and are waiting for their re-probe.
+    it "counts the failures that were reached against the current master" do
       state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
-      # due: probed before this master and past the throttle
+      # failed against this master: a verdict we can stand behind
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
-             base_committed_at: state.master_committed_at, last_master_apply_at: 3.days.ago)
-      # never probed, so also due
+             base_sha: "f" * 40, base_committed_at: state.master_committed_at,
+             master_apply_sha: state.master_sha,
+             master_apply_error: "CONFLICT (content): Merge conflict in a.c")
+      # failed, but against a master we have since moved past
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
-             base_committed_at: state.master_committed_at, last_master_apply_at: nil)
-      # already checked against this master, so not waiting
+             base_sha: "e" * 40, base_committed_at: state.master_committed_at,
+             master_apply_sha: "0" * 40,
+             master_apply_error: "CONFLICT (content): Merge conflict in a.c")
+      # applied when last tried and master has moved since: not a failure at all
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
-             base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
+             base_sha: "d" * 40, base_committed_at: state.master_committed_at)
 
       get "/ci"
 
       bucket = Nokogiri::HTML(response.body).css(".ci-health .bucket")
-                                           .find { |node| node.at_css(".t").text.strip == "applies" }
-      expect(bucket.at_css(".n").text.strip).to eq("3")
-      waiting = bucket.css("li").find { |li| li.text.include?("waiting for a rebase") }
-      expect(waiting.css("span").last.text.strip).to eq("2")
+                                           .find { |node| node.at_css(".t").text.strip == "needs rebase" }
+      expect(bucket.at_css(".n").text.strip).to eq("2")
+      failing = bucket.css("li").find { |li| li.text.include?("failing on this master") }
+      expect(failing.css("span").last.text.strip).to eq("1")
+    end
+
+    # an empty apply is our bug, not a patchset that failed to build, so the
+    # never_applied panel says how many of them there are rather than burying
+    # them with the extract and conflict failures
+    it "counts the patchsets that applied without changing anything" do
+      create(:patch_ci_repo_state)
+      create(:patch_branch, status: "failed", failure_stage: "empty",
+             failure_reason: PatchBranches::Applier::UNSUPPORTED_FORMAT)
+      create(:patch_branch, status: "failed", failure_stage: "apply",
+             failure_reason: "patch does not apply")
+
+      get "/ci"
+      bucket = Nokogiri::HTML(response.body).css(".ci-health .bucket")
+                                           .find { |node| node.at_css(".t").text.strip == "never applied" }
+
+      expect(bucket.at_css(".n").text.strip).to eq("2")
+      empty = bucket.css("li").find { |li| li.text.include?("applied but changed nothing") }
+      expect(empty.css("span").last.text.strip).to eq("1")
     end
 
     it "warns on the status strip when rows have gone unchecked" do
@@ -576,8 +601,9 @@ RSpec.describe "CI dashboard", type: :request do
     end
 
     it "filters by state" do
-      create(:patch_ci_repo_state)
+      state = create(:patch_ci_repo_state)
       applies = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
+                       base_sha: state.master_sha,
                        base_committed_at: 1.day.ago, base_commit_height: 10)
       failed = create(:patch_branch, status: "failed", failure_stage: "apply")
 
@@ -958,6 +984,22 @@ RSpec.describe "CI dashboard", type: :request do
       get ci_topic_path(topic)
 
       expect(response.body).to include("conflict in gram.y")
+    end
+
+    # which master it failed on is the whole value of the record: without it the
+    # error could be about any of the several masters we see in a day
+    it "names the master a failing re-apply was tried against, and where" do
+      topic, _message, = pushed_patchset(master_apply_error: "conflict in gram.y",
+                                         master_apply_sha: "abc1234" + "0" * 33,
+                                         master_conflict_files: [ "src/backend/parser/gram.y" ],
+                                         last_master_apply_at: 2.hours.ago)
+
+      get ci_topic_path(topic)
+      rebase = Nokogiri::HTML(response.body).css(".ci-fact")
+                                           .find { |node| node.at_css(".k").text.strip == "rebase" }
+
+      expect(rebase.text).to include("abc12340")
+      expect(rebase.text).to include("src/backend/parser/gram.y")
     end
 
     it "leaves the rebase row out when master re-apply never ran" do

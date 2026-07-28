@@ -24,9 +24,9 @@ module PatchCi
     end
 
     # Rows a re-probe could tell us something new about: master has moved since
-    # the last probe AND the throttle has expired. Sole owner of "due" -
-    # Planner#rebase_scope filters on this, and the dashboard counts it, so the
-    # figure people read cannot drift from the work the tier actually emits.
+    # the last probe AND the throttle has expired. Sole owner of "due", so a
+    # second copy of the clause cannot drift from Planner#rebase_scope, which is
+    # its only caller - the dashboard reports the rebase tier's own depth.
     #
     # Not a TIERS value: 'current' already means "master has not moved", but
     # 'behind' spans both sides of the throttle, so due is a narrower question

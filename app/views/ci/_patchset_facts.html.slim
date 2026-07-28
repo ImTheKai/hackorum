@@ -42,8 +42,16 @@
       span.v
         - if row.last_master_apply_at
           = "last tried #{smart_time_display(row.last_master_apply_at)}"
+        / which master, not just when: master moves several times a day, so the
+        / stamp alone does not say what the error is an answer about
+        - if row.master_apply_sha.present?
+          = " on "
+          = link_to ci_short_sha(row.master_apply_sha), commit_web_url(row.master_apply_sha),
+                    class: "mono", target: "_blank", rel: "noopener"
         - if row.master_apply_error.present?
           pre.ci-output = row.master_apply_error
+        - if row.master_conflict_files.any?
+          .muted = "conflicts on master: #{row.master_conflict_files.join(', ')}"
 
   - if row.pushed_at
     .ci-fact

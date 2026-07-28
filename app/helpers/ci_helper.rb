@@ -56,8 +56,8 @@ module CiHelper
   # live breakdown of its own - awaiting_ci and wont_retry build theirs from
   # counts, so they are absent here on purpose.
   CI_BUCKET_BLURBS = {
-    "applies" => "applied on master when last checked",
-    "needs_rebase" => "did not apply on master, still retrying",
+    "applies" => "applied on master when last tried",
+    "needs_rebase" => "the last apply on master failed, still retrying",
     "never_applied" => "extract, base detection or apply failed"
   }.freeze
 
@@ -206,13 +206,16 @@ module CiHelper
     row.branch_name.to_s[/_(\d+)\z/, 1]
   end
 
-  # the four stages ApplyOne can fail at, in words. "error" is its catch-all
+  # the five stages ApplyOne can fail at, in words. "error" is its catch-all
   # for an exception, which "failed at error" would not convey.
   FAILURE_STAGE_PHRASES = {
     "extract" => "patch extract failed",
     "base_detection" => "no usable base commit",
     "apply" => "apply failed",
-    "error" => "apply crashed"
+    "error" => "apply crashed",
+    # deliberately not "apply failed": it did not, it produced nothing. The
+    # failure_reason on the row says which of the ways that happened.
+    "empty" => "applied but changed nothing"
   }.freeze
 
   # the one-phrase "what became of this patchset", for a row with nothing to

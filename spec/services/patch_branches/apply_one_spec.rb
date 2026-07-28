@@ -61,7 +61,9 @@ RSpec.describe PatchBranches::ApplyOne do
   end
 
   # everything a bare master-attempt touch is allowed to move
-  let(:volatile) { %w[last_master_apply_at master_apply_error updated_at] }
+  let(:volatile) do
+    %w[last_master_apply_at master_apply_error master_apply_sha master_conflict_files updated_at]
+  end
 
   it "records base metadata and a clean master apply outcome" do
     base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" }, date: Time.current.iso8601)
@@ -98,9 +100,65 @@ RSpec.describe PatchBranches::ApplyOne do
     expect(record.on_master).to eq(false)
     expect(record.base_source).to eq("history")
     expect(record.master_apply_error).to be_present
+    expect(record.master_apply_sha).to eq(master_sha)
+    expect(record.master_conflict_files).to eq([ "a.c" ])
     expect(record.base_committed_at).to eq(Time.zone.parse(old_date))
     expect(record.base_commit_height).to eq(1)
     expect(record.last_master_apply_at).to be_within(1.minute).of(Time.current)
+  end
+
+  # a git-level refusal is not a conflict, so base detection must not be handed
+  # a master failure that never happened - that is how an infra hiccup ends up
+  # stored as "this patchset does not apply"
+  it "writes no row when the master attempt fails for an infra reason" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" })
+    patch = generate_patch(fixture.path, base, "a.c", "v2\n", @patch_dir)
+    message = message_with_patch(patch)
+    allow_any_instance_of(PatchBranches::Applier).to receive(:apply)
+      .and_return(PatchBranches::Applier::Result.new(
+        success: false, infra: true, conflict_files: [],
+        output: "fatal: previous rebase directory /x/rebase-apply still exists but mbox given."))
+
+    outcome, = apply_one.call(message.id, master_sha: base)
+
+    expect(outcome).to eq(:infra_failed)
+    expect(PatchBranch.count).to eq(0)
+  end
+
+  # an apply that changed nothing is not a patchset we can test: the branch would
+  # carry an empty commit and CI would report it as a pass. Terminal, unlike a
+  # conflict - no later master makes an unreadable patch readable.
+  it "fails at empty when the patch applies without changing anything" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "line1\nline2\nline3\n" })
+    patch = File.join(@patch_dir, "context.patch")
+    File.write(patch, <<~PATCH)
+      diff --git a/a.c b/a.c
+      new file mode 100644
+      index 4c83a63..b5f4ccf
+      *** a/a.c
+      --- b/a.c
+      *************** context
+      *** 1,3 ****
+        line1
+      ! line2
+        line3
+      --- 1,3 ----
+        line1
+      ! CHANGED
+        line3
+    PATCH
+    message = message_with_patch(patch)
+
+    outcome, record = apply_one.call(message.id, master_sha: base)
+
+    expect(outcome).to eq(:empty_patchset)
+    record.reload
+    expect(record.status).to eq("failed")
+    expect(record.failure_stage).to eq("empty")
+    expect(record.failure_reason).to include("unsupported patch format")
+    expect(record.pushed_at).to be_nil
+    # no base detection either: an empty result is not a master conflict
+    expect(record.master_apply_error).to be_nil
   end
 
   it "does not claim a master attempt when extraction fails before applying" do
@@ -370,7 +428,13 @@ RSpec.describe PatchBranches::ApplyOne do
       expect(record.status).to eq("applied")
       expect(record.failure_stage).to be_nil
       expect(record.attributes.except(*volatile)).to eq(before.except(*volatile))
-      expect(record.master_apply_error).to include("worktree gone")
+      # a crash found out nothing about master, so the verdict columns keep what
+      # the last real attempt left - here the old master it applied on, not the
+      # one the probe died against. Only the throttle moves, or a patchset that
+      # crashes the applier would be retried every cycle.
+      expect(record.master_apply_error).to be_nil
+      expect(record.master_apply_sha).to eq(@old)
+      expect(record.last_master_apply_at).to be_within(1.minute).of(Time.current)
     end
 
     it "keeps the row applied when extraction fails during a probe" do
@@ -387,7 +451,81 @@ RSpec.describe PatchBranches::ApplyOne do
       expect(record.status).to eq("applied")
       expect(record.failure_stage).to be_nil
       expect(record.attributes.except(*volatile)).to eq(before.except(*volatile))
-      expect(record.master_apply_error).to include("no patch attachments")
+      # same as a crash: not a master verdict, so master_apply_error stays clean
+      expect(record.master_apply_error).to be_nil
+      expect(record.last_master_apply_at).to be_within(1.minute).of(Time.current)
+    end
+
+    # the probe timestamp is the throttle: bumping it for a failure that never
+    # tested the patch would park a healthy row for a day and record a conflict
+    # it never had
+    it "leaves the row completely alone when the probe fails for an infra reason" do
+      message = applied_on_old_base
+      new_master = fixture.commit(subject: "unrelated", files: { "b.c" => "other\n" })
+      before = PatchBranch.find_by(message_id: message.id).attributes
+      allow_any_instance_of(PatchBranches::Applier).to receive(:apply)
+        .and_return(PatchBranches::Applier::Result.new(
+          success: false, infra: true, conflict_files: [],
+          output: "fatal: previous rebase directory /x/rebase-apply still exists but mbox given."))
+
+      outcome, record = apply_one.call(message.id, master_sha: new_master, master_only: true)
+
+      expect(outcome).to eq(:infra_failed)
+      expect(record.reload.attributes).to eq(before)
+    end
+
+    # the whole point of the column: master moves several times a day, so a
+    # failure is only usable if it says which master it was against
+    it "records the master a failed probe was against, and where it conflicted" do
+      message = applied_on_old_base
+      new_master = fixture.commit(subject: "conflicting", files: { "a.c" => "v2\n" },
+                                  date: "2026-02-01T00:00:00+00:00")
+
+      outcome, record = apply_one.call(message.id, master_sha: new_master, master_only: true)
+
+      expect(outcome).to eq(:master_apply_failed)
+      record.reload
+      expect(record.master_apply_sha).to eq(new_master)
+      expect(record.master_conflict_files).to eq([ "a.c" ])
+      # the branch still sits on its own base, so the row's base columns do not move
+      expect(record.base_sha).to eq(@old)
+    end
+
+    it "clears the last conflict when a probe applies again" do
+      message = applied_on_old_base
+      PatchBranch.find_by(message_id: message.id)
+                 .update_columns(master_apply_sha: "0" * 40, master_apply_error: "old conflict",
+                                 master_conflict_files: [ "a.c" ])
+      new_master = fixture.commit(subject: "unrelated", files: { "b.c" => "other\n" })
+
+      _outcome, record = apply_one.call(message.id, master_sha: new_master, master_only: true)
+
+      record.reload
+      expect(record.master_apply_sha).to eq(new_master)
+      expect(record.master_apply_error).to be_nil
+      expect(record.master_conflict_files).to eq([])
+    end
+
+    # a patchset that has been committed upstream applies empty on every master
+    # from then on, so the probe has to retire the row rather than keep a pushed
+    # branch whose CI verdict is about an empty commit
+    it "retires the row when a probe applies empty on the new master" do
+      message = applied_on_old_base
+      allow_any_instance_of(PatchBranches::Applier).to receive(:apply)
+        .and_return(PatchBranches::Applier::Result.new(
+          success: false, empty: true, conflict_files: [],
+          output: PatchBranches::Applier::ALREADY_IN_BASE))
+      new_master = fixture.commit(subject: "unrelated", files: { "b.c" => "other\n" })
+
+      outcome, record = apply_one.call(message.id, master_sha: new_master, master_only: true)
+
+      expect(outcome).to eq(:empty_patchset)
+      record.reload
+      expect(record.status).to eq("failed")
+      expect(record.failure_stage).to eq("empty")
+      expect(record.failure_reason).to include("already in the base")
+      # the base metadata stays: it is what the branch out there was built on
+      expect(record.base_sha).to eq(@old)
     end
 
     it "leaves everything alone when the row already sits on this master" do

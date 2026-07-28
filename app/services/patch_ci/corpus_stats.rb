@@ -13,6 +13,7 @@ module PatchCi
       @active_only = active_only
       @freshness = BaseFreshness.new(repo_state: repo_state)
       @health = BranchHealth.new(repo_state: repo_state)
+      @check = MasterCheck.new(repo_state: repo_state)
     end
 
     # same five bands the pipeline panel stacks, plus the two states a branch can
@@ -37,7 +38,8 @@ module PatchCi
 
     def all
       { headline: headline, base_age_distribution: base_age_distribution,
-        freshness_tiers: freshness_tiers, outcome_by_base_year: outcome_by_base_year,
+        freshness_tiers: freshness_tiers, master_check_tiers: master_check_tiers,
+        outcome_by_base_year: outcome_by_base_year,
         success_rate_by_base_year: success_rate_by_base_year,
         apply_failures_by_base_year: apply_failures_by_base_year,
         build_cost_by_base_year: build_cost_by_base_year, per_major: per_major,
@@ -65,11 +67,11 @@ module PatchCi
     # failure_stage 'apply' means the patch would not apply even to its own
     # detected, contemporaneous base - a patch-extraction / base-detection
     # signal, not staleness. This does NOT measure how fast applyability
-    # decays as master moves on: that would need master_apply_error (what
-    # BranchHealth's needs_rebase bucket uses), and that column is only
-    # populated for the 2026 cohort - the historical backfill applied
-    # straight onto each patch's detected base and never attempted master
-    # for it. So there is no historical series for the staleness question yet.
+    # decays as master moves on: that one reads on_master, the same column
+    # BranchHealth's needs_rebase bucket keys on. Every row carries it, the
+    # historical backfill included - ApplyOne only falls back to a detected
+    # base after master has failed, so on_master = false is itself the record
+    # of a conflict. That series can be built; it is just not this one.
     def apply_failures_by_base_year
       totals = toggled_scope.group(base_year_sql).count
       stages = toggled_scope.failed.group(base_year_sql, :failure_stage).count
@@ -95,6 +97,14 @@ module PatchCi
     # key the same rows differently
     def freshness_tiers
       @freshness.counts(base_scope)
+    end
+
+    # the pair to freshness_tiers: that one measures the base commit, this one
+    # measures us. Different denominator on purpose - "are we keeping up" is a
+    # question about the rows in front of you, so this one follows the toggle
+    # while freshness_tiers stays corpus-wide.
+    def master_check_tiers
+      @check.counts(toggled_scope)
     end
 
     def headline
@@ -246,10 +256,10 @@ module PatchCi
                 .where("topics.last_message_at >= ?", Config::ACTIVE_THREAD_DAYS.days.ago)
     end
 
-    # the scope Tasks 13-16's toggle-honouring aggregates read off.
-    # base_age_distribution is the one exception: it reads active_scope
-    # directly for its second series regardless of the toggle, since showing
-    # both series side by side is the whole point of that chart.
+    # what an aggregate reads when it should follow the discussions control.
+    # Several deliberately do not - headline and freshness_tiers stay
+    # corpus-wide, base_age_distribution plots both scopes side by side,
+    # coverage_by_era is active-only - and each says why where it is defined.
     def toggled_scope
       @active_only ? active_scope : base_scope
     end

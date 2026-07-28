@@ -39,10 +39,10 @@ RSpec.describe PatchCi::BranchQuery do
     end
 
     it "filters by health bucket" do
-      fresh = branch(pushed_at: 1.day.ago, ci_status: "success")
+      applies = branch(pushed_at: 1.day.ago, ci_status: "success")
       branch(status: "failed", failure_stage: "apply")
 
-      expect(names(query(state: "fresh"))).to eq([ fresh.branch_name ])
+      expect(names(query(state: "applies"))).to eq([ applies.branch_name ])
     end
 
     it "filters by pg major" do
@@ -133,6 +133,58 @@ RSpec.describe PatchCi::BranchQuery do
 
     it "raises on a facet it does not know" do
       expect { query.facet_values(:nope) }.to raise_error(ArgumentError, /unknown facet/)
+    end
+  end
+
+  # master_committed_at is now, so any past probe is older than master and only
+  # the warn window decides between behind and overdue
+  describe "check facet" do
+    def probed(hours)
+      branch(last_master_apply_at: hours.hours.ago)
+    end
+
+    it "filters by check tier" do
+      overdue = probed(PatchCi::Config::MASTER_CHECK_WARN_HOURS + 1)
+      probed(1)
+      branch(last_master_apply_at: nil)
+
+      expect(names(query(check: "overdue"))).to eq([ overdue.branch_name ])
+    end
+
+    it "accepts several check tiers" do
+      overdue = probed(PatchCi::Config::MASTER_CHECK_WARN_HOURS + 1)
+      never = branch(last_master_apply_at: nil)
+      behind = probed(1)
+
+      got = names(query(check: "overdue,never"))
+
+      expect(got).to match_array([ overdue.branch_name, never.branch_name ])
+      expect(got).not_to include(behind.branch_name)
+    end
+
+    it "combines with another facet" do
+      wanted = probed(1)
+      wanted.update_columns(pg_major: 20)
+      probed(1).update_columns(pg_major: 15)
+      branch(last_master_apply_at: nil, pg_major: 20)
+
+      expect(names(query(check: "behind", pg: "20"))).to eq([ wanted.branch_name ])
+    end
+
+    it "drops an unknown check value" do
+      row = branch(last_master_apply_at: nil)
+
+      expect(names(query(check: "bogus"))).to eq([ row.branch_name ])
+      expect(query(check: "bogus").active_params).to eq({})
+      expect(query(check: "bogus")).not_to be_filtered
+    end
+
+    it "exposes the tiers as facet values" do
+      expect(query.facet_values(:check)).to eq(PatchCi::MasterCheck::TIERS)
+    end
+
+    it "is one of the page's facets" do
+      expect(described_class::FACETS).to include(:check)
     end
   end
 
@@ -322,7 +374,7 @@ RSpec.describe PatchCi::BranchQuery do
     end
 
     it "is true for a facet" do
-      expect(query(state: "fresh")).to be_filtered
+      expect(query(state: "applies")).to be_filtered
     end
 
     it "is true for a search" do
@@ -356,10 +408,10 @@ RSpec.describe PatchCi::BranchQuery do
       branch(pushed_at: 1.day.ago, ci_status: "success")
       branch(status: "failed", failure_stage: "apply")
 
-      counts = query(state: "fresh").bucket_counts
+      counts = query(state: "applies").bucket_counts
 
-      expect(counts["fresh"]).to eq(1)
-      expect(counts["needs_rebase"]).to eq(1)
+      expect(counts["applies"]).to eq(1)
+      expect(counts["never_applied"]).to eq(1)
     end
 
     it "counts under the filters" do

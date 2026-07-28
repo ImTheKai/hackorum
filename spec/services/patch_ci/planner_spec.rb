@@ -1,8 +1,11 @@
 require "rails_helper"
 
 RSpec.describe PatchCi::Planner do
-  let(:master_at) { Time.current.change(usec: 0) }
-  let!(:repo_state) { create(:patch_ci_repo_state, master_committed_at: master_at) }
+  # a sha the repo state factory never generates, so a row carrying it is on
+  # some base other than master
+  NON_MASTER_SHA = "b" * 40
+
+  let!(:repo_state) { create(:patch_ci_repo_state) }
 
   def planner
     described_class.new(repo_state: PatchCiRepoState.current)
@@ -148,93 +151,131 @@ RSpec.describe PatchCi::Planner do
   end
 
   describe "tier 3 rebase" do
-    def active_topic = create(:topic, last_message_at: 1.day.ago)
-
     def pushed_row(topic, **attrs)
       create(:patch_branch, { topic: topic, status: "applied", pushed_at: 1.day.ago,
-                              base_committed_at: 100.days.ago }.merge(attrs))
+                              base_sha: NON_MASTER_SHA, base_committed_at: 10.days.ago }.merge(attrs))
     end
 
-    it "emits stale pushed rows stalest first" do
-      fresher = pushed_row(active_topic, base_committed_at: 60.days.ago)
-      stalest = pushed_row(active_topic, base_committed_at: 200.days.ago)
+    it "emits rows on a non-master base, stalest first" do
+      fresher = pushed_row(create(:topic), base_committed_at: 5.days.ago)
+      stalest = pushed_row(create(:topic), base_committed_at: 20.days.ago)
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ stalest, fresher ])
     end
 
     it "emits rows with a nil base_committed_at" do
-      row = pushed_row(active_topic, base_committed_at: nil)
+      row = pushed_row(create(:topic), base_committed_at: nil)
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
     it "orders equally aged nil base_committed_at rows by id" do
       attempted_at = 3.days.ago
-      first = pushed_row(active_topic, base_committed_at: nil, last_master_apply_at: attempted_at)
-      second = pushed_row(active_topic, base_committed_at: nil, last_master_apply_at: attempted_at)
+      first = pushed_row(create(:topic), base_committed_at: nil, last_master_apply_at: attempted_at)
+      second = pushed_row(create(:topic), base_committed_at: nil, last_master_apply_at: attempted_at)
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ first, second ])
     end
 
     it "puts the least recently attempted row first, even if its base is fresher" do
-      just_tried = pushed_row(active_topic, base_committed_at: 200.days.ago,
-                                            last_master_apply_at: 1.hour.ago)
-      long_untried = pushed_row(active_topic, base_committed_at: 60.days.ago,
-                                              last_master_apply_at: 5.days.ago)
+      # both probes clear the throttle, so the pair pins the sort direction
+      recently_tried = pushed_row(create(:topic), base_committed_at: 20.days.ago,
+                                                  last_master_apply_at: 2.days.ago)
+      long_untried = pushed_row(create(:topic), base_committed_at: 5.days.ago,
+                                                last_master_apply_at: 5.days.ago)
 
-      expect(items_of(:rebase).map(&:patch_branch)).to eq([ long_untried, just_tried ])
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ long_untried, recently_tried ])
     end
 
     it "puts never attempted rows ahead of attempted ones" do
-      attempted = pushed_row(active_topic, base_committed_at: 200.days.ago,
-                                           last_master_apply_at: 5.days.ago)
-      never = pushed_row(active_topic, base_committed_at: 60.days.ago, last_master_apply_at: nil)
+      attempted = pushed_row(create(:topic), base_committed_at: 20.days.ago,
+                                             last_master_apply_at: 5.days.ago)
+      never = pushed_row(create(:topic), base_committed_at: 5.days.ago, last_master_apply_at: nil)
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ never, attempted ])
     end
 
-    it "emits rows with a master_apply_error even when the base is fresh" do
-      row = pushed_row(active_topic, base_committed_at: 1.day.ago,
-                                     master_apply_error: "conflict in src/backend")
+    # a conflict is already implied by a base that is not master, so the error
+    # column must not become a filter again the way it was before
+    it "treats a conflicting row like any other, master_apply_error is not a filter" do
+      row = pushed_row(create(:topic), base_committed_at: 1.day.ago,
+                                       master_apply_error: "conflict in src/backend")
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
     it "does not emit rows with ci in flight" do
-      pushed_row(active_topic, ci_status: "running")
+      pushed_row(create(:topic), ci_status: "running")
 
       expect(items_of(:rebase)).to be_empty
     end
 
     it "emits rows whose ci already reached a verdict" do
-      row = pushed_row(active_topic, ci_status: "success")
+      row = pushed_row(create(:topic), ci_status: "success")
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
     it "emits rows whose run was marked infra_error" do
-      row = pushed_row(active_topic, ci_status: "infra_error")
+      row = pushed_row(create(:topic), ci_status: "infra_error")
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
-    it "does not emit fresh pushed rows" do
-      pushed_row(active_topic, base_committed_at: 1.day.ago)
+    it "does not emit a row already sitting on the current master" do
+      pushed_row(create(:topic), base_sha: repo_state.master_sha, base_committed_at: 1.day.ago)
 
       expect(items_of(:rebase)).to be_empty
     end
 
-    it "does not emit rows on inactive topics" do
-      stale_topic = create(:topic)
-      pushed_row(stale_topic)
+    it "emits a row on a recent base that is not master" do
+      row = pushed_row(create(:topic), base_committed_at: 1.day.ago)
+
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
+    end
+
+    # never-pushed rows belong to backfill. plan hides the overlap behind the
+    # per-topic dedupe, so assert on counts: that is where a rebase forecast
+    # inflated by the whole backfill queue would show up
+    it "does not count a never pushed row, however far its base is from master" do
+      pushed_row(create(:topic), pushed_at: nil, base_committed_at: 1.day.ago)
+
+      expect(planner.counts[:rebase]).to eq(0)
+      expect(planner.counts[:backfill]).to eq(1)
+    end
+
+    it "does not emit a row whose base has aged past the retirement window" do
+      pushed_row(create(:topic),
+                 base_committed_at: repo_state.master_committed_at -
+                                    (PatchCi::Config::REBASE_AFTER_DAYS + 1).days)
+
+      expect(items_of(:rebase)).to be_empty
+    end
+
+    it "does not emit a row probed inside the throttle window" do
+      pushed_row(create(:topic), last_master_apply_at: 1.hour.ago)
+
+      expect(items_of(:rebase)).to be_empty
+    end
+
+    it "emits a row probed before the throttle window once master has moved" do
+      row = pushed_row(create(:topic),
+                       last_master_apply_at: (PatchCi::Config::MASTER_CHECK_AFTER_HOURS + 1).hours.ago)
+
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
+    end
+
+    it "emits rows on threads with no recent message - staleness is the base, not the discussion" do
+      quiet_topic = create(:topic)
+      row = pushed_row(quiet_topic)
       # creating the row's message bumps last_message_at, so age the thread after
-      stale_topic.update_column(:last_message_at, 90.days.ago)
+      quiet_topic.update_column(:last_message_at, 90.days.ago)
 
-      expect(items_of(:rebase)).to be_empty
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
-    it "does not emit rows on committed topics even when the thread is active" do
-      topic = active_topic
+    it "does not emit rows on committed topics" do
+      topic = create(:topic)
       pushed_row(topic)
       create(:commit_topic, topic: topic)
 
@@ -242,8 +283,8 @@ RSpec.describe PatchCi::Planner do
       expect(planner.counts[:rebase]).to eq(0)
     end
 
-    it "does not emit rows on merged topics even when the thread is active" do
-      topic = active_topic
+    it "does not emit rows on merged topics" do
+      topic = create(:topic)
       pushed_row(topic)
       topic.update!(merged_into_topic_id: create(:topic).id)
 
@@ -252,29 +293,62 @@ RSpec.describe PatchCi::Planner do
     end
 
     it "emits failed never-pushed rows whose failure_stage is apply" do
-      row = create(:patch_branch, topic: active_topic, status: "failed",
-                                  failure_stage: "apply", pushed_at: nil)
+      row = create(:patch_branch, topic: create(:topic), status: "failed",
+                                  failure_stage: "apply", pushed_at: nil,
+                                  base_committed_at: 5.days.ago)
 
       expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
     end
 
+    it "does not emit a failed apply row whose base has aged past the retirement window" do
+      create(:patch_branch, topic: create(:topic), status: "failed",
+                            failure_stage: "apply", pushed_at: nil,
+                            base_committed_at: repo_state.master_committed_at -
+                                               (PatchCi::Config::REBASE_AFTER_DAYS + 1).days)
+
+      expect(items_of(:rebase)).to be_empty
+    end
+
+    it "emits a base_detection failure whose submission is inside the window" do
+      row = create(:patch_branch, topic: create(:topic), status: "failed",
+                                  failure_stage: "base_detection", pushed_at: nil,
+                                  base_sha: nil, base_committed_at: nil,
+                                  message: create(:message, created_at: 5.days.ago))
+
+      expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
+    end
+
+    it "does not emit a base_detection failure whose submission has aged out" do
+      create(:patch_branch, topic: create(:topic), status: "failed",
+                            failure_stage: "base_detection", pushed_at: nil,
+                            base_sha: nil, base_committed_at: nil,
+                            message: create(:message,
+                                            created_at: (PatchCi::Config::REBASE_AFTER_DAYS + 1).days.ago))
+
+      expect(items_of(:rebase)).to be_empty
+    end
+
     it "does not emit failed rows whose failure_stage is extract" do
-      create(:patch_branch, topic: active_topic, status: "failed",
+      create(:patch_branch, topic: create(:topic), status: "failed",
                             failure_stage: "extract", pushed_at: nil)
 
       expect(items_of(:rebase)).to be_empty
     end
 
     describe "retry guard" do
+      # master frozen well back, so the throttle is expired in both examples and
+      # only the "has master moved since the probe" half is under test
+      before { repo_state.update!(master_committed_at: 3.days.ago) }
+
       it "excludes rows already retried against the current master" do
-        pushed_row(active_topic, last_master_apply_at: master_at)
+        pushed_row(create(:topic), last_master_apply_at: 2.days.ago)
 
         expect(items_of(:rebase)).to be_empty
       end
 
       it "re-includes them once master moves forward" do
-        row = pushed_row(active_topic, last_master_apply_at: master_at)
-        repo_state.update!(master_committed_at: master_at + 1.hour)
+        row = pushed_row(create(:topic), last_master_apply_at: 2.days.ago)
+        repo_state.update!(master_committed_at: 1.day.ago)
 
         expect(items_of(:rebase).map(&:patch_branch)).to eq([ row ])
       end
@@ -285,10 +359,10 @@ RSpec.describe PatchCi::Planner do
     def one_of_each
       new_version_topic = create(:topic)
       patch_message(new_version_topic)
-      create(:patch_branch, status: "applied", pushed_at: nil, ci_status: nil)
-      create(:patch_branch, topic: create(:topic, last_message_at: 1.day.ago),
-                            status: "applied", pushed_at: 1.day.ago,
-                            base_committed_at: 100.days.ago)
+      create(:patch_branch, status: "applied", pushed_at: nil, ci_status: nil,
+                            base_sha: NON_MASTER_SHA, base_committed_at: 10.days.ago)
+      create(:patch_branch, topic: create(:topic), status: "applied", pushed_at: 1.day.ago,
+                            base_sha: NON_MASTER_SHA, base_committed_at: 10.days.ago)
     end
 
     it "orders tiers new_version, backfill, rebase" do
@@ -306,9 +380,9 @@ RSpec.describe PatchCi::Planner do
     describe "per-topic dedupe" do
       # topic with a stale pushed row AND a newer rowless patch message
       def topic_in_two_tiers
-        topic = create(:topic, last_message_at: 1.day.ago)
+        topic = create(:topic)
         create(:patch_branch, topic: topic, status: "applied", pushed_at: 1.day.ago,
-                              base_committed_at: 100.days.ago)
+                              base_sha: NON_MASTER_SHA, base_committed_at: 10.days.ago)
         patch_message(topic, created_at: 1.day.ago)
         topic
       end
@@ -324,9 +398,9 @@ RSpec.describe PatchCi::Planner do
 
       it "still spends the limit on other topics, not on the dropped row" do
         topic_in_two_tiers
-        other = create(:topic, last_message_at: 1.day.ago)
+        other = create(:topic)
         rebase_row = create(:patch_branch, topic: other, status: "applied", pushed_at: 1.day.ago,
-                                           base_committed_at: 200.days.ago)
+                                           base_sha: NON_MASTER_SHA, base_committed_at: 20.days.ago)
 
         items = planner.plan(limit: 2)
 

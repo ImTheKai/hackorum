@@ -5,12 +5,14 @@ module PatchCi
   class BranchRows
     def initialize(repo_state:,
                    health: BranchHealth.new(repo_state: repo_state),
-                   freshness: BaseFreshness.new(repo_state: repo_state))
+                   freshness: BaseFreshness.new(repo_state: repo_state),
+                   check: MasterCheck.new(repo_state: repo_state))
       @health = health
       @freshness = freshness
+      @check = check
     end
 
-    attr_reader :health, :freshness
+    attr_reader :health, :freshness, :check
 
     # relation -> the same relation, loaded, decorated and with run summaries
     # on its records. Still a relation, so kaminari can paginate the object
@@ -21,9 +23,12 @@ module PatchCi
 
     private
 
-    # relation -> relation, with health_bucket and base_tier selected
+    # relation -> relation, with health_bucket, base_tier and check_tier
+    # selected. All three also select the star for their standalone callers,
+    # see BaseFreshness#with_tier - select_values is a union, so composing them
+    # still asks for it once.
     def decorate(relation)
-      @freshness.with_tier(@health.with_bucket(relation))
+      @check.with_tier(@freshness.with_tier(@health.with_bucket(relation)))
     end
 
     # mutates the rows it is handed. Every row gets a summary or an explicit

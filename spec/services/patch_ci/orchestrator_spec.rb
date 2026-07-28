@@ -11,21 +11,21 @@ RSpec.describe PatchCi::Orchestrator do
   let(:pruner) { instance_double(PatchCi::ResultRefPruner, prune!: 0) }
   let(:planner) { instance_double(PatchCi::Planner, plan: []) }
   let(:repo) do
-    instance_double(PatchBranches::GitRepo, rev_parse: master_sha,
-                    commit_time: Time.current, commit_height: 100_000)
+    instance_double(PatchBranches::GitRepo, commit_time: Time.current, commit_height: 100_000)
+  end
+  let(:master_sync) do
+    instance_double(PatchCi::MasterSync,
+                    call: PatchCi::MasterSync::Result.new(sha: master_sha, fetch_failed: false,
+                                                          mirror_error: nil))
   end
 
   before do
-    # the master fetch and the result-ref fetch are different git calls
-    allow(repo).to receive(:run).and_return(
-      instance_double(PatchBranches::GitRepo::Result, success?: true)
-    )
     allow(PatchCi::DashboardBroadcast).to receive(:refresh!)
   end
 
   def orchestrator(**opts)
     described_class.new(client: client, pusher: pusher, guard: guard, apply_one: apply_one,
-                        result_refs: refs, pruner: pruner, repo: repo,
+                        result_refs: refs, pruner: pruner, repo: repo, master_sync: master_sync,
                         planner_factory: ->(_state) { planner }, **opts)
   end
 
@@ -42,38 +42,51 @@ RSpec.describe PatchCi::Orchestrator do
     allow(planner).to receive(:plan).and_return(items)
   end
 
-  it "refreshes the repo state from the master ref" do
+  it "refreshes the repo state from the sha master sync resolved" do
     orchestrator.cycle
 
     state = PatchCiRepoState.current
-    expect(repo).to have_received(:run).with("fetch", "--quiet", "origin", "master")
+    expect(master_sync).to have_received(:call)
     expect(state.master_sha).to eq(master_sha)
     expect(state.master_commit_height).to eq(100_000)
   end
 
-  it "falls back to the local master when the remote ref is unknown" do
-    allow(repo).to receive(:rev_parse).with("origin/master").and_return(nil)
-    allow(repo).to receive(:rev_parse).with("master").and_return(master_sha)
-
-    expect(orchestrator.cycle[:error]).to be_nil
-  end
-
-  it "raises when no master ref resolves at all" do
-    allow(repo).to receive(:rev_parse).and_return(nil)
-
-    expect { orchestrator.cycle }.to raise_error(/cannot resolve origin\/master/)
-  end
-
-  it "reports and warns about a failed master fetch, and carries on" do
-    allow(repo).to receive(:run).and_return(
-      instance_double(PatchBranches::GitRepo::Result, success?: false, output: "no route to host")
+  it "reports a failed master fetch and carries on" do
+    allow(master_sync).to receive(:call).and_return(
+      PatchCi::MasterSync::Result.new(sha: master_sha, fetch_failed: true, mirror_error: nil)
     )
 
-    result = nil
-    expect { result = orchestrator.cycle }.to output(/master fetch failed: no route to host/).to_stderr
+    result = orchestrator.cycle
 
-    expect(result[:fetch_failed]).to eq(true)
+    expect(result[:fetch_failed]).to be(true)
     expect(result[:error]).to be_nil
+  end
+
+  it "reports a failed mirror push and carries on" do
+    allow(master_sync).to receive(:call).and_return(
+      PatchCi::MasterSync::Result.new(sha: master_sha, fetch_failed: false,
+                                      mirror_error: "Write access denied")
+    )
+
+    result = orchestrator.cycle
+
+    expect(result[:mirror_error]).to eq("Write access denied")
+    expect(result[:error]).to be_nil
+  end
+
+  # the mirror is resolved before anything that can raise, so a lost cycle
+  # still has to report why the fork's master is not moving
+  it "reports a failed mirror push even when the github fetch fails" do
+    allow(master_sync).to receive(:call).and_return(
+      PatchCi::MasterSync::Result.new(sha: master_sha, fetch_failed: false,
+                                      mirror_error: "Write access denied")
+    )
+    allow(client).to receive(:runs).and_raise(PatchCi::GithubClient::Error, "boom")
+
+    result = orchestrator.cycle
+
+    expect(result[:mirror_error]).to eq("Write access denied")
+    expect(result[:error]).to eq("boom")
   end
 
   it "does not re-read runs whose verdict the branch already took" do
@@ -485,7 +498,7 @@ RSpec.describe PatchCi::Orchestrator do
     it "does not fetch when a repo state row already exists" do
       orchestrator(dry_run: true).cycle
 
-      expect(repo).not_to have_received(:run)
+      expect(master_sync).not_to have_received(:call)
     end
 
     it "still fetches on the very first run" do
@@ -493,7 +506,7 @@ RSpec.describe PatchCi::Orchestrator do
 
       orchestrator(dry_run: true).cycle
 
-      expect(repo).to have_received(:run).with("fetch", "--quiet", "origin", "master")
+      expect(master_sync).to have_received(:call)
     end
   end
 end

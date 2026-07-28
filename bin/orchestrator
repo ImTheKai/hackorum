@@ -17,7 +17,8 @@ options = {
   repo: File.expand_path("../postgres", __dir__),
   worktree: File.expand_path("../tmp/patch_ci_worktree", __dir__),
   remote: "origin",
-  master_ref: "origin/master",
+  upstream_remote: "postgres",
+  mirror_master: true,
   interval: 60
 }
 
@@ -37,7 +38,9 @@ OptionParser.new do |o|
   o.on("--interval N", Integer, "seconds between cycles (default 60)") { |v| options[:interval] = v }
   o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
   o.on("--github-repo NAME", "owner/name CI runs in (default from PatchCi::Config)") { |v| options[:github_repo] = v }
-  o.on("--master-ref REF", "ref that is master truth (default origin/master)") { |v| options[:master_ref] = v }
+  o.on("--master-ref REF", "ref that is master truth (default <upstream-remote>/master)") { |v| options[:master_ref] = v }
+  o.on("--upstream-remote NAME", "remote master truth is fetched from (default postgres)") { |v| options[:upstream_remote] = v }
+  o.on("--[no-]mirror-master", "fast-forward the push remote's master from upstream (default on)") { |v| options[:mirror_master] = v }
 end.parse!
 
 require_relative "../config/environment"
@@ -61,8 +64,10 @@ orchestrator = PatchCi::Orchestrator.new(
   result_refs: PatchCi::ResultRefs.new(repo, remote: options[:remote]),
   pruner: PatchCi::ResultRefPruner.new(repo, remote: options[:remote]),
   repo: repo,
-  remote: options[:remote],
-  master_ref: options[:master_ref],
+  master_sync: PatchCi::MasterSync.new(repo, upstream_remote: options[:upstream_remote],
+                                             push_remote: options[:remote],
+                                             master_ref: options[:master_ref],
+                                             mirror: options[:mirror_master]),
   budget: options[:budget],
   max_pushes: options[:max_pushes],
   dry_run: options[:dry_run]

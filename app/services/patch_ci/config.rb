@@ -7,11 +7,24 @@ module PatchCi
     UP_NEXT_LIST = 30
     RECENT_LIST = 50
     BRANCHES_PAGE = 100         # /ci/branches page size
-    REBASE_AFTER_DAYS = 30      # base older than this vs master -> rebase due
+    REBASE_AFTER_DAYS = 30      # base this far behind master -> stop retrying
     ANCIENT_AFTER_DAYS = 365    # base older than a major release cycle; keep above REBASE_AFTER_DAYS
+    # only CorpusStats reads this, for the /ci/stats "active threads" toggle.
+    # Not a scheduling input: whether a patch applies on master has nothing to
+    # do with whether anyone is still discussing it.
     ACTIVE_THREAD_DAYS = 30     # thread with newer messages counts as active
     STUCK_RUN_HOURS = 48        # pushed but no verdict -> infra_error
     PUSH_RETRY_MINUTES = 30     # backoff before retrying a push_failed row
+    # how often a row is re-probed against master. The probe is cheap, the push
+    # it triggers is not, so this is the cadence of the whole rebase tier.
+    MASTER_CHECK_AFTER_HOURS = 24
+    # when the UI calls a row overdue. Above MASTER_CHECK_AFTER_HOURS on
+    # purpose: a row waiting its turn in a normal sweep is not a problem.
+    MASTER_CHECK_WARN_HOURS = 26
+    # items planned per free CI slot. Guard rejections and failed master probes
+    # consume items without consuming slots, so the planner is always asked for
+    # more than the budget can push.
+    PLAN_HEADROOM = 3
     RESULT_REF_KEEP_DAYS = 14   # refs/hackorum-ci retention after ingest
     # backstop on the cached whole-table aggregates: the cache key carries the
     # repo state's fetched_at, so a live orchestrator turns them over sooner

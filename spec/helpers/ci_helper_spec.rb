@@ -31,6 +31,10 @@ RSpec.describe CiHelper, type: :helper do
     expect(CiHelper::CI_BUCKET_BADGES.keys).to match_array(PatchCi::BranchHealth::BUCKETS)
   end
 
+  it "has a badge for every master check tier and nothing else" do
+    expect(CiHelper::CI_CHECK_TIER_BADGES.keys).to match_array(PatchCi::MasterCheck::TIERS)
+  end
+
   describe "#ci_base_tier_badge" do
     it "labels a recent base with a compact day count" do
       html = helper.ci_base_tier_badge(
@@ -152,6 +156,77 @@ RSpec.describe CiHelper, type: :helper do
     end
   end
 
+  describe "#ci_work_reason" do
+    def rebase_item(**attrs)
+      PatchCi::Planner::WorkItem.new(kind: :rebase, patch_branch: build(:patch_branch, **attrs))
+    end
+
+    it "names the recorded error when there is one" do
+      item = rebase_item(on_master: false, master_apply_error: "conflict in xlog.c")
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("master apply failing, retrying")
+    end
+
+    # the rows off master mostly predate the probe columns, so reading the
+    # timestamp first would call thousands of known conflicts unchecked
+    it "reads a row off master as a conflict, not as never checked" do
+      item = rebase_item(on_master: false, master_apply_error: nil, last_master_apply_at: nil)
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("not on master, retrying")
+    end
+
+    it "blames the moving master for an on-master row with no probe yet" do
+      item = rebase_item(on_master: true, last_master_apply_at: nil)
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("master moved since it was built")
+    end
+
+    it "dates the last probe when there is one" do
+      item = rebase_item(on_master: true, last_master_apply_at: 3.hours.ago)
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("last checked about 3 hours ago")
+    end
+
+    it "dates the submission for a new version" do
+      item = PatchCi::Planner::WorkItem.new(kind: :new_version,
+                                            message: build(:message, created_at: 2.days.ago))
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("patch posted 2 days ago")
+    end
+
+    it "is fixed prose for a backfill" do
+      item = PatchCi::Planner::WorkItem.new(kind: :backfill, patch_branch: build(:patch_branch))
+
+      expect(helper.ci_work_reason(item, repo_state)).to eq("applied, never pushed")
+    end
+  end
+
+  describe "#ci_check_tier_badge" do
+    # check_tier is a select alias like base_tier, so the same stand-in trick
+    def check_row(tier, last_master_apply_at: nil)
+      branch = build(:patch_branch, last_master_apply_at: last_master_apply_at)
+      branch.define_singleton_method(:check_tier) { tier }
+      branch
+    end
+
+    it "carries the tier and the stamp in the title" do
+      html = helper.ci_check_tier_badge(check_row("overdue", last_master_apply_at: 3.days.ago))
+
+      expect(html).to include(">overdue<")
+      expect(html).to include("badge b-rebase")
+      expect(html).to include("last tried on master 3 days ago")
+      expect(html).to include("ci-hover")
+    end
+
+    it "says so when the row was never tried on master" do
+      html = helper.ci_check_tier_badge(check_row("never"))
+
+      expect(html).to include(">never<")
+      expect(html).to include("never tried on master")
+      expect(html).to include("badge b-queued")
+    end
+  end
+
   describe "#ci_result_cell" do
     it "is a dash for a branch with no CI status" do
       expect(helper.ci_result_cell(build(:patch_branch, ci_status: nil))).to eq(helper.ci_muted_dash)
@@ -202,9 +277,9 @@ RSpec.describe CiHelper, type: :helper do
 
   describe "facet chips" do
     it "adds itself to a facet that already has a value" do
-      html = helper.ci_facet_chip(query(state: "fresh"), :state, "wont_retry")
+      html = helper.ci_facet_chip(query(state: "applies"), :state, "wont_retry")
 
-      expect(html).to include("state=fresh%2Cwont_retry")
+      expect(html).to include("state=applies%2Cwont_retry")
       expect(html).not_to include("is-active")
       # link_to escapes the apostrophe in the shared bucket label
       expect(html).to include(">won&#39;t retry<")
@@ -212,7 +287,7 @@ RSpec.describe CiHelper, type: :helper do
 
     # an empty facet must leave the url, not linger as state=
     it "drops the facet entirely when the last value is toggled off" do
-      html = helper.ci_facet_chip(query(state: "fresh"), :state, "fresh")
+      html = helper.ci_facet_chip(query(state: "applies"), :state, "applies")
 
       expect(html).to include("is-active")
       expect(html).to include(%(href="/ci/branches"))
@@ -220,14 +295,14 @@ RSpec.describe CiHelper, type: :helper do
     end
 
     it "drops only its own value from a multi-value facet" do
-      html = helper.ci_facet_chip(query(state: "fresh,wont_retry"), :state, "fresh")
+      html = helper.ci_facet_chip(query(state: "applies,wont_retry"), :state, "applies")
 
       expect(html).to include(%(href="/ci/branches?state=wont_retry"))
     end
 
     it "leaves the other facets, the search and the sort alone" do
       html = helper.ci_facet_chip(query(base: "recent", q: "vacuum", sort: "pg", dir: "asc"),
-                                 :state, "fresh")
+                                 :state, "applies")
 
       expect(html).to include("base=recent")
       expect(html).to include("q=vacuum")
@@ -236,18 +311,18 @@ RSpec.describe CiHelper, type: :helper do
     end
 
     it "shows a count when it is given one" do
-      expect(helper.ci_facet_chip(query, :state, "fresh", count: 1234)).to include("fresh (1,234)")
+      expect(helper.ci_facet_chip(query, :state, "applies", count: 1234)).to include("applies (1,234)")
     end
 
     # a chip renders inside the frame, so it targets it without saying so
     it "carries no turbo attributes of its own" do
-      expect(helper.ci_facet_chip(query, :state, "fresh")).not_to include("data-turbo")
+      expect(helper.ci_facet_chip(query, :state, "applies")).not_to include("data-turbo")
     end
 
     # colour alone does not reach a screen reader
     it "marks the selected state on the active chip" do
-      expect(helper.ci_facet_chip(query(state: "fresh"), :state, "fresh")).to include(%(aria-current="true"))
-      expect(helper.ci_facet_chip(query, :state, "fresh")).not_to include("aria-current")
+      expect(helper.ci_facet_chip(query(state: "applies"), :state, "applies")).to include(%(aria-current="true"))
+      expect(helper.ci_facet_chip(query, :state, "applies")).not_to include("aria-current")
     end
 
     # the table renders these statuses through CI_BADGES; a chip that spells the
@@ -266,11 +341,11 @@ RSpec.describe CiHelper, type: :helper do
 
     it "marks the all chip active only while its facet is empty" do
       expect(helper.ci_facet_all_chip(query, :state)).to include("is-active")
-      expect(helper.ci_facet_all_chip(query(state: "fresh"), :state)).not_to include("is-active")
+      expect(helper.ci_facet_all_chip(query(state: "applies"), :state)).not_to include("is-active")
     end
 
     it "clears just its own facet from the all chip" do
-      html = helper.ci_facet_all_chip(query(state: "fresh", base: "recent"), :state)
+      html = helper.ci_facet_all_chip(query(state: "applies", base: "recent"), :state)
 
       expect(html).to include("base=recent")
       expect(html).not_to include("state=")
@@ -308,9 +383,9 @@ RSpec.describe CiHelper, type: :helper do
     end
 
     it "keeps the active facets when re-sorting" do
-      html = helper.ci_sort_header(query(state: "fresh"), "pg", "PG")
+      html = helper.ci_sort_header(query(state: "applies"), "pg", "PG")
 
-      expect(html).to include("state=fresh")
+      expect(html).to include("state=applies")
     end
 
     it "is a plain header for the dashboard sections, which have no query" do

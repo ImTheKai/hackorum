@@ -1,9 +1,9 @@
 module PatchCi
   # Request params -> one page of table-ready branch rows. Everything the
   # /ci/branches chrome can ask for lives here so the controller stays a
-  # dispatcher: four facets, a search box, a whitelisted sort, pagination.
+  # dispatcher: five facets, a search box, a whitelisted sort, pagination.
   class BranchQuery
-    FACETS = %i[base state pg result].freeze
+    FACETS = %i[base state check pg result].freeze
     NO_RESULT = "none".freeze
     RESULT_VALUES = (PatchCiRun::STATUSES + [ NO_RESULT ]).freeze
     MAX_QUERY = 100
@@ -98,12 +98,13 @@ module PatchCi
       out.compact
     end
 
-    # the chips to render for all four facets, but the filter whitelist for
-    # only three - pg validates by shape instead, see validate
+    # the chips to render for all five facets, but the filter whitelist for
+    # only four - pg validates by shape instead, see validate
     def facet_values(facet)
       case facet
       when :base then BaseFreshness::TIERS
       when :state then BranchHealth::BUCKETS
+      when :check then MasterCheck::TIERS
       when :pg then present_majors
       when :result then RESULT_VALUES
       else raise ArgumentError, "unknown facet: #{facet.inspect}"
@@ -152,11 +153,16 @@ module PatchCi
       @row_builder.freshness
     end
 
+    def check
+      @row_builder.check
+    end
+
     # each facet owns its own SQL; this only decides the order they compose in
     def filtered
       scope = PatchBranch.current
       scope = freshness.filter(scope, selected(:base))
       scope = health.filter(scope, selected(:state))
+      scope = check.filter(scope, selected(:check))
       scope = filter_pg(scope)
       scope = filter_result(scope)
       apply_search(scope)

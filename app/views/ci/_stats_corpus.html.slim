@@ -17,6 +17,14 @@
 - tiers = @corpus[:freshness_tiers]
 = render "stats_tiles", tiles: tiers.map { |tier, count| { k: tier, v: ci_stat_count(count), d: "base age tier, all patchsets" } }
 
+/ bars, not tiles like the block above it pairs with: four tiers whose reading
+/ is the shape of the split, and tiles leave you doing the ratio by eye
+= render "stats_bars",
+  id: "master-check",
+  title: "Master re-check recency",
+  note: "when each patchset was last tried against master; overdue is past #{PatchCi::Config::MASTER_CHECK_WARN_HOURS}h with master moved since. Unlike the base age tiles above, this follows the discussions control.",
+  rows: @corpus[:master_check_tiers].map { |tier, count| { label: tier, value: count } }
+
 / both series side by side, not behind the toggle: the gap between the bars is
 / the point - stale-and-abandoned against stale-and-still-being-discussed
 - by_band = @corpus[:base_age_distribution].index_by { |row| [ row[:band], row[:series] ] }

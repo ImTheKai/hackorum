@@ -150,7 +150,8 @@ module PatchBranches
 
     # A probe never writes status/failure_*: those move the row out of every
     # planner tier, so a failed probe would retire a healthy pushed branch.
-    # master_apply_error is the one column that keeps it in the rebase tier.
+    # What keeps it in the rebase tier is its base_sha still differing from
+    # master; master_apply_error only records why the last probe failed.
     def save_failure(failure_stage:, failure_reason:)
       return touch_master_apply_only(clip(failure_reason)) if @master_only
 

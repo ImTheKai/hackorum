@@ -27,6 +27,13 @@ RSpec.describe "CI dashboard", type: :request do
     [ headers, rows[1].css("td") ]
   end
 
+  # the strip's tiles are k/v/d triples in document order, so name the tile
+  # rather than hoping a bare number lands in the right one
+  def stat_tile(key)
+    Nokogiri::HTML(response.body).css(".ci-strip .stat")
+            .find { |tile| tile.at_css(".k")&.text&.strip == key }
+  end
+
   def branch_with_run(branch_attrs = {}, run_attrs = {})
     branch = create(:patch_branch, **branch_attrs)
     run = create(:patch_ci_run, patch_branch: branch, **run_attrs)
@@ -276,7 +283,7 @@ RSpec.describe "CI dashboard", type: :request do
 
       get "/ci/branches"
 
-      expect(dashboard).to eq([ "Result", "Branch", "Topic", "PG", "Base", "State",
+      expect(dashboard).to eq([ "Result", "Branch", "Topic", "PG", "Base", "State", "Check",
                                 "Tests", "Timing", "Try it", "Updated" ])
       expect(header_labels(response.body)).to eq(dashboard)
     end
@@ -316,6 +323,80 @@ RSpec.describe "CI dashboard", type: :request do
       get "/ci"
 
       expect(response.body).to include("ancient")
+    end
+
+    # the number is an intersection of two dimensions, so a row that satisfies
+    # only one of them is the case worth pinning
+    it "counts patchsets applying on the current master and checked against it" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
+      # applies, but the last check predates this master
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 3.days.ago)
+      # checked against this master, but conflicts
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: false,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
+
+      get "/ci"
+
+      expect(stat_tile("Verified on master").at_css(".v").text.strip).to eq("1")
+    end
+
+    it "warns on the status strip when rows have gone unchecked" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 3.days.ago)
+
+      get "/ci"
+
+      tile = stat_tile("Verified on master")
+      expect(tile.at_css(".d").text.strip)
+        .to eq("1 not rechecked in #{PatchCi::Config::MASTER_CHECK_WARN_HOURS}h")
+      # the red is the warning, not decoration on it
+      expect(tile.at_css(".d")["class"].split).to include("ci-down")
+    end
+
+    # the planner never re-probes a retired row, so counting one as overdue
+    # would put a permanent, growing floor under the warning. Both retired
+    # shapes are here: an ancient failed row buckets as never_applied, an
+    # ancient applied one as wont_retry.
+    it "leaves retired rows out of the overdue warning" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      retired = state.master_committed_at - (PatchCi::Config::REBASE_AFTER_DAYS + 1).days
+      create(:patch_branch, status: "failed", failure_stage: "apply", pushed_at: nil,
+             base_committed_at: retired, last_master_apply_at: 3.days.ago)
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: retired, last_master_apply_at: 3.days.ago)
+
+      get "/ci"
+
+      tile = stat_tile("Verified on master")
+      expect(tile.at_css(".d").text.strip).to eq("applied on the current master")
+      expect(tile.at_css(".ci-down")).to be_nil
+    end
+
+    it "describes the stat plainly while nothing is overdue" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
+
+      get "/ci"
+
+      tile = stat_tile("Verified on master")
+      expect(tile.at_css(".d").text.strip).to eq("applied on the current master")
+      expect(tile.at_css(".ci-down")).to be_nil
+    end
+
+    it "shows the master check tier on dashboard rows" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      create(:patch_branch, ci_status: "success", pushed_at: 1.hour.ago,
+             last_master_apply_at: state.master_committed_at + 1.hour)
+
+      get "/ci"
+      headers, cells = first_table_row(response.body)
+
+      expect(cells[headers.index("Check")].text.strip).to eq("current")
     end
   end
 
@@ -357,9 +438,10 @@ RSpec.describe "CI dashboard", type: :request do
       expect(response.body).to include("ci-search")
       expect(response.body).to include("ci-facets")
       expect(response.body).to include(%(id="ci-branches"))
-      # one chip per facet value, so all four rows are wired to the query
+      # one chip per facet value, so all five rows are wired to the query
       expect(response.body).to include(%(href="/ci/branches?base=recent"))
-      expect(response.body).to include(%(href="/ci/branches?state=fresh"))
+      expect(response.body).to include(%(href="/ci/branches?state=applies"))
+      expect(response.body).to include(%(href="/ci/branches?check=current"))
       expect(response.body).to include(%(href="/ci/branches?pg=18"))
       expect(response.body).to include(%(href="/ci/branches?result=success"))
       # a sortable header on a column that is not the current sort
@@ -391,11 +473,11 @@ RSpec.describe "CI dashboard", type: :request do
     it "carries the active facets and sort through the search form" do
       create(:patch_ci_repo_state)
 
-      get "/ci/branches", params: { base: "recent", state: "fresh", sort: "pg", dir: "asc" }
+      get "/ci/branches", params: { base: "recent", state: "applies", sort: "pg", dir: "asc" }
 
       form = response.body[/<form class="ci-search".*?<\/form>/m]
       expect(form).to include(%(<input type="hidden" name="base" value="recent"))
-      expect(form).to include(%(<input type="hidden" name="state" value="fresh"))
+      expect(form).to include(%(<input type="hidden" name="state" value="applies"))
       expect(form).to include(%(<input type="hidden" name="sort" value="pg"))
       expect(form).to include(%(<input type="hidden" name="dir" value="asc"))
       # exactly one q, the visible one
@@ -413,7 +495,7 @@ RSpec.describe "CI dashboard", type: :request do
     # turbo carries a permanent element across drive renders too, so only a real
     # browser navigation empties the search box
     it "clears filters with turbo declining the link" do
-      get "/ci/branches", params: { state: "fresh" }
+      get "/ci/branches", params: { state: "applies" }
 
       expect(response.body).to match(%r{data-turbo="false"[^>]*href="/ci/branches">clear filters})
     end
@@ -422,12 +504,12 @@ RSpec.describe "CI dashboard", type: :request do
       create(:patch_ci_repo_state)
       create(:patch_branch)
 
-      get "/ci/branches", params: { state: "fresh" }
+      get "/ci/branches", params: { state: "applies" }
 
       # an inactive chip adds itself to what is already selected
-      expect(response.body).to include(%(href="/ci/branches?state=fresh%2Cwont_retry"))
+      expect(response.body).to include(%(href="/ci/branches?state=applies%2Cwont_retry"))
       # the active chip drops its own value, leaving no empty state= behind
-      expect(response.body).to match(%r{is-active[^>]*href="/ci/branches">fresh})
+      expect(response.body).to match(%r{is-active[^>]*href="/ci/branches">applies})
       expect(response.body).to include("clear filters")
     end
 
@@ -471,23 +553,36 @@ RSpec.describe "CI dashboard", type: :request do
 
     it "filters by state" do
       create(:patch_ci_repo_state)
-      fresh = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
-                     base_committed_at: 1.day.ago, base_commit_height: 10)
+      applies = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
+                       base_committed_at: 1.day.ago, base_commit_height: 10)
       failed = create(:patch_branch, status: "failed", failure_stage: "apply")
 
-      get "/ci/branches", params: { state: "fresh" }
+      get "/ci/branches", params: { state: "applies" }
 
-      expect(response.body).to include(fresh.branch_name)
+      expect(response.body).to include(applies.branch_name)
       expect(response.body).not_to include(failed.branch_name)
     end
 
     it "ignores an unknown state filter" do
-      fresh = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
-                     base_committed_at: 1.day.ago, base_commit_height: 10)
+      applies = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
+                       base_committed_at: 1.day.ago, base_commit_height: 10)
 
       get "/ci/branches", params: { state: "not_a_bucket" }
 
-      expect(response.body).to include(fresh.branch_name)
+      expect(response.body).to include(applies.branch_name)
+      expect(response.body).not_to include("clear filters")
+    end
+
+    # a bookmark holding a bucket name we have since renamed degrades to no
+    # filter at all, rather than 500ing
+    it "ignores a retired bucket name in the state filter" do
+      applies = create(:patch_branch, pushed_at: 1.day.ago, ci_status: "success",
+                       base_committed_at: 1.day.ago, base_commit_height: 10)
+
+      get "/ci/branches", params: { state: "fresh" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(applies.branch_name)
       expect(response.body).not_to include("clear filters")
     end
 
@@ -501,7 +596,7 @@ RSpec.describe "CI dashboard", type: :request do
       expect(response.body).to include(hit.branch_name)
       expect(response.body).not_to include(miss.branch_name)
       # the search survives a facet click
-      expect(response.body).to include(%(href="/ci/branches?q=upgra&amp;state=fresh"))
+      expect(response.body).to include(%(href="/ci/branches?q=upgra&amp;state=applies"))
     end
 
     it "sorts by a requested column in both directions" do
@@ -1011,6 +1106,18 @@ RSpec.describe "CI dashboard", type: :request do
       expect(row.css("td").map(&:text)).to eq([ "1-7d", "1", "1" ])
     end
 
+    it "renders the master re-check recency block" do
+      create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      create(:patch_branch, last_master_apply_at: 3.days.ago)
+
+      get "/ci/stats"
+
+      block = Nokogiri::HTML(response.body).at_css("#master-check")
+      expect(block.at_css("h3").text).to eq("Master re-check recency")
+      bar = block.css(".ci-stats-bar").find { |row| row.at_css(".label").text.strip == "overdue" }
+      expect(bar.at_css(".n").text.strip).to eq("1")
+    end
+
     it "renders the pipeline tiles and the infra health table" do
       get "/ci/stats"
 
@@ -1043,7 +1150,7 @@ RSpec.describe "CI dashboard", type: :request do
 
       # a generous ceiling: the point is to catch a per-row or per-block query,
       # not to pin the exact count. Raise it deliberately if you add aggregates.
-      # 45 as of this commit
+      # 46 as of this commit
       queries = captured_queries { get "/ci/stats" }
 
       expect(response).to have_http_status(:ok)

@@ -29,7 +29,7 @@ module CiHelper
   # css + label. The health panel, the State badge and the state facet chip all
   # read their words off here, so the same bucket cannot be called two things.
   CI_BUCKET_BADGES = {
-    "fresh" => [ "b-success", "fresh" ],
+    "applies" => [ "b-success", "applies" ],
     "needs_rebase" => [ "b-rebase", "needs rebase" ],
     "awaiting_ci" => [ "b-queued", "awaiting CI" ],
     "wont_retry" => [ "b-infra", "won't retry" ],
@@ -43,13 +43,22 @@ module CiHelper
     "unknown" => "b-queued"
   }.freeze
 
+  # muted on purpose: recency is an ops signal, not a per-row verdict, so it
+  # must not compete with the State badge beside it
+  CI_CHECK_TIER_BADGES = {
+    "current" => "b-queued",
+    "behind" => "b-queued",
+    "overdue" => "b-rebase",
+    "never" => "b-queued"
+  }.freeze
+
   # what lands in a bucket, in one line. Only the buckets whose panel has no
   # live breakdown of its own - awaiting_ci and wont_retry build theirs from
   # counts, so they are absent here on purpose.
   CI_BUCKET_BLURBS = {
-    "fresh" => "applies on recent master",
-    "needs_rebase" => "base stale or apply failing",
-    "never_applied" => "apply or extract failed"
+    "applies" => "applied on master when last checked",
+    "needs_rebase" => "did not apply on master, still retrying",
+    "never_applied" => "extract, base detection or apply failed"
   }.freeze
 
   # what each /ci/branches facet row is called; facet names are prose, but every
@@ -57,6 +66,7 @@ module CiHelper
   FACET_LABELS = {
     base: "base age",
     state: "state",
+    check: "master check",
     pg: "pg major",
     result: "result"
   }.freeze
@@ -114,6 +124,20 @@ module CiHelper
     tag.span(label, class: "badge #{css} ci-hover", title: ci_behind_title(row, repo_state))
   end
 
+  # no figure beside the tier: the tiers already carry the only threshold that
+  # matters, and the exact stamp is a hover away
+  def ci_check_tier_badge(row)
+    tier = row.check_tier.to_s
+    css = CI_CHECK_TIER_BADGES.fetch(tier, "b-queued")
+    tag.span(tier, class: "badge #{css} ci-hover", title: ci_check_title(row))
+  end
+
+  def ci_check_title(row)
+    stamp = row.last_master_apply_at
+    return "never tried on master" unless stamp
+    "last tried on master #{time_ago_in_words(stamp)} ago"
+  end
+
   def ci_behind_label(days)
     return nil unless days
     days = [ days, 0 ].max
@@ -133,11 +157,18 @@ module CiHelper
     when :backfill then "applied, never pushed"
     when :rebase
       row = item.patch_branch
+      # read on_master before the probe timestamp, same order bucket_sql uses.
+      # A row off master already lost an apply to master; most of them predate
+      # the probe columns, so keying on those would call a known conflict
+      # unchecked.
       if row.master_apply_error.present?
         "master apply failing, retrying"
+      elsif !row.on_master
+        "not on master, retrying"
+      elsif row.last_master_apply_at.nil?
+        "master moved since it was built"
       else
-        parts = ci_behind_parts(row, repo_state)
-        parts ? "#{parts} behind" : "base metadata missing"
+        "last checked #{time_ago_in_words(row.last_master_apply_at)} ago"
       end
     end
   end

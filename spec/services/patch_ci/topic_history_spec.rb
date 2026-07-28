@@ -28,7 +28,7 @@ RSpec.describe PatchCi::TopicHistory do
 
     row = history.patchsets.first
 
-    expect(row.health_bucket).to eq("fresh")
+    expect(row.health_bucket).to eq("applies")
     expect(row.base_tier).to eq("recent")
   end
 

@@ -15,6 +15,7 @@
       = ci_sort_header(sort_query, "pg", "PG", numeric: true)
       = ci_sort_header(sort_query, "base", "Base")
       th State
+      th Check
       th.num Tests
       th.num Timing
       th Try it
@@ -33,6 +34,7 @@
         td.num = row.pg_major || ci_muted_dash
         td = ci_base_tier_badge(row, repo_state)
         td = ci_bucket_badge(row.health_bucket)
+        td = ci_check_tier_badge(row)
         td.num = ci_tests_cell(row)
         td.num = ci_timing_cell(row)
         td = ci_image_cell(row)

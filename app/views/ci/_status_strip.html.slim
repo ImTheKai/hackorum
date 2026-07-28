@@ -16,6 +16,15 @@
       .v.muted unknown
       .d no repo state
   .stat
+    .k Verified on master
+    .v = number_with_delimiter(@verified)
+    / the warning takes the sub-line rather than sitting beside it: an overdue
+    / backlog is exactly what makes the number above it untrustworthy
+    - if @overdue.positive?
+      .d.ci-down = "#{number_with_delimiter(@overdue)} not rechecked in #{PatchCi::Config::MASTER_CHECK_WARN_HOURS}h"
+    - else
+      .d applied on the current master
+  .stat
     .k In flight
     .v = "#{@in_flight_count} / #{PatchCi::Config::BUDGET}"
     .d CI slots in use

@@ -134,6 +134,27 @@ RSpec.describe PatchCi::CorpusStats do
     end
   end
 
+  describe "#master_check_tiers" do
+    # master_at is a fixed past date, so a probe of a minute ago sits after
+    # master and reads 'current'
+    it "counts every tier" do
+      branch(last_master_apply_at: nil)
+      branch(last_master_apply_at: 1.minute.ago)
+
+      tiers = stats.master_check_tiers
+
+      expect(tiers.keys).to eq(PatchCi::MasterCheck::TIERS)
+      expect(tiers).to eq("current" => 1, "behind" => 0, "overdue" => 0, "never" => 1)
+    end
+
+    it "honours the active-only toggle" do
+      branch(last_master_apply_at: nil, active: false)
+
+      expect(stats(active_only: true).master_check_tiers["never"]).to eq(0)
+      expect(stats.master_check_tiers["never"]).to eq(1)
+    end
+  end
+
   describe "#headline" do
     it "counts patchsets and the shares" do
       fresh = branch(base_age_days: 1, ci_status: "success")

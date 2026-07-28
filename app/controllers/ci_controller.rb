@@ -19,7 +19,7 @@ class CiController < ApplicationController
                                    .order(updated_at: :desc, id: :desc)
                                    .limit(PatchCi::Config::RECENT_LIST))
 
-    load_aggregates(rows.health)
+    load_aggregates(rows.health, rows.check)
   end
 
   def branches
@@ -47,9 +47,10 @@ class CiController < ApplicationController
   # whole-table aggregates are computed once per orchestrator cycle instead of
   # once per client. The row lists stay live - they are cheap, and they are
   # what people watch.
-  # takes the request's one BranchHealth - a second instance would recompute
-  # its cutoffs and could disagree with the row labels already rendered
-  def load_aggregates(health)
+  # takes the request's one BranchHealth and MasterCheck - a second instance
+  # would recompute its cutoffs and could disagree with the row labels already
+  # rendered. MasterCheck freezes a wall clock, so it has the same hazard.
+  def load_aggregates(health, check)
     # not folded into the agg below: a second copy would expire on its own
     # schedule and disagree with /ci/branches
     @health_counts = health.cached_counts
@@ -63,6 +64,20 @@ class CiController < ApplicationController
         wont_retry: health.wont_retry_breakdown,
         awaiting_not_pushed: awaiting.fetch(true, 0),
         awaiting_pushed: awaiting.fetch(false, 0),
+        # the intersection, not a third bucket: the outcome says it applied,
+        # the tier says we checked that against this master. Either one alone
+        # overstates it.
+        verified: check.filter(health.scope_for("applies"), [ "current" ]).count,
+        # live buckets only, NOT PatchBranch.current - the planner never
+        # re-probes a retired row, so the whole corpus puts a permanent and
+        # monotonically growing floor under the warning and the all-clear
+        # branch becomes dead. Retired rows are split across two buckets:
+        # the CASE tests status = 'failed' before base age, so an ancient
+        # failed row reads never_applied rather than wont_retry, and excluding
+        # only wont_retry would miss the bulk of them. Costs the handful of
+        # still-retryable failed rows, which is the cheaper error.
+        overdue: check.counts(health.filter(PatchBranch.current, %w[applies needs_rebase awaiting_ci]))
+                      .fetch("overdue", 0),
         last24: PatchCiRun.terminal.where("completed_at >= ?", 24.hours.ago).group(:status).count }
     end
 
@@ -70,6 +85,8 @@ class CiController < ApplicationController
     @wont_retry = agg[:wont_retry]
     @awaiting_not_pushed = agg[:awaiting_not_pushed]
     @awaiting_pushed = agg[:awaiting_pushed]
+    @verified = agg[:verified]
+    @overdue = agg[:overdue]
     @last24 = agg[:last24]
   end
 

@@ -2,16 +2,16 @@ module PatchCi
   # One CASE expression, three consumers: dashboard counts, per-row labels,
   # /ci/branches filters. Keeping it in SQL keeps the three in agreement.
   #
-  # Deliberate divergences from Planner (do not "fix" these to match Planner
-  # exactly, they read different questions):
-  # (a) last_master_apply_at is a WHEN-to-retry guard, not a does-work-exist
-  #     one. A row with master_apply_error stays needs_rebase here for display
-  #     even while Planner is waiting for master to move before retrying it.
-  # (b) awaiting_ci outranks staleness for queued/running rows here, same as
-  #     Planner's in-flight exclusion from the rebase tier - a force-push
-  #     would burn the running CI slot, so neither of us touches it yet.
+  # The bucket is the last known apply outcome: not how recently we looked,
+  # and not what happens next. MasterCheck owns recency, Planner owns the
+  # queue - a row Planner is throttling still shows its last outcome here.
+  #
+  # Deliberate divergence from Planner (do not "fix" it, the two read
+  # different questions): every failed row reads never_applied whatever its
+  # stage, while Planner still retries never-pushed apply and base_detection
+  # failures. The count and the rebase tier overlap on purpose.
   class BranchHealth
-    BUCKETS = %w[fresh needs_rebase awaiting_ci wont_retry never_applied].freeze
+    BUCKETS = %w[applies needs_rebase awaiting_ci wont_retry never_applied].freeze
 
     def initialize(repo_state: PatchCiRepoState.current)
       @repo_state = repo_state
@@ -78,30 +78,42 @@ module PatchCi
         # same boundary BaseFreshness draws between recent and stale, read as
         # a yes/no instead of a tier. Without a repo state there is nothing to
         # measure against, so WORK_FROM is the floor - a pre-2017 base still
-        # reads stale. BaseFreshness falls back to 'unknown' instead; both are
-        # deliberate and spec-pinned.
+        # reads retired. BaseFreshness falls back to 'unknown' instead; both
+        # are deliberate and spec-pinned.
         stale_cutoff = @repo_state ? @repo_state.master_committed_at - Config::REBASE_AFTER_DAYS.days : Config::WORK_FROM
+        # on_master, not master_apply_error, is the conflict signal: ApplyOne
+        # only reaches the detected-base path after master has already failed,
+        # so an applied row off master conflicted even when the error column
+        # (added later) is null. Never branch on master_apply_error alone.
+        #
+        # The arms are ordered and the order is the rule. Retirement outranks
+        # outcome, so an on_master row whose base has aged out reads wont_retry
+        # rather than applies. awaiting_ci outranks both, matching Planner's
+        # in-flight exclusion - a force-push would burn the running CI slot.
+        # And wont_retry comes out of two arms meaning different things,
+        # terminal-by-nature and retired-by-age; wont_retry_reason_sql is where
+        # they are told apart.
         ActiveRecord::Base.sanitize_sql_array(
-          [ <<~SQL, active_cutoff: Config::ACTIVE_THREAD_DAYS.days.ago, stale_cutoff: stale_cutoff ])
+          [ <<~SQL, stale_cutoff: stale_cutoff ])
           CASE
             WHEN patch_branches.ci_status = 'ci_none'
               OR EXISTS (SELECT 1 FROM commit_topics ct WHERE ct.topic_id = patch_branches.topic_id)
+              OR topics.merged_into_topic_id IS NOT NULL
               THEN 'wont_retry'
-            WHEN patch_branches.status = 'failed' THEN
-              CASE WHEN patch_branches.failure_stage IN ('apply', 'base_detection')
-                        AND topics.merged_into_topic_id IS NULL
-                        AND topics.last_message_at >= :active_cutoff
-                   THEN 'needs_rebase' ELSE 'never_applied' END
+            WHEN patch_branches.status = 'failed' THEN 'never_applied'
             WHEN patch_branches.pushed_at IS NULL THEN 'awaiting_ci'
             WHEN patch_branches.ci_status IN (#{in_flight_list})
               THEN 'awaiting_ci'
-            WHEN patch_branches.master_apply_error IS NOT NULL
-              OR patch_branches.base_committed_at < :stale_cutoff
-              OR patch_branches.base_committed_at IS NULL THEN
-              CASE WHEN topics.merged_into_topic_id IS NULL
-                        AND topics.last_message_at >= :active_cutoff
-                   THEN 'needs_rebase' ELSE 'wont_retry' END
-            ELSE 'fresh'
+            WHEN patch_branches.base_committed_at IS NOT NULL
+              AND patch_branches.base_committed_at < :stale_cutoff THEN 'wont_retry'
+            -- the IS NOT NULL above only spells out what the comparison
+            -- already does; the one below is load bearing. No base date means
+            -- the age is unjudgeable, so the row falls to needs_rebase and
+            -- stays retryable rather than claiming to apply. Do not collapse
+            -- the two into one shape.
+            WHEN patch_branches.on_master
+              AND patch_branches.base_committed_at IS NOT NULL THEN 'applies'
+            ELSE 'needs_rebase'
           END
         SQL
       end
@@ -116,13 +128,17 @@ module PatchCi
       PatchCiRun::IN_FLIGHT_BRANCH_STATUSES.map { |status| "'#{status}'" }.join(", ")
     end
 
+    # the ELSE is the retired-by-age arm by elimination, not a catch-all: an
+    # aged-out base is the only other thing bucket_sql sends to wont_retry. A
+    # fifth arm there needs one here, or it renders as "base too old".
     def wont_retry_reason_sql
       <<~SQL
         CASE
           WHEN patch_branches.ci_status = 'ci_none' THEN coalesce(patch_branches.ci_skip_reason, 'ci_none')
           WHEN EXISTS (SELECT 1 FROM commit_topics ct WHERE ct.topic_id = patch_branches.topic_id)
             THEN 'committed'
-          ELSE 'thread inactive'
+          WHEN topics.merged_into_topic_id IS NOT NULL THEN 'merged thread'
+          ELSE 'base too old'
         END
       SQL
     end

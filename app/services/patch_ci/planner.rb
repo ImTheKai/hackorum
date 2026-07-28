@@ -60,14 +60,11 @@ module PatchCi
       end
     end
 
+    # every tier gates on this, not just one; committed topics read as
+    # wont_retry in BranchHealth. Thread activity is deliberately not part of
+    # it, see ACTIVE_THREAD_DAYS in config.rb.
     def eligible_topics
       Topic.active.where.not(id: CommitTopic.select(:topic_id))
-    end
-
-    # inherits eligible_topics on purpose: committed/merged topics are retired
-    # from all tiers, BranchHealth shows them as wont_retry
-    def active_topics
-      eligible_topics.where("last_message_at >= ?", Config::ACTIVE_THREAD_DAYS.days.ago)
     end
 
     # latest patch message per topic with no row of its own yet.
@@ -107,27 +104,67 @@ module PatchCi
         .order("messages.created_at DESC, messages.id DESC")
     end
 
+    # Every row worth re-probing: due (master moved since the last probe and the
+    # throttle has expired) and not yet retired. Retirement is an exclusion here,
+    # not the trigger: a row that keeps applying has its base moved forward every
+    # day and never ages, a row that stops applying ages out within
+    # REBASE_AFTER_DAYS. Nothing in here reads the discussion.
     def rebase_scope
       stale_cutoff = @repo_state.master_committed_at - Config::REBASE_AFTER_DAYS.days
+      # every column qualified: the messages join carries a created_at too
+      candidates = <<~SQL
+        (
+          -- pushed_at is not redundant with 'applied': it is what keeps this
+          -- tier disjoint from backfill, which owns the never pushed rows.
+          -- Without it counts double-reports the backfill queue as rebase work.
+             (patch_branches.status = 'applied' AND patch_branches.pushed_at IS NOT NULL
+              AND (patch_branches.base_committed_at >= :stale_cutoff
+                   OR patch_branches.base_committed_at IS NULL)
+              AND patch_branches.base_sha IS DISTINCT FROM :master_sha)
+          -- no IS NULL escape here, unlike the applied clause above: unbounded
+          -- probing is worth it for a row backing a live pushed branch whose
+          -- verdict we report, and not for one that never produced a branch.
+          -- The shape this excludes is not "no base" but a base sha we could not
+          -- resolve to a date - the logged-warn path in PatchBranches::ApplyOne
+          -- #save - so it is a trapdoor: such a row never returns here.
+          OR (patch_branches.status = 'failed' AND patch_branches.pushed_at IS NULL
+              AND patch_branches.failure_stage = 'apply'
+              AND patch_branches.base_committed_at >= :stale_cutoff)
+          OR (patch_branches.status = 'failed' AND patch_branches.pushed_at IS NULL
+              AND patch_branches.failure_stage = 'base_detection'
+              AND messages.created_at >= :submission_cutoff)
+        )
+      SQL
+
       PatchBranch.current
-        .where(topic_id: active_topics.select(:id))
-        .where(<<~SQL, cutoff: stale_cutoff)
-          (
-            (pushed_at IS NOT NULL AND status = 'applied'
-              AND (base_committed_at < :cutoff OR base_committed_at IS NULL
-                   OR master_apply_error IS NOT NULL))
-            OR (status = 'failed' AND pushed_at IS NULL AND failure_stage IN ('apply', 'base_detection'))
-          )
-        SQL
+        .where(topic_id: eligible_topics.select(:id))
+        # base_detection failures have no base to age, so they retire on the
+        # submission date instead - joined for that one clause
+        .joins(:message)
+        # two clocks on purpose: base retirement runs off master_committed_at,
+        # submission retirement off the wall clock, so a fetch broken for a week
+        # freezes the first and not the second
+        .where(candidates, stale_cutoff: stale_cutoff, master_sha: @repo_state.master_sha,
+                           submission_cutoff: Config::REBASE_AFTER_DAYS.days.ago)
         # a force-push would burn the running slot and void the verdict, so leave
         # in-flight rows alone. StuckRunMarker flips silent ones to infra_error
         # after 48h, which re-enters them here - no permanent wedge.
-        .where("ci_status IS NULL OR ci_status NOT IN (?)", PatchCiRun::IN_FLIGHT_BRANCH_STATUSES)
-        .where("last_master_apply_at IS NULL OR last_master_apply_at < ?",
-               @repo_state.master_committed_at)
+        .where("patch_branches.ci_status IS NULL OR patch_branches.ci_status NOT IN (?)",
+               PatchCiRun::IN_FLIGHT_BRANCH_STATUSES)
+        # due = master moved since the last probe AND the throttle has expired.
+        # Re-probing an unchanged patch against an unchanged master cannot
+        # change the answer, so the first half spends nothing on no-ops.
+        .where("patch_branches.last_master_apply_at IS NULL" \
+               " OR (patch_branches.last_master_apply_at < :master_at" \
+               " AND patch_branches.last_master_apply_at < :probe_cutoff)",
+               master_at: @repo_state.master_committed_at,
+               probe_cutoff: Config::MASTER_CHECK_AFTER_HOURS.hours.ago)
         # least recently attempted first, so a chronic failure cannot camp at
-        # the head of the queue: it goes to the back until master moves again
-        .order(Arel.sql("last_master_apply_at ASC NULLS FIRST, base_committed_at ASC NULLS FIRST, id ASC"))
+        # the head of the queue, and so a single sweep staggers the timestamps
+        # it writes - the next day's queue arrives already spread out
+        .order(Arel.sql("patch_branches.last_master_apply_at ASC NULLS FIRST," \
+                        " patch_branches.base_committed_at ASC NULLS FIRST," \
+                        " patch_branches.id ASC"))
     end
   end
 end

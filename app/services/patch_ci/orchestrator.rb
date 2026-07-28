@@ -3,7 +3,7 @@ module PatchCi
   # bin/orchestrator does the wiring.
   class Orchestrator
     def initialize(client:, pusher:, guard:, apply_one:, result_refs:, pruner:,
-                   repo:, remote: "origin", master_ref: "origin/master",
+                   repo:, master_sync:,
                    budget: Config::BUDGET, max_pushes: nil, dry_run: false,
                    planner_factory: ->(state) { Planner.new(repo_state: state) })
       @client = client
@@ -13,8 +13,7 @@ module PatchCi
       @result_refs = result_refs
       @pruner = pruner
       @repo = repo
-      @remote = remote
-      @master_ref = master_ref
+      @master_sync = master_sync
       @budget = budget
       @max_pushes = max_pushes
       @dry_run = dry_run
@@ -22,6 +21,7 @@ module PatchCi
       @total_pushed = 0
       @failed = 0
       @fetch_failed = false
+      @mirror_error = nil
     end
 
     def cycle
@@ -59,8 +59,9 @@ module PatchCi
 
       pushed = 0
       if free.positive?
-        # headroom: guard rejections consume items without consuming slots
-        items = @planner_factory.call(state).plan(limit: free * 3)
+        # headroom: guard rejections and failed master probes consume items
+        # without consuming slots
+        items = @planner_factory.call(state).plan(limit: free * Config::PLAN_HEADROOM)
         items.each do |item|
           break if pushed >= free
           pushed += 1 if execute(item, state.master_sha)
@@ -73,14 +74,15 @@ module PatchCi
 
       { in_flight: in_flight, free_slots: free, pushed: pushed, failed: @failed,
         pruned: pruned, era_skips_cleared: @era_skips_cleared, ingested: ingested,
-        refs_stale: !refs_ok, fetch_failed: @fetch_failed, error: nil }
+        refs_stale: !refs_ok, fetch_failed: @fetch_failed, mirror_error: @mirror_error,
+        error: nil }
     rescue GithubClient::Error => e
       # not knowing what is in flight must never be read as "nothing is".
       # the counters read zero even when the fetch and ingest above already
       # happened: the error path reports the cycle as a loss, on purpose
       { in_flight: nil, free_slots: 0, pushed: 0, failed: 0, pruned: 0,
         era_skips_cleared: @era_skips_cleared, ingested: {}, refs_stale: true,
-        fetch_failed: @fetch_failed, error: e.message }
+        fetch_failed: @fetch_failed, mirror_error: @mirror_error, error: e.message }
     end
 
     private
@@ -123,20 +125,16 @@ module PatchCi
     # or there is no master to plan against.
     def refresh_repo_state!
       @fetch_failed = false
+      @mirror_error = nil
       existing = PatchCiRepoState.current
       return existing if @dry_run && existing
 
-      result = @repo.run("fetch", "--quiet", @remote, "master")
-      unless result.success?
-        # planning against a stale master is not fatal, but silence about it is
-        @fetch_failed = true
-        warn "master fetch failed: #{result.output.to_s.slice(0, 200)}"
-      end
-      sha = @repo.rev_parse(@master_ref) || @repo.rev_parse("master")
-      raise "cannot resolve #{@master_ref}" unless sha
-      PatchCiRepoState.refresh!(master_sha: sha,
-                                master_committed_at: @repo.commit_time(sha),
-                                master_commit_height: @repo.commit_height(sha))
+      result = @master_sync.call
+      @fetch_failed = result.fetch_failed
+      @mirror_error = result.mirror_error
+      PatchCiRepoState.refresh!(master_sha: result.sha,
+                                master_committed_at: @repo.commit_time(result.sha),
+                                master_commit_height: @repo.commit_height(result.sha))
     end
 
     def remaining_pushes

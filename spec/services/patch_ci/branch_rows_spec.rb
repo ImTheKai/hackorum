@@ -12,13 +12,14 @@ RSpec.describe PatchCi::BranchRows do
     [ branch, run ]
   end
 
-  it "decorates rows with the health bucket and the base tier" do
+  it "decorates rows with the health bucket, the base tier and the check tier" do
     with_run
 
     row = rows.load(PatchBranch.current).first
 
-    expect(row.health_bucket).to eq("fresh")
+    expect(row.health_bucket).to eq("applies")
     expect(row.base_tier).to eq("recent")
+    expect(row.check_tier).to eq("never")
   end
 
   it "attaches the latest run summary" do

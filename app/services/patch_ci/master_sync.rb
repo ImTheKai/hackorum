@@ -35,6 +35,11 @@ module PatchCi
       sha = @repo.rev_parse(@master_ref) || @repo.rev_parse("master")
       raise Error, "cannot resolve #{@master_ref}" unless sha
 
+      # refs/heads/master is not a remote-tracking ref, so nothing moves it
+      # unless we do. BaseCommitDetector walks it with --before, which caps
+      # every detected base at whatever the clone happened to have.
+      fast_forward_local!(sha)
+
       # mirrors whatever resolved, the local fallback included: a stale sha is
       # either a no-op or a non-ff rejection, never a way to move the fork
       # backwards. Unconditional too, since one round trip a minute is cheaper
@@ -60,6 +65,25 @@ module PatchCi
       warn "master mirror push failed: #{error}" unless error == @last_mirror_error
       @last_mirror_error = error
       error
+    end
+
+    # never a rewrite: master only fast-forwards, so a tip that is not an
+    # ancestor means something happened that we do not model, and the answer
+    # to that is a warn, not a moved ref.
+    def fast_forward_local!(sha)
+      current = @repo.rev_parse("refs/heads/master")
+      return if current == sha
+
+      if current && !@repo.run("merge-base", "--is-ancestor", current, sha).success?
+        warn "local master #{current[0, 12]} is not an ancestor of #{sha[0, 12]}, left alone"
+        return
+      end
+
+      # pass the old value so this is compare-and-swap: bin/ci-repo-setup can
+      # write the same ref with no locking, so a concurrent writer must lose
+      # the race, not get clobbered by a write based on a stale read
+      result = @repo.run("update-ref", "refs/heads/master", sha, current || ("0" * 40))
+      warn "local master update failed: #{message(result.output)}" unless result.success?
     end
 
     # git can fail with nothing on either stream, and an empty message would

@@ -8,6 +8,7 @@
 #   ruby script/commit_import.rb --limit 100
 #   ruby script/commit_import.rb --reparse
 #   ruby script/commit_import.rb --relink
+#   ruby script/commit_import.rb --upstream-remote postgres   # repo where origin is the fork
 #
 # Takes the same advisory lock as CommitImportJob, so a manual run and the
 # hourly job never run at the same time. If the lock is held, this prints a
@@ -18,11 +19,15 @@ require "optparse"
 
 module CommitImportScript
   def self.parse_options(argv)
-    options = { repo: CommitImport.repo_path, fetch: true, limit: nil, reparse: false, relink: false }
+    options = { repo: CommitImport.repo_path, upstream_remote: "origin", fetch: true,
+                limit: nil, reparse: false, relink: false }
 
     parser = OptionParser.new do |o|
       o.banner = "Usage: ruby script/commit_import.rb [options]"
       o.on("--repo PATH", "Git checkout or mirror (default: #{CommitImport.repo_path})") { |v| options[:repo] = v }
+      o.on("--upstream-remote NAME", "remote carrying the postgres history (default origin)") do |v|
+        options[:upstream_remote] = v
+      end
       o.on("--no-fetch", "Skip git fetch (leaves your remotes alone)") { options[:fetch] = false }
       o.on("--limit N", Integer, "Import at most N new commits") { |v| options[:limit] = v }
       o.on("--reparse", "Re-parse trailers of stored commits, no git access") { options[:reparse] = true }
@@ -49,7 +54,8 @@ module CommitImportScript
   # nil", so a flag set unconditionally inside the block is used instead.
   def self.run(options)
     importer = CommitImport::Importer.new(
-      repository: CommitImport::Repository.new(path: options[:repo]),
+      repository: CommitImport::Repository.new(path: options[:repo],
+                                               upstream_remote: options[:upstream_remote]),
       fetch: options[:fetch],
       limit: options[:limit],
       logger: Logger.new($stdout)

@@ -34,6 +34,9 @@ jobs:
           sed -i 's/^work_mem = .*/work_mem = 4MB/' deploy/postgres/postgresql.conf
           sed -i 's/^maintenance_work_mem = .*/maintenance_work_mem = 64MB/' deploy/postgres/postgresql.conf
 
+      - name: Validate compose file
+        run: docker compose -f deploy/docker-compose.yml config >/dev/null
+
       - name: Start database
         run: docker compose -f deploy/docker-compose.yml up -d db
 

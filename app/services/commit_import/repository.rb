@@ -33,8 +33,13 @@ module CommitImport
     Record = Struct.new(:sha, :author_name, :author_email, :committer_name, :committer_email,
                         :authored_at, :committed_at, :subject, :body, :files, keyword_init: true)
 
-    def initialize(path: CommitImport.repo_path, clone_timeout: CLONE_TIMEOUT, git_timeout: GIT_TIMEOUT)
+    # upstream_remote: which remote carries the postgres history. "origin" is
+    # the mirror layout (/pgrepo, and an ordinary clone); the repo the
+    # orchestrator owns keeps origin for the fork and calls this "postgres".
+    def initialize(path: CommitImport.repo_path, upstream_remote: "origin",
+                   clone_timeout: CLONE_TIMEOUT, git_timeout: GIT_TIMEOUT)
       @path = path.to_s
+      @upstream_remote = upstream_remote
       @clone_timeout = clone_timeout
       @git_timeout = git_timeout
     end
@@ -43,7 +48,7 @@ module CommitImport
 
     def sync!(fetch: true)
       if repo?
-        git("fetch", "--prune", "--tags", "origin", log_output: true) if fetch
+        git("fetch", "--prune", "--tags", @upstream_remote, log_output: true) if fetch
       else
         raise Error, "#{@path} is not empty and not a git repository" unless empty_dir?
 
@@ -56,9 +61,12 @@ module CommitImport
     # not interleave a fetch mid-way and expect this to pick it up.
     def branches
       @branches ||= begin
-        remote = filtered_branches(ref_names("refs/remotes/origin/").map { |name| name.sub(%r{\Aorigin/}, "") })
+        remote = filtered_branches(
+          ref_names("refs/remotes/#{@upstream_remote}/")
+            .map { |name| name.delete_prefix("#{@upstream_remote}/") }
+        )
         if remote.any?
-          remote.map { |name| [ name, "origin/#{name}" ] }
+          remote.map { |name| [ name, "#{@upstream_remote}/#{name}" ] }
         else
           filtered_branches(ref_names("refs/heads/")).map { |name| [ name, name ] }
         end
@@ -148,6 +156,8 @@ module CommitImport
       !File.exist?(@path) || (File.directory?(@path) && Dir.children(@path).empty?)
     end
 
+    # Always clones as origin/mirror layout - upstream_remote only matters once
+    # the repo already exists, provisioning a consolidated repo is ci-repo-setup's job.
     def clone!
       FileUtils.mkdir_p(File.dirname(@path))
       out, err, status = run([ "git", "clone", "--mirror", REMOTE_URL, @path ], timeout: @clone_timeout)

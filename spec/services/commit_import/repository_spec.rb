@@ -32,6 +32,39 @@ RSpec.describe CommitImport::Repository do
       repo = described_class.new(path: clone)
       expect(repo.branches).to include([ "REL_18_STABLE", "origin/REL_18_STABLE" ])
     end
+
+    it "reads remote-tracking branches of a named upstream remote" do
+      fixture_repo.commit(subject: "first")
+      fixture_repo.create_branch("REL_18_STABLE")
+      fixture_repo.create_branch("t123_1")
+      bare = fixture_repo.fetch_into_bare(File.join(@tmp, "consolidated.git"))
+
+      repo = described_class.new(path: bare, upstream_remote: "postgres")
+      expect(repo.branches).to contain_exactly([ "master", "postgres/master" ],
+                                               [ "REL_18_STABLE", "postgres/REL_18_STABLE" ])
+    end
+
+    # the patch branches live in refs/heads of the shared repo. The fallback
+    # must not fire while upstream refs exist, or the importer would walk them.
+    it "ignores local heads while the upstream remote has refs" do
+      fixture_repo.commit(subject: "first")
+      bare = fixture_repo.fetch_into_bare(File.join(@tmp, "consolidated.git"))
+      Open3.capture3("git", "-C", bare, "update-ref", "refs/heads/REL_99_STABLE",
+                     "refs/remotes/postgres/master")
+
+      repo = described_class.new(path: bare, upstream_remote: "postgres")
+      expect(repo.branches.map(&:first)).not_to include("REL_99_STABLE")
+    end
+
+    it "falls back to local heads when the named remote has no refs" do
+      fixture_repo.commit(subject: "first")
+      fixture_repo.create_branch("REL_18_STABLE")
+      mirror = fixture_repo.mirror_to(File.join(@tmp, "mirror.git"))
+
+      repo = described_class.new(path: mirror, upstream_remote: "postgres")
+      expect(repo.branches).to contain_exactly([ "master", "master" ],
+                                               [ "REL_18_STABLE", "REL_18_STABLE" ])
+    end
   end
 
   describe "#rev_list" do
@@ -112,6 +145,16 @@ RSpec.describe CommitImport::Repository do
       repo = described_class.new(path: clone)
       repo.sync!
       expect(repo.rev_list("origin/master")).to include(second)
+    end
+
+    it "fetches from a named upstream remote in the consolidated layout" do
+      fixture_repo.commit(subject: "first")
+      bare = fixture_repo.fetch_into_bare(File.join(@tmp, "consolidated.git"))
+      second = fixture_repo.commit(subject: "second")
+
+      repo = described_class.new(path: bare, upstream_remote: "postgres")
+      repo.sync!
+      expect(repo.rev_list("postgres/master")).to include(second)
     end
 
     it "raises when the directory is not empty and not a repo" do

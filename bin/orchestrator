@@ -5,6 +5,7 @@
 # See GITINTEGRATION and --help.
 
 require "optparse"
+require "fileutils"
 
 # block buffering hides an hour of cycles behind nohup or tee
 $stdout.sync = true
@@ -12,6 +13,11 @@ $stdout.sync = true
 LOCK_KEY = "patch_ci_orchestrator"
 # a daemon must survive a timeout; a broken config must not spin on it forever
 MAX_CONSECUTIVE_FAILURES = 20
+
+# the container healthcheck reads this file's mtime. GitRepo#run has no
+# timeout, so a stalled fetch leaves a live process with a frozen cycle -
+# the one death a restart policy cannot see.
+HEARTBEAT_PATH = ENV.fetch("HACKORUM_ORCHESTRATOR_HEARTBEAT", "/tmp/orchestrator.heartbeat")
 
 options = {
   repo: File.expand_path("../postgres", __dir__),
@@ -37,6 +43,7 @@ OptionParser.new do |o|
   o.on("--budget N", Integer, "max queued+running CI runs (default PatchCi::Config::BUDGET)") { |v| options[:budget] = v }
   o.on("--interval N", Integer, "seconds between cycles (default 60)") { |v| options[:interval] = v }
   o.on("--repo PATH", "postgres checkout (default ./postgres)") { |v| options[:repo] = v }
+  o.on("--worktree PATH", "apply worktree (default ./tmp/patch_ci_worktree)") { |v| options[:worktree] = v }
   o.on("--github-repo NAME", "owner/name CI runs in (default from PatchCi::Config)") { |v| options[:github_repo] = v }
   o.on("--master-ref REF", "ref that is master truth (default <upstream-remote>/master)") { |v| options[:master_ref] = v }
   o.on("--upstream-remote NAME", "remote master truth is fetched from (default postgres)") { |v| options[:upstream_remote] = v }
@@ -73,14 +80,35 @@ orchestrator = PatchCi::Orchestrator.new(
   dry_run: options[:dry_run]
 )
 
+def touch_heartbeat
+  FileUtils.touch(HEARTBEAT_PATH)
+rescue SystemCallError => e
+  warn "heartbeat touch failed: #{e.message}"
+end
+
+# hourly, and never on a dry run: the import writes rows, which is exactly what
+# --dry-run promises not to do. on_progress: the pass spans a fetch plus a
+# full commit import - both slower than the healthcheck's stale window - so
+# the heartbeat needs a touch mid-pass, not just at the start and end of a cycle.
+maintenance = PatchCi::RepoMaintenance.new(repo: repo, upstream_remote: options[:upstream_remote],
+                                            on_progress: method(:touch_heartbeat))
+
 def summary_line(result)
   ingested = result[:ingested].to_a.map { |status, count| "#{status}:#{count}" }.join(",")
   rest = result.except(:ingested).map { |k, v| "#{k}=#{v}" }.join(" ")
   "[#{Time.current.iso8601}] #{rest} ingested=#{ingested.presence || '-'}"
 end
 
+def maintenance_line(maint)
+  import = maint.skipped ? "skipped(lock held)" : (maint.import_error || "ok")
+  "[#{Time.current.iso8601}] maintenance fetch=#{maint.fetch_error || 'ok'} import=#{import}"
+end
+
 # same key as script/patch_apply.rb: both write branch refs in the same repo
 ran = AdvisoryLock.with_lock(LOCK_KEY) do
+  # before the first cycle: the healthcheck reads a missing file as unhealthy,
+  # and the first cycle can take a minute
+  touch_heartbeat
   failures = 0
   loop do
     begin
@@ -95,6 +123,11 @@ ran = AdvisoryLock.with_lock(LOCK_KEY) do
       # tmp/ is disposable; a worktree deleted under us turns every following
       # cycle into silent push_failed churn. One rev_parse when it is healthy.
       repo.ensure_worktree!(options[:worktree])
+
+      unless options[:dry_run]
+        maint = maintenance.call
+        puts maintenance_line(maint) if maint.ran
+      end
 
       result = orchestrator.cycle
       puts summary_line(result)
@@ -113,6 +146,9 @@ ran = AdvisoryLock.with_lock(LOCK_KEY) do
       warn "cycle failed (#{failures} in a row): #{e.class}: #{e.message}"
       raise if options[:once] || failures >= MAX_CONSECUTIVE_FAILURES
     end
+    # liveness is "the loop is turning", success or not: a failed cycle warns
+    # for itself and counts toward MAX_CONSECUTIVE_FAILURES
+    touch_heartbeat
     break if options[:once]
     sleep options[:interval]
   end

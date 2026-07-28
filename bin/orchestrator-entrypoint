@@ -1,0 +1,43 @@
+#!/bin/bash -e
+
+# Deploy key: bind-mounted read-only at a staging path and copied, so ssh sees
+# a root-owned 600 file whatever the host uid and mode are. Absent is fine -
+# bin/ci-repo-setup against a local remote needs no key.
+KEY_SOURCE="${HACKORUM_DEPLOY_KEY_PATH:-/run/hackorum_deploy_key}"
+KEY_DEST="${HACKORUM_DEPLOY_KEY_DEST:-/root/.ssh/deploy_key}"
+if [ -f "$KEY_SOURCE" ]; then
+  mkdir -p "$(dirname "$KEY_DEST")"
+  install -m 600 "$KEY_SOURCE" "$KEY_DEST"
+fi
+
+# Only the daemon needs a provisioned repo. bin/ci-repo-setup runs through this
+# same entrypoint and must survive a repo that does not exist yet - hence the
+# command test rather than an unconditional check.
+if [ "$1" = "bin/orchestrator" ]; then
+  # must match the --repo the daemon is started with on the compose command line
+  REPO="${CI_REPO_DIR:-/ci/repo}"
+  UPSTREAM_REMOTE="${CI_UPSTREAM_REMOTE:-postgres}"
+  FORK_REMOTE="${CI_FORK_REMOTE:-origin}"
+
+  fail() {
+    echo "orchestrator: $1" >&2
+    echo "provision it with: docker compose run --rm orchestrator bin/ci-repo-setup" >&2
+    exit 1
+  }
+
+  git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || fail "$REPO is not a git repository"
+  git -C "$REPO" remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1 ||
+    fail "remote $UPSTREAM_REMOTE is not configured in $REPO"
+  git -C "$REPO" remote get-url "$FORK_REMOTE" >/dev/null 2>&1 ||
+    fail "remote $FORK_REMOTE is not configured in $REPO"
+  git -C "$REPO" rev-parse --verify --quiet 'refs/heads/master^{commit}' >/dev/null ||
+    fail "refs/heads/master does not resolve in $REPO"
+fi
+
+# jemalloc, as in bin/container-entrypoint
+if [ -z "${LD_PRELOAD+x}" ]; then
+  LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
+  export LD_PRELOAD
+fi
+
+exec "${@}"

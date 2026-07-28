@@ -61,6 +61,17 @@ class GitFixtureRepo
     target.to_s
   end
 
+  # A bare repo whose only remote is the given name - the consolidated prod
+  # layout, where upstream lives under refs/remotes/<remote>/ and refs/heads
+  # belongs to us.
+  def fetch_into_bare(target, remote: "postgres")
+    target = target.to_s
+    capture("git", "init", "--bare", "--quiet", target)
+    capture("git", "-C", target, "remote", "add", remote, @path)
+    capture("git", "-C", target, "fetch", "--quiet", "--prune", "--tags", remote)
+    target
+  end
+
   private
 
   def git(*args)
@@ -70,6 +81,12 @@ class GitFixtureRepo
   def git_with_env(env, *args)
     out, err, status = Open3.capture3(env, "git", "-C", @path, *args)
     raise "git #{args.join(' ')} failed: #{err}#{out}" unless status.success?
+    out
+  end
+
+  def capture(*args)
+    out, err, status = Open3.capture3(*args)
+    raise "#{args.join(' ')} failed: #{err}#{out}" unless status.success?
     out
   end
 end

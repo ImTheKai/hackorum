@@ -64,8 +64,6 @@ services:
       RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
       # Run Solid Queue supervisor inside Puma so background jobs (emails, etc.) get processed.
       SOLID_QUEUE_IN_PUMA: "1"
-      # Local mirror of the PostgreSQL git history, used by the hourly commit importer.
-      HACKORUM_PG_REPO: /pgrepo
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       # Required: decrypts credentials.yml.enc, which holds the Active Record
       # encryption keys used for Identity OAuth tokens (Gmail send feature).
@@ -79,8 +77,6 @@ services:
       SMTP_DOMAIN: ${SMTP_DOMAIN}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-    volumes:
-      - pgrepo:/pgrepo
     depends_on:
       db:
         condition: service_healthy
@@ -196,6 +192,56 @@ services:
     labels:
       autoheal: "true"
 
+  # The CI orchestrator: apply, push, ingest, forecast. Sole owner of the
+  # ci_repo volume - it is the only process that fetches, and it runs the
+  # hourly commit import itself (see bin/ci-repo-setup, deploy/README.md).
+  orchestrator:
+    build: ..
+    logging: *logging-default
+    env_file: .env
+    entrypoint: ["./bin/orchestrator-entrypoint"]
+    command: ["bin/orchestrator", "--repo", "/ci/repo", "--worktree", "/ci/worktree"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackorum}}
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-hackorum}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      # not read by this process (it touches no encrypted attributes), passed
+      # for uniformity with the other app containers
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      RAILS_LOG_LEVEL: ${RAILS_LOG_LEVEL:-warn}
+      HACKORUM_GITHUB_TOKEN: ${HACKORUM_GITHUB_TOKEN}
+      # must stay in sync with the --repo above: the entrypoint's pre-flight
+      # check reads this, the daemon reads the flag
+      CI_REPO_DIR: /ci/repo
+      # commit import defaults for a manual run inside this container
+      HACKORUM_PG_REPO: /ci/repo
+      GIT_SSH_COMMAND: ssh -i /root/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+    volumes:
+      - ci_repo:/ci
+      - ${HACKORUM_SSH_KEY:?set HACKORUM_SSH_KEY to the host path of the deploy key}:/run/hackorum_deploy_key:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # mtime of the file every cycle touches: a git call stalled with no timeout
+    # leaves a live process and a frozen cycle, which a process check misses
+    #
+    # $$ here (unlike the single $ in the db healthcheck above) is on purpose:
+    # we want the container's shell to see a literal $, not compose to
+    # interpolate a var, so every $ is doubled to survive compose's parsing.
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/orchestrator.heartbeat) )) -lt 600"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+    restart: unless-stopped
+    labels:
+      autoheal: "true"
+
   caddy:
     image: caddy:latest
     logging: *logging-verbose
@@ -236,7 +282,7 @@ services:
 volumes:
   pgdata:
   pgdumps:
-  pgrepo:
+  ci_repo:
   caddy_data:
   caddy_config:
   maildata:

@@ -1,0 +1,55 @@
+#!/bin/bash -e
+set -o pipefail
+
+# Provisions the git repo the orchestrator and the commit importer share.
+# Idempotent, and the whole recovery procedure after a lost volume.
+#
+# Layout (see deploy/README.md):
+#   refs/remotes/$UPSTREAM_REMOTE/*   upstream branches, plus refs/tags/*
+#   refs/heads/master                 upstream master, moved on by every cycle
+#   refs/heads/t<topic>_<index>       patch branches
+#   refs/hackorum-ci/*                result payload refs
+#
+# Every value is overridable so the spec can point at local fixtures.
+# The ruby side of the fork name is PatchCi::Config::GITHUB_REPO.
+
+REPO="${CI_REPO_DIR:-/ci/repo}"
+UPSTREAM_REMOTE="${CI_UPSTREAM_REMOTE:-postgres}"
+UPSTREAM_URL="${CI_UPSTREAM_URL:-https://git.postgresql.org/git/postgresql.git}"
+FORK_REMOTE="${CI_FORK_REMOTE:-origin}"
+FORK_URL="${CI_FORK_URL:-git@github.com:hackorum-dev/postgres.git}"
+
+set_remote() {
+  if git -C "$REPO" remote get-url "$1" >/dev/null 2>&1; then
+    git -C "$REPO" remote set-url "$1" "$2"
+  else
+    git -C "$REPO" remote add "$1" "$2"
+  fi
+}
+
+if ! git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "creating bare repo at $REPO"
+  mkdir -p "$REPO"
+  git init --bare --quiet "$REPO"
+fi
+
+set_remote "$UPSTREAM_REMOTE" "$UPSTREAM_URL"
+set_remote "$FORK_REMOTE" "$FORK_URL"
+
+echo "fetching $UPSTREAM_REMOTE branches and tags (the slow one)"
+git -C "$REPO" fetch --progress --prune --tags "$UPSTREAM_REMOTE"
+
+# our own heads, so the repo and the fork agree from the start: PushGuard
+# refuses a row whose branch is missing here. A re-run resets a local branch to
+# what the fork has, which is what recovery wants and harmless otherwise - the
+# orchestrator force-pushes, and an unpushed branch gets re-applied.
+echo "fetching $FORK_REMOTE heads and result refs"
+git -C "$REPO" fetch --progress "$FORK_REMOTE" '+refs/heads/*:refs/heads/*'
+git -C "$REPO" fetch --progress "$FORK_REMOTE" '+refs/hackorum-ci/*:refs/hackorum-ci/*'
+
+# last, so the fork's mirror of master cannot win: this ref is planning input
+git -C "$REPO" update-ref refs/heads/master "refs/remotes/$UPSTREAM_REMOTE/master"
+
+heads=$(git -C "$REPO" for-each-ref --format='%(refname)' refs/heads | wc -l)
+results=$(git -C "$REPO" for-each-ref --format='%(refname)' refs/hackorum-ci | wc -l)
+echo "done: $heads heads, $results result refs, master $(git -C "$REPO" rev-parse --short refs/heads/master)"

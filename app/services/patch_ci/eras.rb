@@ -1,10 +1,14 @@
 module PatchCi
-  # postgres-ci/eras.yml, read from Rails. Until now only
+  # eras.yml, read from Rails. Until now only postgres-ci's
   # .github/workflows/build-era-images.yml read it, and the app knew majors only
   # through EraDetector::SUPPORTED_MAJORS - so a major-to-family mapping in Ruby
   # would have been a second copy free to drift from the image build.
+  #
+  # The file is a copy of postgres-ci's, see its header: reading it out of a
+  # sibling checkout worked on my machine only, and left the app, its specs and
+  # the image without the mapping everywhere else.
   class Eras
-    PATH = Rails.root.join("postgres-ci/eras.yml")
+    PATH = Rails.root.join("config/patch_ci/eras.yml")
 
     Family = Struct.new(:name, :majors, :enabled, keyword_init: true)
 

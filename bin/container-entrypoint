@@ -22,6 +22,12 @@ fi
 
 # If running the rails server (directly or via bin/dev), create or migrate the database
 if { [ "$1" = "./bin/rails" ] && [ "$2" = "server" ]; } || [ "$1" = "./bin/dev" ]; then
+  # tmp/ comes from the bind mount, so a pid file outlives the container that
+  # wrote it - puma leaves one behind whenever it is killed by a signal. The pid
+  # in it is dead, but pids restart at 1 in the new container and something else
+  # can hold it by now, and then rails exits with "server is already running".
+  rm -f tmp/pids/server.pid
+
   ./bin/rails db:prepare
 fi
 

@@ -1,0 +1,73 @@
+# Copy of hackorum-dev/postgres-ci eras.yml. That repo owns this file - it
+# builds the images from it. The copy exists because the app reads the same
+# mapping and postgres-ci is not, and should not be, a checkout hackorum needs:
+# the specs, the CI runners and the prod image all have to see it.
+#
+# Refresh with `cp postgres-ci/eras.yml config/patch_ci/eras.yml` and put this
+# header back. Only families, majors and enabled are read here, so a change to
+# base_image, eol or runtime_packages needs no re-copy - eras_spec fails when
+# the parts that matter drift and postgres-ci is checked out next to us.
+#
+# Build environments for hackorum patch CI, keyed by the PG major version of
+# the base commit. One image per family; every major it serves is a tag on it.
+#
+# reference_commits warm the baked ccache - one build per major the family
+# serves, all sharing one content-addressed cache.
+#
+# runtime_packages lists the shared-library packages a compiled postgres
+# needs at runtime for that family's Debian release. Runtime library package
+# names change across releases (openssl, ldap and readline all rename
+# theirs), so this is spelled out per family instead of guessed once.
+families:
+  stretch:
+    enabled: true
+    base_image: debian/eol:stretch
+    eol: true
+    majors:
+      9:  bd6cf3f237c9aeb4dad1ac3ec2008c5768fe4c1b
+      10: 8569955ee39650a667b9700385e1bc19fbf47069
+      11: 96102a32a374c3b81ba9c2b24bcf1943a87a9ef6
+    runtime_packages: >-
+      libssl1.1 libreadline7 libicu57 libldap-2.4-2 libxml2 libxslt1.1
+      libpam0g libkrb5-3 libselinux1 libuuid1 zlib1g libperl5.24
+  buster:
+    enabled: true
+    base_image: debian/eol:buster
+    eol: true
+    majors:
+      12: 68a13f28bebc9eb70cc6988bfa2daaf4500f519f
+      13: 7559d8ebfa11d98728e816f6b655582ce41150f3
+    runtime_packages: >-
+      libssl1.1 libreadline7 libicu63 libldap-2.4-2 libxml2 libxslt1.1
+      libpam0g libkrb5-3 libselinux1 libuuid1 zlib1g libperl5.28
+  bullseye:
+    enabled: true
+    base_image: debian:bullseye
+    eol: false
+    majors:
+      14: 88e014c149cc396fb218b08eda17c47d5b33e94f
+      15: cab5b9ab2c066ba904f13de2681872dcda31e207
+    runtime_packages: >-
+      libssl1.1 libreadline8 libicu67 libldap-2.4-2 libxml2 libxslt1.1
+      libpam0g libkrb5-3 libselinux1 libuuid1 zlib1g libperl5.32
+  bookworm:
+    enabled: true
+    base_image: debian:bookworm
+    eol: false
+    majors:
+      16: c8e1ba736b2b9e8c98d37a5b77c4ed31baf94147
+      17: 29275b1d177096597675b5c6e7e7c9db2df8f4df
+    runtime_packages: >-
+      libssl3 libreadline8 libicu72 libldap-2.5-0 libxml2 libxslt1.1
+      libpam0g libkrb5-3 libselinux1 libuuid1 zlib1g libperl5.36
+  trixie:
+    enabled: true
+    base_image: debian:trixie
+    eol: false
+    majors:
+      18: c9b3d4909bbfcaa8cc2ed434d12a562fb30fe422
+      19: 45d92b76dc4ac31d44e46ca38bee12d5d8fac1f5
+      20: 1c4b1de888559a47df599dcef356ea7fbf96fd0c
+    runtime_packages: >-
+      libssl3t64 libreadline8t64 libicu76 libldap2 libxml2 libxslt1.1
+      libpam0g libkrb5-3 libselinux1 libuuid1 zlib1g libperl5.40

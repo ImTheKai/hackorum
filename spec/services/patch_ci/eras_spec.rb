@@ -75,4 +75,25 @@ RSpec.describe PatchCi::Eras do
     expect { family.majors << 99 }.to raise_error(FrozenError)
     expect { family.name = "mutated!" }.to raise_error(FrozenError)
   end
+
+  # our config/patch_ci/eras.yml is a copy of postgres-ci's, so it can go stale
+  # after a family is added there. Nothing on a CI runner can catch that - the
+  # other repo is not checked out - but a dev box with it next to us can, and
+  # that is where the copy gets refreshed anyway. Compares what the app reads,
+  # not the whole file: base images and runtime packages are postgres-ci's
+  # business and change without touching the mapping.
+  it "carries the same mapping as postgres-ci's eras.yml" do
+    source = [ Rails.root.join("postgres-ci/eras.yml"), Rails.root.join("../postgres-ci/eras.yml") ]
+             .find(&:exist?)
+    skip "postgres-ci is not checked out next to this repo" unless source
+
+    expect(mapping(described_class::PATH)).to eq(mapping(source)),
+      "config/patch_ci/eras.yml drifted, refresh it: cp #{source} #{described_class::PATH}"
+  end
+
+  def mapping(path)
+    YAML.safe_load_file(path).fetch("families").transform_values do |config|
+      { majors: config.fetch("majors").keys.map(&:to_i).sort, enabled: config["enabled"] == true }
+    end
+  end
 end

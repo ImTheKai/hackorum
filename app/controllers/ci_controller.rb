@@ -68,6 +68,11 @@ class CiController < ApplicationController
         # the tier says we checked that against this master. Either one alone
         # overstates it.
         verified: check.filter(health.scope_for("applies"), [ "current" ]).count,
+        # of the rows that applied, how many the rebase tier would re-probe now.
+        # Same MasterCheck#due the planner filters on, so this cannot promise
+        # work the tier would not pick up. Reads equal to the bucket total on a
+        # corpus nothing has re-probed yet, and drops as the sweep lands.
+        applies_due: check.due(health.scope_for("applies")).count,
         # live buckets only, NOT PatchBranch.current - the planner never
         # re-probes a retired row, so the whole corpus puts a permanent and
         # monotonically growing floor under the warning and the all-clear
@@ -86,6 +91,7 @@ class CiController < ApplicationController
     @awaiting_not_pushed = agg[:awaiting_not_pushed]
     @awaiting_pushed = agg[:awaiting_pushed]
     @verified = agg[:verified]
+    @applies_due = agg[:applies_due]
     @overdue = agg[:overdue]
     @last24 = agg[:last24]
   end

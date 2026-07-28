@@ -120,6 +120,48 @@ RSpec.describe PatchCi::MasterCheck do
     end
   end
 
+  describe "#due" do
+    # one owner: Planner#rebase_scope filters on this too, so the dashboard's
+    # "waiting for a rebase" figure cannot drift from what the tier emits
+    it "includes a row that has never been probed" do
+      row = branch(nil)
+      expect(check.due(PatchBranch.all).pluck(:id)).to eq([ row.id ])
+    end
+
+    it "includes a row probed before master moved and past the throttle" do
+      row = branch((PatchCi::Config::MASTER_CHECK_AFTER_HOURS + 1).hours.ago)
+      expect(check.due(PatchBranch.all).pluck(:id)).to eq([ row.id ])
+    end
+
+    # probed AFTER master's commit would be excluded by the master-moved half
+    # alone, which would not test the throttle at all. This row is on the far
+    # side of master and still inside the throttle, so only the throttle can
+    # reject it.
+    it "excludes a row probed after master moved but inside the throttle window" do
+      branch(repo_state.master_committed_at - 1.hour)
+      expect(check.due(PatchBranch.all)).to be_empty
+    end
+
+    it "excludes a row probed since master last moved" do
+      branch(1.minute.ago)
+      expect(check.due(PatchBranch.all)).to be_empty
+    end
+
+    # the throttle is not the only gate: re-probing against an unchanged master
+    # cannot change the answer, however long ago the probe was
+    it "excludes an old probe when master has not moved since" do
+      frozen = create(:patch_ci_repo_state, master_committed_at: 10.days.ago)
+      create(:patch_branch, last_master_apply_at: 9.days.ago)
+
+      expect(described_class.new(repo_state: frozen).due(PatchBranch.all)).to be_empty
+    end
+
+    it "matches nothing without a repo state" do
+      branch(nil)
+      expect(described_class.new(repo_state: nil).due(PatchBranch.all)).to be_empty
+    end
+  end
+
   describe "#counts" do
     it "groups every tier in one query" do
       branch(1.hour.ago)

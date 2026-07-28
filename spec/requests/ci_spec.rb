@@ -343,6 +343,30 @@ RSpec.describe "CI dashboard", type: :request do
       expect(stat_tile("Verified on master").at_css(".v").text.strip).to eq("1")
     end
 
+    # the applies bucket's own sub-line: of the rows that applied, how many the
+    # rebase tier would re-probe now. Not the bucket total - a row checked
+    # against this master is not waiting for anything.
+    it "counts the applying rows still waiting for a rebase" do
+      state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
+      # due: probed before this master and past the throttle
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 3.days.ago)
+      # never probed, so also due
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: nil)
+      # already checked against this master, so not waiting
+      create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,
+             base_committed_at: state.master_committed_at, last_master_apply_at: 1.hour.ago)
+
+      get "/ci"
+
+      bucket = Nokogiri::HTML(response.body).css(".ci-health .bucket")
+                                           .find { |node| node.at_css(".t").text.strip == "applies" }
+      expect(bucket.at_css(".n").text.strip).to eq("3")
+      waiting = bucket.css("li").find { |li| li.text.include?("waiting for a rebase") }
+      expect(waiting.css("span").last.text.strip).to eq("2")
+    end
+
     it "warns on the status strip when rows have gone unchecked" do
       state = create(:patch_ci_repo_state, master_committed_at: 2.days.ago)
       create(:patch_branch, ci_status: "success", pushed_at: 1.day.ago, on_master: true,

@@ -13,6 +13,11 @@
           li
             span pushed, awaiting verdict
             span = number_with_delimiter(@awaiting_pushed)
+        - elsif bucket == "applies"
+          li
+            span waiting for a rebase
+            span = number_with_delimiter(@applies_due)
+          li: span = ci_bucket_blurb(bucket)
         - elsif bucket == "wont_retry"
           - @wont_retry.first(3).each do |reason, count|
             li

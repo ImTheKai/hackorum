@@ -152,13 +152,9 @@ module PatchCi
         .where("patch_branches.ci_status IS NULL OR patch_branches.ci_status NOT IN (?)",
                PatchCiRun::IN_FLIGHT_BRANCH_STATUSES)
         # due = master moved since the last probe AND the throttle has expired.
-        # Re-probing an unchanged patch against an unchanged master cannot
-        # change the answer, so the first half spends nothing on no-ops.
-        .where("patch_branches.last_master_apply_at IS NULL" \
-               " OR (patch_branches.last_master_apply_at < :master_at" \
-               " AND patch_branches.last_master_apply_at < :probe_cutoff)",
-               master_at: @repo_state.master_committed_at,
-               probe_cutoff: Config::MASTER_CHECK_AFTER_HOURS.hours.ago)
+        # MasterCheck owns that clause: /ci reports how many rows are waiting,
+        # and a second copy here would let the number and the queue disagree.
+        .then { |scope| MasterCheck.new(repo_state: @repo_state).due(scope) }
         # least recently attempted first, so a chronic failure cannot camp at
         # the head of the queue, and so a single sweep staggers the timestamps
         # it writes - the next day's queue arrives already spread out

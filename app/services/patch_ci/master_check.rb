@@ -23,6 +23,28 @@ module PatchCi
       relation.where("#{tier_sql} IN (?)", tiers)
     end
 
+    # Rows a re-probe could tell us something new about: master has moved since
+    # the last probe AND the throttle has expired. Sole owner of "due" -
+    # Planner#rebase_scope filters on this, and the dashboard counts it, so the
+    # figure people read cannot drift from the work the tier actually emits.
+    #
+    # Not a TIERS value: 'current' already means "master has not moved", but
+    # 'behind' spans both sides of the throttle, so due is a narrower question
+    # than any single tier answers.
+    #
+    # Without a repo state there is no master to compare against, so nothing is
+    # due - unlike tier_sql, which claims 'never'. Planner returns no plan at
+    # all in that state, and this agrees with it.
+    def due(relation)
+      return relation.none unless @repo_state
+
+      relation.where("patch_branches.last_master_apply_at IS NULL" \
+                     " OR (patch_branches.last_master_apply_at < :master_at" \
+                     " AND patch_branches.last_master_apply_at < :probe_cutoff)",
+                     master_at: @repo_state.master_committed_at,
+                     probe_cutoff: Config::MASTER_CHECK_AFTER_HOURS.hours.ago)
+    end
+
     # no repo state means every row is 'never' (see tier_sql), handled before
     # grouping: a bare string constant in GROUP BY is an ordinal reference to
     # Postgres, not a literal

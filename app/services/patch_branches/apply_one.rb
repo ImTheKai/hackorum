@@ -152,11 +152,17 @@ module PatchBranches
     # planner tier, so a failed probe would retire a healthy pushed branch.
     # What keeps it in the rebase tier is its base_sha still differing from
     # master; master_apply_error only records why the last probe failed.
+    # keep_base: extract and error fire before anything looks at a base, so
+    # save's nil defaults would destroy columns the failure has no bearing on -
+    # and a row that once applied would become indistinguishable from one that
+    # never had a base. base_detection is different: it did look, and found
+    # nothing for this patchset, so there the nils are the answer.
     def save_failure(failure_stage:, failure_reason:)
       return touch_master_apply_only(clip(failure_reason)) if @master_only
 
       tolerantly do
-        save(status: "failed", failure_stage: failure_stage, failure_reason: failure_reason)
+        save(status: "failed", failure_stage: failure_stage, failure_reason: failure_reason,
+             keep_base: true)
       end
     end
 
@@ -179,31 +185,35 @@ module PatchBranches
 
     def save(status:, base_sha: nil, on_master: false, base_source: nil,
              failure_stage: nil, failure_reason: nil, conflict_files: [],
-             content_hash: nil, master_apply_error: :unset)
+             content_hash: nil, master_apply_error: :unset, keep_base: false)
       now = Time.current
-      committed_at = base_sha && @repo.commit_time(base_sha)
-      Rails.logger.warn("patch_branches meta lookup failed for #{@branch_name} base #{base_sha}") if base_sha && !committed_at
       @record.assign_attributes(
         topic_id: @message.topic_id,
         branch_name: @branch_name,
         status: status,
-        base_sha: base_sha,
-        on_master: on_master,
-        base_source: base_source,
         failure_stage: failure_stage,
         failure_reason: failure_reason,
         conflict_files: conflict_files || [],
         patch_content_hash: content_hash,
-        attempted_at: now,
+        attempted_at: now
+      )
+      @record.assign_attributes(base_columns(base_sha, on_master, base_source)) unless keep_base
+      touch_master_apply(master_apply_error, now: now) unless master_apply_error == :unset
+      @record.save!
+    end
+
+    # the six columns that only mean anything together: all derived from
+    # base_sha, so they are written as one group or not at all
+    def base_columns(base_sha, on_master, base_source)
+      committed_at = base_sha && @repo.commit_time(base_sha)
+      Rails.logger.warn("patch_branches meta lookup failed for #{@branch_name} base #{base_sha}") if base_sha && !committed_at
+      { base_sha: base_sha, on_master: on_master, base_source: base_source,
         base_committed_at: committed_at,
         base_commit_height: base_sha && @repo.commit_height(base_sha),
         # the major the base commit itself belongs to, not the newest one that
         # could build the patch. PgMajorBackfill reads the same number back off
         # patch_ci_runs, which agrees only because CI builds the base's own era.
-        pg_major: base_sha && @era.major_for(base_sha)
-      )
-      touch_master_apply(master_apply_error, now: now) unless master_apply_error == :unset
-      @record.save!
+        pg_major: base_sha && @era.major_for(base_sha) }
     end
 
     def touch_master_apply(error, now: Time.current)

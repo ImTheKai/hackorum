@@ -118,6 +118,47 @@ RSpec.describe PatchBranches::ApplyOne do
     expect(record.master_apply_error).to be_nil
   end
 
+  # extract and error never get as far as looking at a base, so nulling the
+  # row's base columns destroys information the failure has no bearing on -
+  # and leaves a row that once applied indistinguishable from one that never
+  # had a base at all
+  it "keeps the base metadata when extraction fails on a row that already applied" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" }, date: Time.current.iso8601)
+    patch = generate_patch(fixture.path, base, "a.c", "v2\n", @patch_dir)
+    message = message_with_patch(patch)
+    expect(apply_one.call(message.id, master_sha: base).first).to eq(:applied_on_master)
+    before = PatchBranch.find_by(message_id: message.id)
+
+    allow_any_instance_of(PatchBranches::PatchsetExtractor).to receive(:extract)
+      .and_raise(PatchBranches::PatchsetExtractor::Error, "no patch attachments")
+    outcome, = apply_one.call(message.id, master_sha: base)
+
+    expect(outcome).to eq(:extract_failed)
+    expect(before.reload).to have_attributes(
+      status: "failed", failure_stage: "extract",
+      base_sha: base, base_source: "master", on_master: true,
+      base_committed_at: be_present, base_commit_height: be_present
+    )
+  end
+
+  it "keeps the base metadata when an apply crashes on a row that already applied" do
+    base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" }, date: Time.current.iso8601)
+    patch = generate_patch(fixture.path, base, "a.c", "v2\n", @patch_dir)
+    message = message_with_patch(patch)
+    expect(apply_one.call(message.id, master_sha: base).first).to eq(:applied_on_master)
+    before = PatchBranch.find_by(message_id: message.id)
+
+    one = apply_one(force: true)
+    allow_any_instance_of(PatchBranches::Applier).to receive(:apply).and_raise("boom")
+    error = capture_error { one.call(message.id, master_sha: base) }
+    expect(one.persist_error(error)).to be_nil
+
+    expect(before.reload).to have_attributes(
+      status: "failed", failure_stage: "error",
+      base_sha: base, base_committed_at: be_present
+    )
+  end
+
   it "skips an unchanged applied row and re-applies it with force" do
     base = fixture.commit(subject: "base", files: { "a.c" => "v1\n" }, date: Time.current.iso8601)
     patch = generate_patch(fixture.path, base, "a.c", "v2\n", @patch_dir)

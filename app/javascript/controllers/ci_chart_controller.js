@@ -23,10 +23,21 @@ export default class extends Controller {
 
   disconnect() {
     this.observer?.disconnect()
+    this.sizeObserver?.disconnect()
+    this.sizeObserver = null
     this.teardown()
   }
 
   render() {
+    // specs are width: "container", and vega-lite resolves that once at embed
+    // time from the element's clientWidth, then only ever recomputes it on
+    // window:resize. Embedding into a box-less element - a tab panel still on
+    // display: none - pins the chart at zero width for good, so wait instead.
+    if (!this.element.clientWidth) {
+      this.waitForWidth()
+      return
+    }
+
     this.theme = document.documentElement.dataset.theme
     if (typeof vegaEmbed !== "function") {
       this.fail()
@@ -56,6 +67,20 @@ export default class extends Controller {
       .catch(() => {
         if (token === this.generation) this.fail()
       })
+  }
+
+  // one-shot: a ResizeObserver reports 0x0 while the element has no box and
+  // fires again the moment it gets one. Disconnected before rendering so the
+  // embedded view's own size changes cannot bounce back in here.
+  waitForWidth() {
+    if (this.sizeObserver) return
+    this.sizeObserver = new ResizeObserver(() => {
+      if (!this.element.clientWidth) return
+      this.sizeObserver.disconnect()
+      this.sizeObserver = null
+      this.render()
+    })
+    this.sizeObserver.observe(this.element)
   }
 
   // drop the old view before embedding a new one - vegaEmbed owns a canvas,

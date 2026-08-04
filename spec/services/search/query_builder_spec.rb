@@ -352,6 +352,54 @@ RSpec.describe Search::QueryBuilder, type: :service do
         end
       end
 
+      describe 'ignored:me' do
+        let!(:ignored_topic) { create(:topic) }
+        let!(:normal_topic) { create(:topic) }
+        let!(:ignored_starred_topic) { create(:topic) }
+
+        before do
+          create(:topic_ignore, user: user, topic: ignored_topic)
+          create(:topic_ignore, user: user, topic: ignored_starred_topic)
+          create(:topic_star, user: user, topic: ignored_starred_topic)
+        end
+
+        it 'returns only ignored topics when ignored:me is used' do
+          result = build_query('ignored:me')
+          expect(result.relation).to include(ignored_topic)
+          expect(result.relation).to include(ignored_starred_topic)
+          expect(result.relation).not_to include(normal_topic)
+        end
+      end
+
+      describe 'default ignore exclusion' do
+        let!(:ignored_topic) { create(:topic) }
+        let!(:normal_topic) { create(:topic) }
+        let!(:ignored_starred_topic) { create(:topic) }
+
+        before do
+          create(:topic_ignore, user: user, topic: ignored_topic)
+          create(:topic_ignore, user: user, topic: ignored_starred_topic)
+          create(:topic_star, user: user, topic: ignored_starred_topic)
+        end
+
+        it 'excludes ignored topics from general search results' do
+          result = build_query('starred:me')
+          expect(result.relation).not_to include(ignored_topic)
+        end
+
+        it 'includes ignored-but-starred topics (star wins)' do
+          result = build_query('starred:me')
+          expect(result.relation).to include(ignored_starred_topic)
+        end
+
+        it 'excludes ignored topics from a general text search' do
+          ignored_topic.update!(title: 'unique-xyzzy-word')
+          create(:message, topic: ignored_topic, body: 'unique-xyzzy-word content')
+          result = build_query('unique-xyzzy-word')
+          expect(result.relation).not_to include(ignored_topic)
+        end
+      end
+
       describe 'commitfest: selector' do
         let!(:tag) { create(:commitfest_tag) }
         let!(:commitfest_first) { create(:commitfest, name: 'PGX-Final') }

@@ -19,6 +19,7 @@ saved_searches
 team_members
 teams
 thread_awarenesses
+topic_ignores
 topic_merges
 topic_stars
 user_features

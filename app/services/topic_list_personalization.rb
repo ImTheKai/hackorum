@@ -6,6 +6,7 @@ class TopicListPersonalization
     preload_states
     preload_note_counts
     preload_star_data
+    preload_ignore_data
     preload_participation
   end
 
@@ -27,6 +28,10 @@ class TopicListPersonalization
 
   def star_data_for(topic)
     @star_data[topic.id] || { starred_by_me: false, team_starrers: [] }
+  end
+
+  def ignored_for(topic)
+    @ignored_topic_ids.include?(topic.id)
   end
 
   private
@@ -104,6 +109,13 @@ class TopicListPersonalization
         team_starrers: team_stars[topic.id] || []
       }
     end
+  end
+
+  def preload_ignore_data
+    @ignored_topic_ids = Set.new
+    return if topic_ids.empty?
+
+    @ignored_topic_ids = TopicIgnore.where(user:, topic_id: topic_ids).pluck(:topic_id).to_set
   end
 
   def preload_participation

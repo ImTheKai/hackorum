@@ -17,6 +17,7 @@
   - participation = personalization ? personalization.participation_for(topic) : {}
   - team_readers = personalization ? personalization.team_readers_for(topic) : []
   - star_data = personalization ? personalization.star_data_for(topic) : {}
+  - ignored = personalization ? personalization.ignored_for(topic) : false
   - row_class = [ "topic-row" ]
   - if personalization
     - status = state[:status] || "new"
@@ -24,7 +25,7 @@
     - row_class << "has-new-replies" if status.to_s == "reading"
 
   tr id=dom_id(topic) class=row_class.join(" ") data-topic-id=topic.id data-last-message-id=topic.last_message_id
-    = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data }
+    = render partial: "topics/status_cell", locals: { topic: topic, state: state, note_count: note_count, team_readers: team_readers, star_data: star_data, ignored: ignored }
     td.topic-mailing-lists data-label="Mailing Lists"
       - topic_lists = @topic_mailing_lists_map&.dig(topic.id) || []
       - if topic_lists.any?

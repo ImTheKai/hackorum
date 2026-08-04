@@ -1,14 +1,15 @@
 class TopicsController < ApplicationController
   include DraftSidebarLoader
 
-  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :latest_patchset, :summary, :messages ]
-  before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar ]
+  before_action :set_topic, only: [ :show, :message_batch, :attachments_sidebar, :patchsets_sidebar, :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore, :latest_patchset, :summary, :messages ]
+  before_action :require_authentication, only: [ :aware, :read_all, :unread_all, :star, :unstar, :ignore, :unignore ]
 
   TOPIC_LIST_PRELOADS = [ :creator, { creator_person: :default_alias }, { last_sender_person: :default_alias } ].freeze
 
   def index
     @search_query = nil
     base_query = Topic.includes(*TOPIC_LIST_PRELOADS)
+    base_query = apply_default_ignore_filter(base_query) if user_signed_in?
 
     apply_cursor_pagination(base_query)
     preload_topic_participants
@@ -224,6 +225,30 @@ class TopicsController < ApplicationController
     respond_to do |format|
       format.turbo_stream { render :update_star_state }
       format.json { render json: { starred: false } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  end
+
+  def ignore
+    TopicIgnore.find_or_create_by!(user: current_user, topic: @topic)
+    respond_to do |format|
+      format.turbo_stream { render :update_ignore_state }
+      format.json { render json: { ignored: true } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  rescue ActiveRecord::RecordNotUnique
+    respond_to do |format|
+      format.turbo_stream { render :update_ignore_state }
+      format.json { render json: { ignored: true } }
+      format.html { redirect_to topic_path(@topic) }
+    end
+  end
+
+  def unignore
+    TopicIgnore.where(user: current_user, topic: @topic).destroy_all
+    respond_to do |format|
+      format.turbo_stream { render :update_ignore_state }
+      format.json { render json: { ignored: false } }
       format.html { redirect_to topic_path(@topic) }
     end
   end
@@ -567,6 +592,16 @@ class TopicsController < ApplicationController
 
       segment_index += 1
     end
+  end
+
+  # Starring always wins: an ignored-and-starred topic still appears.
+  def apply_default_ignore_filter(base_query)
+    user_id = current_user.id
+    base_query.where(
+      "topics.id NOT IN (SELECT topic_id FROM topic_ignores WHERE user_id = ?) " \
+      "OR topics.id IN (SELECT topic_id FROM topic_stars WHERE user_id = ?)",
+      user_id, user_id
+    )
   end
 
   def apply_cursor_pagination(base_query)

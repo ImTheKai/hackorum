@@ -16,7 +16,7 @@ module Search
 
     AUTHOR_SELECTORS = %i[from starter last_from].freeze
 
-    STATE_SELECTORS = %i[unread read reading new starred notes].freeze
+    STATE_SELECTORS = %i[unread read reading new starred ignored notes].freeze
 
     CONTENT_SELECTORS = %i[title body].freeze
 

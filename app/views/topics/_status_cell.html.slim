@@ -6,6 +6,7 @@
   - reading_unread_count = [total_count - read_count, 0].max
 - status_class = "status-#{status}"
 - status_class = "#{status_class} has-new-replies" if status.to_s == "reading"
+- ignored = local_assigns[:ignored] || false
 - star_data = star_data || {}
 - icons_html = capture do
   - if status.to_s == "reading"
@@ -13,6 +14,7 @@
       i.fa-solid.fa-envelope
       span.topic-icon-badge.topic-icon-badge-sup = reading_unread_count
   = star_icon_html(topic: topic, star_data: star_data)
+  = ignore_icon_html(topic: topic, ignored: ignored)
   = note_icon_html(topic: topic, count: note_count.to_i)
   = team_readers_icon_html(topic: topic, readers: team_readers)
   - commit_summary = @commit_summaries&.dig(topic.id)

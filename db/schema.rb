@@ -797,6 +797,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.index ["user_id"], name: "index_thread_awarenesses_on_user_id"
   end
 
+  create_table "topic_ignores", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_topic_ignores_on_topic_id"
+    t.index ["user_id", "topic_id"], name: "index_topic_ignores_on_user_id_and_topic_id", unique: true
+    t.index ["user_id"], name: "index_topic_ignores_on_user_id"
+  end
+
   create_table "topic_mailing_lists", force: :cascade do |t|
     t.bigint "topic_id", null: false
     t.bigint "mailing_list_id", null: false
@@ -843,6 +853,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.index ["topic_id"], name: "index_topic_stars_on_topic_id"
     t.index ["user_id", "topic_id"], name: "index_topic_stars_on_user_id_and_topic_id", unique: true
     t.index ["user_id"], name: "index_topic_stars_on_user_id"
+  end
+
+  create_table "topic_subscriptions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.string "unsubscribe_token", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id"], name: "index_topic_subscriptions_on_topic_id"
+    t.index ["unsubscribe_token"], name: "index_topic_subscriptions_on_unsubscribe_token", unique: true
+    t.index ["user_id", "topic_id"], name: "index_topic_subscriptions_on_user_id_and_topic_id", unique: true
+    t.index ["user_id"], name: "index_topic_subscriptions_on_user_id"
   end
 
   create_table "topics", force: :cascade do |t|
@@ -906,6 +928,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
     t.datetime "deleted_at"
     t.bigint "person_id", null: false
     t.enum "mention_restriction", default: "anyone", null: false, enum_type: "user_mention_restriction"
+    t.boolean "bold_unread_threads", default: false, null: false
     t.boolean "open_threads_at_first_unread", default: false, null: false
     t.datetime "last_login_at"
     t.boolean "collapse_read_messages", default: true, null: false
@@ -918,7 +941,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "admin_email_changes", "users", column: "performed_by_id"
   add_foreign_key "admin_email_changes", "users", column: "target_user_id"
   add_foreign_key "aliases", "people"
-  add_foreign_key "aliases", "users", validate: false
+  add_foreign_key "aliases", "users"
   add_foreign_key "attachments", "messages"
   add_foreign_key "commit_files", "commits"
   add_foreign_key "commit_people", "commits"
@@ -945,7 +968,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "message_read_ranges", "topics"
   add_foreign_key "message_read_ranges", "users"
   add_foreign_key "messages", "aliases", column: "sender_id"
-  add_foreign_key "messages", "identities", column: "sent_via_identity_id", validate: false
+  add_foreign_key "messages", "identities", column: "sent_via_identity_id"
   add_foreign_key "messages", "messages", column: "reply_to_id"
   add_foreign_key "messages", "people", column: "sender_person_id"
   add_foreign_key "messages", "topics"
@@ -978,6 +1001,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "team_members", "users"
   add_foreign_key "thread_awarenesses", "topics"
   add_foreign_key "thread_awarenesses", "users"
+  add_foreign_key "topic_ignores", "topics"
+  add_foreign_key "topic_ignores", "users"
   add_foreign_key "topic_mailing_lists", "mailing_lists"
   add_foreign_key "topic_mailing_lists", "topics"
   add_foreign_key "topic_merges", "topics", column: "source_topic_id"
@@ -987,12 +1012,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_141138) do
   add_foreign_key "topic_participants", "topics"
   add_foreign_key "topic_stars", "topics"
   add_foreign_key "topic_stars", "users"
+  add_foreign_key "topic_subscriptions", "topics"
+  add_foreign_key "topic_subscriptions", "users"
   add_foreign_key "topics", "aliases", column: "creator_id"
   add_foreign_key "topics", "messages", column: "last_message_id"
   add_foreign_key "topics", "people", column: "creator_person_id"
   add_foreign_key "topics", "people", column: "last_sender_person_id"
   add_foreign_key "topics", "topics", column: "merged_into_topic_id"
-  add_foreign_key "user_features", "users", validate: false
+  add_foreign_key "user_features", "users"
   add_foreign_key "user_tokens", "users"
   add_foreign_key "users", "people"
 end
